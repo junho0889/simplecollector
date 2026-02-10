@@ -1,0 +1,153 @@
+# =============================================================================
+# Simple Collector - MkDocs Configuration
+# =============================================================================
+# Copyright (c) 2024-2026 NEUROSENSE Inc. All Rights Reserved.
+# =============================================================================
+
+site_name: Simple Collector
+site_description: Industrial Data Collection Framework by NEUROSENSE
+site_author: NEUROSENSE Inc.
+site_url: https://docs.neurosense.io/simple-collector
+
+# Copyright
+copyright: |
+  Copyright &copy; 2024-2026 <a href="https://neurosense.io" target="_blank">NEUROSENSE Inc.</a>
+  All Rights Reserved.
+
+# Theme Configuration
+theme:
+  name: material
+  custom_dir: docs/overrides
+  language: ko
+  palette:
+    - scheme: default
+      primary: cyan
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: 다크 모드로 전환
+    - scheme: slate
+      primary: cyan
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: 라이트 모드로 전환
+  font:
+    text: Noto Sans KR
+    code: JetBrains Mono
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.copy
+    - content.code.annotate
+  logo: assets/logo.png
+  favicon: assets/favicon.ico
+
+# Plugins
+plugins:
+  - search:
+      lang:
+        - ko
+        - en
+  - minify:
+      minify_html: true
+
+# Markdown Extensions
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Extra CSS/JS
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+# Extra Configuration
+extra:
+  version:
+    provider: mike
+    default: stable
+  generator: false
+
+# Navigation Structure
+nav:
+  - Home:
+    - index.md
+    - changelog.md
+    - license.md
+
+  - Getting Started:
+    - getting-started/index.md
+    - getting-started/installation.md
+    - getting-started/quickstart.md
+    - getting-started/docker.md
+    - getting-started/troubleshooting.md
+
+  - Configuration:
+    - configuration/index.md
+    - configuration/yaml-config.md
+    - configuration/tags-csv.md
+    - configuration/environment.md
+    - configuration/logging.md
+
+  - Protocols:
+    - protocols/index.md
+    - protocols/modbus.md
+    - protocols/mc-protocol.md
+    - protocols/fenet.md
+    - protocols/s7-protocol.md
+    - protocols/opcua.md
+
+  - Publishers:
+    - publishers/index.md
+    - publishers/database.md
+    - publishers/mqtt.md
+    - publishers/json-file.md
+
+  - Architecture:
+    - architecture/index.md

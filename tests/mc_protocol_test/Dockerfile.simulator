@@ -1,0 +1,7 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY mc_simulator.py .
+
+CMD ["python", "-u", "mc_simulator.py"]

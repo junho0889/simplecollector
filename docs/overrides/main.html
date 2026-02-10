@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block header %}
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <!-- Logo -->
+    <a href="{{ nav.homepage.url | url }}" title="{{ config.site_name | e }}" class="md-header__button md-logo" aria-label="{{ config.site_name }}">
+      {% include "partials/logo.html" %}
+    </a>
+
+    <!-- Inline Navigation Tabs -->
+    <div class="md-header__nav" data-md-component="header-nav">
+      {% if nav %}
+        <nav class="md-header__tabs">
+          <ul class="md-header__tabs-list">
+            {% for nav_item in nav %}
+              {% if not loop.first %}
+                {% if nav_item.children %}
+                  <li class="md-header__tabs-item">
+                    <a href="{{ nav_item.children[0].url | url }}" class="md-header__tabs-link{% if nav_item.active %} md-header__tabs-link--active{% endif %}">
+                      {{ nav_item.title }}
+                    </a>
+                  </li>
+                {% elif nav_item.url %}
+                  <li class="md-header__tabs-item">
+                    <a href="{{ nav_item.url | url }}" class="md-header__tabs-link{% if nav_item.active %} md-header__tabs-link--active{% endif %}">
+                      {{ nav_item.title }}
+                    </a>
+                  </li>
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          </ul>
+        </nav>
+      {% endif %}
+    </div>
+
+    <!-- Search (without separate icon button) -->
+    {% include "partials/search.html" %}
+
+    <!-- Single Theme Toggle Button -->
+    <button class="md-header__button theme-toggle" id="theme-toggle" title="테마 전환" aria-label="테마 전환">
+      <svg class="theme-icon-light" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+        <path fill="currentColor" d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69Z"/>
+      </svg>
+      <svg class="theme-icon-dark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+        <path fill="currentColor" d="M17.75 4.09L15.22 6.03l-2.28-1.1.81 2.45-2.02 1.69 2.54.11.83 2.44 1.1-2.29 2.54-.12-2.01-1.68.82-2.44M21.25 11l-1.5 1.25 1.25 1.5-1.5 1.25 1.5 1.25-1.5 1.25 1.5 1.25-1.25 1.5 1.5 1.25-5 .5-1.25-1.5-1.5-1.25 1.25-1.5-1.25-1.5 1.25-1.5-1.25-1.5 1.25-1.5L12.75 11l.5-5 1.5 1.25L16 6l1.25 1.5L18.5 6l1.25 1.5 1.5-1.25.5 5M9.5 22c-4.14 0-7.5-3.36-7.5-7.5 0-.97.19-1.88.53-2.72A7.007 7.007 0 0 0 9.5 17c0-.97-.19-1.88-.53-2.72A7.007 7.007 0 0 0 2 14c0-3.9 3.16-7.06 7.06-7.06 1.06 0 2.07.23 2.97.65-.51.89-.78 1.89-.78 2.91 0 3.03 2.47 5.5 5.5 5.5.89 0 1.73-.21 2.47-.59.48.97.78 2.04.78 3.09 0 4.14-3.36 7.5-7.5 7.5z"/>
+      </svg>
+    </button>
+
+    <!-- Hidden palette form for Material theme compatibility -->
+    {% if config.theme.palette %}
+      {% if not config.theme.palette is mapping %}
+        <form class="md-header__option" data-md-component="palette" style="display:none !important;">
+          {% for option in config.theme.palette %}
+            {% set scheme = option.scheme | d("default", true) %}
+            <input class="md-option" data-md-color-media="{{ option.media }}" data-md-color-scheme="{{ scheme }}" data-md-color-primary="{{ option.primary }}" data-md-color-accent="{{ option.accent }}" {% if option.toggle %}aria-label="{{ option.toggle.name }}"{% endif %} type="radio" name="__palette" id="__palette_{{ loop.index0 }}">
+          {% endfor %}
+        </form>
+      {% endif %}
+    {% endif %}
+  </nav>
+</header>
+{% endblock %}
+
+{% block tabs %}
+<!-- Tabs block is empty - tabs are now in header -->
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+// Theme toggle functionality
+(function() {
+  const toggle = document.getElementById('theme-toggle');
+  const palette = document.querySelector('[data-md-component="palette"]');
+
+  if (!toggle || !palette) return;
+
+  const inputs = palette.querySelectorAll('input[name="__palette"]');
+  if (inputs.length < 2) return;
+
+  // Get current scheme
+  function getCurrentScheme() {
+    return document.body.getAttribute('data-md-color-scheme') || 'default';
+  }
+
+  // Update icon visibility based on current theme
+  function updateIcon() {
+    const scheme = getCurrentScheme();
+    const isDark = scheme === 'slate';
+    toggle.classList.toggle('is-dark', isDark);
+  }
+
+  // Toggle theme on click
+  toggle.addEventListener('click', function() {
+    const current = getCurrentScheme();
+    const isDark = current === 'slate';
+    const targetIndex = isDark ? 0 : 1;
+
+    // Click the appropriate radio input to trigger Material theme change
+    if (inputs[targetIndex]) {
+      inputs[targetIndex].click();
+    }
+
+    // Update icon after theme change
+    setTimeout(updateIcon, 50);
+  });
+
+  // Initialize icon on page load
+  updateIcon();
+
+  // Watch for external theme changes
+  const observer = new MutationObserver(updateIcon);
+  observer.observe(document.body, {
+    attributes: true,
+    attributeFilter: ['data-md-color-scheme']
+  });
+})();
+</script>
+{% endblock %}

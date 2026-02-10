@@ -1,0 +1,2 @@
+tag_id,tag_name,memory,address,data_type,collection_group,scale,offset,decimals,word_length,format,unit,description
+1,D0,D,0,int16,fast,1,0,,,,,D0

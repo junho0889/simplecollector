@@ -1,0 +1,60 @@
+# Simple Collector - PLC-A Test Configuration
+# ============================================================
+# 1001개 태그 테스트용 설정
+
+collector:
+  plc_id: 1
+  name: "PLC-A_Test"
+  tags_file: "config/tags_01_PLC-A.csv"
+
+  protocol:
+    type: "mc_protocol"
+    host: "192.168.0.1"
+    port: 5007
+    unit_id: 1
+    timeout_ms: 5000
+    reconnect_interval_ms: 3000
+
+    extra:
+      plc_series: "iq-r"
+      frame_type: "binary_3e"
+      network_no: 0
+      pc_no: 0xFF
+      unit_io: 0x03FF
+      unit_station: 0
+      max_address_gap: 200
+
+  collection_groups:
+    - name: "fast"
+      interval_ms: 2000
+      timeout_ms: 5000
+      retry_count: 2
+
+buffer:
+  max_size: 10000
+  flush_threshold: 1000
+  flush_interval_ms: 3000
+
+publisher:
+  batch_size: 1100
+  retry_count: 3
+  retry_delay_ms: 1000
+
+  database:
+    enabled: false
+
+  mqtt:
+    enabled: false
+
+  json_file:
+    enabled: true
+    file_path: "data/output.json"
+    mode: "append"
+    max_size_mb: 10
+    backup_count: 5
+
+logging:
+  level: "DEBUG"
+  collection_level: "DEBUG"
+  publish_level: "INFO"
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"

@@ -1,0 +1,72 @@
+version: "3.8"
+
+services:
+  # MC Protocol Simulator (PLC)
+  mc-simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile.simulator
+    container_name: mc-simulator
+    ports:
+      - "5000:5000"
+    networks:
+      - collector-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost',5000)); s.close()"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # TimescaleDB
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: timescaledb
+    environment:
+      POSTGRES_USER: collector
+      POSTGRES_PASSWORD: collector123
+      POSTGRES_DB: collector
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - timescale_data:/var/lib/postgresql/data
+    networks:
+      - collector-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U collector -d collector"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # Collector
+  collector:
+    build:
+      context: ../..
+      dockerfile: tests/mc_protocol_test/Dockerfile.collector
+    container_name: collector
+    depends_on:
+      mc-simulator:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    environment:
+      - PLC_HOST=mc-simulator
+      - PLC_PORT=5000
+      - DB_HOST=timescaledb
+      - DB_PORT=5432
+      - DB_USER=collector
+      - DB_PASSWORD=collector123
+      - DB_NAME=collector
+    volumes:
+      - ./config:/app/config
+    networks:
+      - collector-net
+
+networks:
+  collector-net:
+    driver: bridge
+
+volumes:
+  timescale_data:
