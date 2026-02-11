@@ -11,7 +11,7 @@ Configuration Structure:
 
 YAML 설정 구조:
     - collector: 수집기 설정 (프로토콜, 접속정보, 수집주기)
-    - publisher: 발행기 설정 (DB, MQTT 접속정보)
+    - publisher: 발행기 설정 (RabbitMQ 접속정보)
     - buffer: 버퍼 설정 (크기, 배치, 임계값)
     - logging: 로그 설정 (레벨, 파일경로)
 
@@ -30,7 +30,7 @@ Usage:
     tags = ConfigLoader.load_tags("config/tags.csv")
 
     # 환경변수 치환
-    db_host = config.publisher.database.host  # 환경변수 적용됨
+    rmq_host = config.publisher.rabbitmq.host  # 환경변수 적용됨
 """
 
 import csv
@@ -208,91 +208,6 @@ class CollectorConfig:
 
 
 @dataclass
-class DatabaseConfig:
-    """
-    데이터베이스 설정.
-
-    Attributes:
-        enabled: 활성화 여부
-        type: DB 유형 (postgresql, timescaledb)
-        host: DB 호스트
-        port: DB 포트
-        database: 데이터베이스 이름
-        user: 사용자명
-        password: 비밀번호
-        pool_size: 커넥션 풀 크기
-        table_name: 테이블 이름 (기본 데이터 테이블)
-        master_sync_enabled: 마스터 테이블 동기화 활성화 여부
-        master_sync_schema: 마스터 테이블 스키마 이름
-        events_file: 이벤트 마스터 CSV 파일 경로
-        group_tables: 그룹별 테이블 매핑 (예: {"fast": "plc_data_fast"})
-    """
-    enabled: bool = True
-    type: str = "timescaledb"
-    host: str = "localhost"
-    port: int = 5432
-    database: str = "collector"
-    user: str = "collector"
-    password: str = ""
-    pool_size: int = 5
-    table_name: str = "plc_data_integrated"
-    master_sync_enabled: bool = False
-    master_sync_schema: str = "master"
-    events_file: str = ""
-    group_tables: Dict[str, str] = field(default_factory=dict)
-
-
-@dataclass
-class MqttConfig:
-    """
-    MQTT 설정.
-
-    Attributes:
-        enabled: 활성화 여부
-        host: MQTT 브로커 호스트
-        port: MQTT 브로커 포트
-        client_id: 클라이언트 ID
-        username: 사용자명
-        password: 비밀번호
-        topic: 발행 토픽
-        qos: QoS 레벨 (0, 1, 2)
-        use_tls: TLS 사용 여부
-        encrypt_payload: 페이로드 암호화 여부
-        encryption_key: 암호화 키 (base64)
-    """
-    enabled: bool = False
-    host: str = "localhost"
-    port: int = 1883
-    client_id: str = "collector"
-    username: str = ""
-    password: str = ""
-    topic: str = "plc/data"
-    qos: int = 1
-    use_tls: bool = False
-    encrypt_payload: bool = False
-    encryption_key: str = ""
-
-
-@dataclass
-class JsonFileConfig:
-    """
-    JSON 파일 발행기 설정.
-
-    Attributes:
-        enabled: 활성화 여부
-        file_path: JSON 파일 경로
-        mode: 쓰기 모드 ('append' 또는 'overwrite')
-        max_size_mb: 최대 파일 크기 (MB), append 모드에서 파일 로테이션에 사용
-        backup_count: 백업 파일 개수
-    """
-    enabled: bool = False
-    file_path: str = "data/output.json"
-    mode: str = "append"  # 'append' or 'overwrite'
-    max_size_mb: int = 10
-    backup_count: int = 5
-
-
-@dataclass
 class RabbitMQConfig:
     """
     RabbitMQ 발행기 설정.
@@ -337,16 +252,11 @@ class PublisherConfig:
     발행기 설정.
 
     Attributes:
-        database: 데이터베이스 설정
-        mqtt: MQTT 설정
-        json_file: JSON 파일 설정
+        rabbitmq: RabbitMQ 설정
         publish_interval_ms: 발행 주기 (밀리초)
         max_retries: 최대 재시도 횟수
         retry_delay_ms: 재시도 간격 (밀리초)
     """
-    database: DatabaseConfig = field(default_factory=DatabaseConfig)
-    mqtt: MqttConfig = field(default_factory=MqttConfig)
-    json_file: JsonFileConfig = field(default_factory=JsonFileConfig)
     rabbitmq: RabbitMQConfig = field(default_factory=RabbitMQConfig)
     publish_interval_ms: int = 1000
     max_retries: int = 3
@@ -397,7 +307,7 @@ class ConfigLoader:
         tags = ConfigLoader.load_tags("config/tags.csv")
 
         # 환경변수 치환 확인
-        print(config.publisher.database.host)
+        print(config.publisher.rabbitmq.host)
     """
 
     # 환경변수 패턴: ${VAR_NAME} 또는 ${VAR_NAME:default_value}
@@ -460,7 +370,9 @@ class ConfigLoader:
         tags: List[TagDefinition] = []
 
         with open(tags_path, 'r', encoding='utf-8-sig') as f:
-            reader = csv.DictReader(f)
+            # '#'으로 시작하는 주석 행 제거
+            lines = [line for line in f if not line.strip().startswith('#')]
+            reader = csv.DictReader(lines)
 
             for row_num, row in enumerate(reader, start=2):  # 헤더가 1번째 줄
                 try:
@@ -558,6 +470,9 @@ class ConfigLoader:
                 timeout_ms=int(g.get('timeout_ms', 5000)),
                 retry_count=int(g.get('retry_count', 3)),
                 retry_delay_ms=int(g.get('retry_delay_ms', 1000)),
+                mode=g.get('mode', 'polling'),
+                deadband=float(g.get('deadband', 0.0)),
+                deadband_type=g.get('deadband_type', 'absolute'),
             )
             for g in groups_list
         ]
@@ -573,45 +488,6 @@ class ConfigLoader:
 
         # Publisher 설정
         publisher_dict = config_dict.get('publisher', {})
-        db_dict = publisher_dict.get('database', {})
-        mqtt_dict = publisher_dict.get('mqtt', {})
-
-        database = DatabaseConfig(
-            enabled=db_dict.get('enabled', True),
-            type=db_dict.get('type', 'timescaledb'),
-            host=db_dict.get('host', 'localhost'),
-            port=int(db_dict.get('port', 5432)),
-            database=db_dict.get('database', 'collector'),
-            user=db_dict.get('user', 'collector'),
-            password=db_dict.get('password', ''),
-            pool_size=int(db_dict.get('pool_size', 5)),
-            table_name=db_dict.get('table_name', 'plc_data_integrated'),
-            master_sync_enabled=db_dict.get('master_sync_enabled', False),
-            master_sync_schema=db_dict.get('master_sync_schema', 'test'),
-        )
-
-        mqtt = MqttConfig(
-            enabled=mqtt_dict.get('enabled', False),
-            host=mqtt_dict.get('host', 'localhost'),
-            port=int(mqtt_dict.get('port', 1883)),
-            client_id=mqtt_dict.get('client_id', 'collector'),
-            username=mqtt_dict.get('username', ''),
-            password=mqtt_dict.get('password', ''),
-            topic=mqtt_dict.get('topic', 'plc/data'),
-            qos=int(mqtt_dict.get('qos', 1)),
-            use_tls=mqtt_dict.get('use_tls', False),
-            encrypt_payload=mqtt_dict.get('encrypt_payload', False),
-            encryption_key=mqtt_dict.get('encryption_key', ''),
-        )
-
-        json_file_dict = publisher_dict.get('json_file', {})
-        json_file = JsonFileConfig(
-            enabled=json_file_dict.get('enabled', False),
-            file_path=json_file_dict.get('file_path', 'data/output.json'),
-            mode=json_file_dict.get('mode', 'append'),
-            max_size_mb=int(json_file_dict.get('max_size_mb', 10)),
-            backup_count=int(json_file_dict.get('backup_count', 5)),
-        )
 
         rabbitmq_dict = publisher_dict.get('rabbitmq', {})
         rabbitmq = RabbitMQConfig(
@@ -633,9 +509,6 @@ class ConfigLoader:
         )
 
         publisher = PublisherConfig(
-            database=database,
-            mqtt=mqtt,
-            json_file=json_file,
             rabbitmq=rabbitmq,
             publish_interval_ms=int(publisher_dict.get('publish_interval_ms', 1000)),
             max_retries=int(publisher_dict.get('max_retries', 3)),
@@ -892,7 +765,7 @@ class ConfigLoader:
                     f"{group.interval_ms}ms (min: 10ms)"
                 )
 
-        # Publisher 검사 (둘 다 disabled면 로그만 출력 - 허용)
+        # Publisher 검사 (disabled면 로그만 출력 - 허용)
 
         # Buffer 검사
         if config.buffer.batch_size > config.buffer.max_size:

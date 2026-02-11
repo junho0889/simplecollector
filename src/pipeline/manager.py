@@ -34,13 +34,13 @@ Pipeline Structure:
     - Collector: 데이터 수집 (프로토콜별)
     - Processor: 데이터 처리 (파싱, 스케일링)
     - Buffer: 데이터 임시 저장
-    - Publisher: 데이터 발행 (DB, MQTT)
+    - Publisher: 데이터 발행 (RabbitMQ)
 
 Usage:
     # 컴포넌트 생성
     collector = ModbusCollector(plc_id=1, name="PLC1", config=collector_config)
     processor = ModbusProcessor("processor1")
-    publisher = DatabasePublisher("db_publisher", publisher_config)
+    publisher = RabbitMQPublisher("rmq_publisher", publisher_config)
 
     # 파이프라인 생성
     pipeline = Pipeline(

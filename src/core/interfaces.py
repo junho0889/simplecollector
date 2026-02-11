@@ -347,6 +347,9 @@ class ProcessedData:
 
     quality_code: int = 1                  # 1=정상, 0=통신이상
 
+    # 메타데이터 (DB 직접 컬럼 아님, 라우팅용)
+    collection_group: str = "default"      # 수집 그룹 (fast, alm, log 등)
+
     @property
     def value(self) -> Any:
         """주요 값 반환 (하위 호환성)."""
@@ -389,6 +392,10 @@ class ProcessedData:
 
         # 단일 value 필드 (대표값)
         result["value"] = self.value
+
+        # 수집 그룹 (publisher에서 테이블 라우팅용)
+        if self.collection_group != "default":
+            result["collection_group"] = self.collection_group
 
         return result
 
@@ -638,13 +645,10 @@ class IPublisher(ABC):
         - 설정된 간격 또는 버퍼 임계값 도달 시 전송
 
     Example:
-        class DatabasePublisher(IPublisher):
+        class RabbitMQPublisher(IPublisher):
             async def publish(self, data: List[ProcessedData]) -> bool:
-                async with self._pool.acquire() as conn:
-                    await conn.executemany(
-                        "INSERT INTO plc_data_integrated VALUES ($1,$2,$3,$4,$5)",
-                        [d.to_tuple() for d in data]
-                    )
+                message = aio_pika.Message(body=serialized_data)
+                await self._exchange.publish(message, routing_key)
                 return True
     """
 

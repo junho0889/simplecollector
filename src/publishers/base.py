@@ -29,21 +29,20 @@ Architecture:
     │                                        │
     │  ┌────────────┐    ┌────────────────┐ │
     │  │   Buffer   │───▶│ External System│ │
-    │  └────────────┘    │  (DB/MQTT/...)  │ │
+    │  └────────────┘    │   (RabbitMQ)    │ │
     │                    └────────────────┘ │
     └──────────────────────────────────────┘
 
 Extension:
     각 발행 대상별 구현체는 BasePublisher를 상속받아 구현합니다.
 
-    class DatabasePublisher(BasePublisher):
+    class RabbitMQPublisher(BasePublisher):
         async def _do_connect(self) -> bool:
-            self._pool = await asyncpg.create_pool(...)
+            self._connection = await aio_pika.connect(...)
             return True
 
         async def _do_publish(self, data: List[ProcessedData]) -> bool:
-            async with self._pool.acquire() as conn:
-                await conn.executemany(INSERT_SQL, ...)
+            await self._exchange.publish(message, routing_key)
             return True
 
 Example:

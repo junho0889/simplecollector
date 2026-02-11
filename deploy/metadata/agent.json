@@ -1,0 +1,69 @@
+{
+  "name": "collectorhub-agent",
+  "display_name": "CollectorHub Agent",
+  "description": "Collector Management API - Docker & RabbitMQ Control",
+  "version": "1.0.0",
+  "service_type": "agent",
+  "icon": "settings",
+  "environment": [
+    {
+      "key": "AGENT_ID",
+      "default": "agent-01",
+      "description": "Agent unique ID",
+      "required": true
+    },
+    {
+      "key": "AGENT_NAME",
+      "default": "Collector Agent",
+      "description": "Agent display name",
+      "required": false
+    },
+    {
+      "key": "AGENT_COLLECTOR_CONFIG_PATH",
+      "default": "/opt/collector/config",
+      "description": "Collector config directory",
+      "required": false
+    },
+    {
+      "key": "AGENT_DOCKER_SOCKET",
+      "default": "/var/run/docker.sock",
+      "description": "Docker socket path",
+      "required": true
+    },
+    {
+      "key": "AGENT_RABBITMQ_HOST",
+      "default": "rabbitmq",
+      "description": "RabbitMQ host",
+      "required": false
+    },
+    {
+      "key": "AGENT_RABBITMQ_MANAGEMENT_PORT",
+      "default": "15672",
+      "description": "RabbitMQ Management API port",
+      "required": false
+    },
+    {
+      "key": "AGENT_RABBITMQ_ADMIN_USER",
+      "default": "admin",
+      "description": "RabbitMQ admin username",
+      "required": false
+    },
+    {
+      "key": "AGENT_RABBITMQ_ADMIN_PASSWORD",
+      "default": "admin",
+      "description": "RabbitMQ admin password",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "volumes": [
+    {"container_path": "/var/run/docker.sock", "description": "Docker socket", "mode": "rw"},
+    {"container_path": "/opt/collector/config", "description": "Collector configs", "mode": "rw"},
+    {"container_path": "/opt/collector/backups", "description": "Config backups", "mode": "rw"}
+  ],
+  "ports": [
+    {"container_port": 8080, "description": "Agent API"}
+  ],
+  "depends_on": [],
+  "network": "collector-net"
+}

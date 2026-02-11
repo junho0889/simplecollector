@@ -1,0 +1,31 @@
+tag_id,tag_name,memory,address,data_type,collection_group,scale,offset,decimals,word_length,format,unit,description
+1,HR_0000,D,0,uint16,fast,1,0,0,,,,Holding Register 0
+2,HR_0001,D,1,uint16,fast,1,0,0,,,,Holding Register 1
+3,HR_0002,D,2,uint16,fast,1,0,0,,,,Holding Register 2
+4,HR_0003,D,3,uint16,fast,1,0,0,,,,Holding Register 3
+5,HR_0004,D,4,uint16,fast,1,0,0,,,,Holding Register 4
+6,HR_0005,D,5,uint16,fast,1,0,0,,,,Holding Register 5
+7,HR_0006,D,6,uint16,fast,1,0,0,,,,Holding Register 6
+8,HR_0007,D,7,uint16,fast,1,0,0,,,,Holding Register 7
+9,HR_0008,D,8,uint16,fast,1,0,0,,,,Holding Register 8
+10,HR_0009,D,9,uint16,fast,1,0,0,,,,Holding Register 9
+11,HR_0010,D,10,uint16,slow,1,0,0,,,,Holding Register 10
+12,HR_0011,D,11,uint16,slow,1,0,0,,,,Holding Register 11
+13,HR_0012,D,12,uint16,slow,1,0,0,,,,Holding Register 12
+14,HR_0013,D,13,uint16,slow,1,0,0,,,,Holding Register 13
+15,HR_0014,D,14,uint16,slow,1,0,0,,,,Holding Register 14
+16,HR_0015,D,15,uint16,slow,1,0,0,,,,Holding Register 15
+17,HR_0016,D,16,uint16,slow,1,0,0,,,,Holding Register 16
+18,HR_0017,D,17,uint16,slow,1,0,0,,,,Holding Register 17
+19,HR_0018,D,18,uint16,slow,1,0,0,,,,Holding Register 18
+20,HR_0019,D,19,uint16,slow,1,0,0,,,,Holding Register 19
+100,ALM_EMG_Stop,D,200,bool,alm,1,0,,,,,비상정지 알람
+101,ALM_Overload,D,201,bool,alm,1,0,,,,,과부하 알람
+102,ALM_Overheat,D,202,bool,alm,1,0,,,,,과열 알람
+103,ALM_Comm_Err,D,203,bool,alm,1,0,,,,,통신 이상 알람
+104,ALM_Low_Level,D,204,bool,alm,1,0,,,,,레벨 하한 알람
+200,LOG_Temp_1,D,300,int16,log,0.1,0,1,,,℃,온도 센서 1
+201,LOG_Temp_2,D,301,int16,log,0.1,0,1,,,℃,온도 센서 2
+202,LOG_Pressure,D,302,uint16,log,0.01,0,2,,,bar,압력
+203,LOG_Flow_Rate,D,303,uint16,log,0.1,0,1,,,L/min,유량
+204,LOG_Level,D,304,uint16,log,0.1,0,1,,,%,탱크 레벨

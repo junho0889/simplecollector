@@ -334,6 +334,7 @@ class BaseProcessor(IProcessor):
             v_float=v_float,
             v_text=v_text,
             quality_code=quality_code,
+            collection_group=tag.collection_group,
         )
 
     def _create_processed_data(

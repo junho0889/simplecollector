@@ -161,10 +161,6 @@ class PublisherRegistry:
     """Publisher 레지스트리."""
 
     PUBLISHERS: Dict[str, Tuple[str, List[str]]] = {
-        'database': ('src.publishers.database', ['asyncpg']),
-        'timescaledb': ('src.publishers.database', ['asyncpg']),  # alias
-        'postgresql': ('src.publishers.database', ['asyncpg']),   # alias
-        'mqtt': ('src.publishers.mqtt', ['aiomqtt']),
         'rabbitmq': ('src.publishers.rabbitmq', ['aio_pika']),
     }
 
@@ -224,8 +220,6 @@ def check_environment() -> Dict[str, Dict[str, bool]]:
     return {
         'protocols': ProtocolRegistry.list_all(),
         'publishers': {
-            'database': PublisherRegistry.is_available('database'),
-            'mqtt': PublisherRegistry.is_available('mqtt'),
             'rabbitmq': PublisherRegistry.is_available('rabbitmq'),
         }
     }
@@ -249,6 +243,6 @@ def print_environment():
 
     print("\nTo install missing modules:")
     print("  pip install simple-collector[modbus]")
-    print("  pip install simple-collector[database,mqtt]")
+    print("  pip install simple-collector[rabbitmq]")
     print("  pip install simple-collector[full]")
     print()

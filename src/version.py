@@ -25,7 +25,7 @@ MODULE_VERSIONS: Dict[str, str] = {
     "processors": "0.2.0",     # 데이터 처리기
     "publishers": "0.2.1",     # 데이터 발행기 (VERBOSE 로그 지원)
     "pipeline": "0.2.0",       # 파이프라인 관리
-    "services": "0.2.0",       # 부가 서비스 (마스터 동기화, API 등)
+    "services": "0.2.0",       # 부가 서비스 (Status API 등)
     "utils": "0.2.1",          # 유틸리티 (VERBOSE 로그 레벨 추가)
 }
 
@@ -41,10 +41,7 @@ SUPPORTED_PROTOCOLS: Dict[str, str] = {
 # Publisher Support
 # =============================================================================
 SUPPORTED_PUBLISHERS: Dict[str, str] = {
-    "database": "0.2.0",       # TimescaleDB/PostgreSQL
-    "mqtt": "0.1.0",           # MQTT
-    "json_file": "0.1.0",      # JSON file output (compact format)
-    "log": "0.2.0",            # Log output
+    "rabbitmq": "0.2.0",       # RabbitMQ (aio_pika)
 }
 
 
@@ -71,19 +68,12 @@ def get_dependency_versions() -> Dict[str, str]:
     """주요 의존성 버전 반환."""
     deps = {}
 
-    # asyncpg
+    # aio_pika (RabbitMQ)
     try:
-        import asyncpg
-        deps["asyncpg"] = asyncpg.__version__
+        import aio_pika
+        deps["aio-pika"] = aio_pika.__version__
     except (ImportError, AttributeError):
-        deps["asyncpg"] = "not installed"
-
-    # paho-mqtt
-    try:
-        import paho.mqtt
-        deps["paho-mqtt"] = getattr(paho.mqtt, '__version__', 'unknown')
-    except ImportError:
-        deps["paho-mqtt"] = "not installed"
+        deps["aio-pika"] = "not installed"
 
     # PyYAML
     try:

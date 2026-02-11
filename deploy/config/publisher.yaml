@@ -1,0 +1,61 @@
+# ============================================================================
+# Collector Publisher Service - Configuration
+# ============================================================================
+# RabbitMQ에서 메시지를 소비하여 Database/MQTT로 전달하는 서비스 설정
+# 환경변수: ${VAR_NAME} 또는 ${VAR_NAME:default_value} 형식 지원
+# ============================================================================
+
+# RabbitMQ 소비자 설정
+rabbitmq:
+  host: "${RABBITMQ_HOST:rabbitmq}"
+  port: 5672
+  virtual_host: "/"
+  username: "${RABBITMQ_USER:admin}"
+  password: "${RABBITMQ_PASSWORD:admin}"
+  exchange_name: "plc.data"
+  exchange_type: "topic"
+  queue_db: "queue.db"
+  queue_mqtt: "queue.mqtt"
+  routing_key_pattern: "plc.*.data"
+  prefetch_count: 50
+  heartbeat: 60
+  connection_timeout: 10
+  # 압축/암호화 (simpleCollector RabbitMQ Publisher와 동일해야 함)
+  compression: "zlib"             # 'none', 'zlib', 'gzip'
+  encryption_enabled: false
+  encryption_key: ""              # Fernet key (base64)
+
+# Database 설정 (PostgreSQL / TimescaleDB)
+database:
+  enabled: true
+  host: "10.8.0.4"
+  port: 15432
+  database: "neurosense"
+  user: "user"
+  password: "neuro0901"
+  pool_size: 5
+  pool_min_size: 2
+  table_name: "plc_data_integrated"
+  schema_name: "jem_jh02"              
+  insert_method: "copy"           # 'copy' (최고속), 'batch'
+  auto_init_schema: true          # 시작 시 스키마/테이블 자동 생성
+  master_sync_enabled: true       # collector config → 마스터 테이블 자동 동기화
+
+# MQTT 포워더 설정
+mqtt:
+  enabled: false
+  host: "${MQTT_HOST:mqtt-broker}"
+  port: 1883
+  client_id: "publisher-service"
+  username: "${MQTT_USER:}"
+  password: "${MQTT_PASSWORD:}"
+  topic: "plc/data"
+  qos: 1
+  use_tls: false
+
+# 로깅 설정
+logging:
+  level: "INFO"
+  file_path: "logs/publisher-service.log"
+  max_size_mb: 10
+  backup_count: 5

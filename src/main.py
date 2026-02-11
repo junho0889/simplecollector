@@ -94,6 +94,64 @@ Examples:
 
 
 # ============================================================================
+# Multi-Publisher Wrapper
+# ============================================================================
+
+from src.publishers.base import BasePublisher as _BasePublisher
+
+
+class MultiPublisher(_BasePublisher):
+    """
+    여러 Publisher에 동시 발행하는 래퍼.
+
+    Pipeline이 하나의 publisher만 받으므로, 여러 publisher를 묶어서
+    하나처럼 동작합니다. publish loop는 MultiPublisher가 관리하고,
+    _do_publish에서 각 inner publisher에 fan-out합니다.
+    """
+
+    def __init__(self, name: str, publishers: list, config):
+        super().__init__(name, config)
+        self._publishers = publishers
+
+    async def _do_connect(self) -> bool:
+        results = await asyncio.gather(
+            *[p.connect() for p in self._publishers],
+            return_exceptions=True,
+        )
+        success_count = sum(1 for r in results if r is True)
+        _logger = LoggerFactory.get_system_logger()
+        _logger.info(
+            f"[{self._name}] Connected {success_count}/{len(self._publishers)} publishers"
+        )
+        return success_count > 0
+
+    async def _do_disconnect(self) -> None:
+        await asyncio.gather(
+            *[p.disconnect() for p in self._publishers],
+            return_exceptions=True,
+        )
+
+    async def _do_publish(self, data) -> bool:
+        results = await asyncio.gather(
+            *[p.publish(data) for p in self._publishers],
+            return_exceptions=True,
+        )
+        return any(r is True for r in results)
+
+    async def _do_health_check(self) -> bool:
+        checks = await asyncio.gather(
+            *[p.health_check() for p in self._publishers],
+            return_exceptions=True,
+        )
+        return any(c is True for c in checks)
+
+    def get_stats(self):
+        stats = super().get_stats()
+        stats["publishers"] = [p.get_stats() for p in self._publishers]
+        return stats
+
+
+# ============================================================================
 # Component Factory
 # ============================================================================
 
@@ -185,48 +243,6 @@ class ComponentFactory:
             Publisher 인스턴스 리스트
         """
         publishers = []
-
-        # Database Publisher
-        if config.publisher.database.enabled:
-            try:
-                from src.publishers.database import DatabasePublisher
-                publishers.append(DatabasePublisher(
-                    name=f"{config.collector.name}_db_publisher",
-                    db_config=config.publisher.database,
-                    publisher_config=config.publisher,
-                ))
-            except ImportError as e:
-                LoggerFactory.get_system_logger().warning(
-                    f"Database publisher not available: {e}"
-                )
-
-        # MQTT Publisher
-        if config.publisher.mqtt.enabled:
-            try:
-                from src.publishers.mqtt import MqttPublisher
-                publishers.append(MqttPublisher(
-                    name=f"{config.collector.name}_mqtt_publisher",
-                    mqtt_config=config.publisher.mqtt,
-                    publisher_config=config.publisher,
-                ))
-            except ImportError as e:
-                LoggerFactory.get_system_logger().warning(
-                    f"MQTT publisher not available: {e}"
-                )
-
-        # JSON File Publisher
-        if config.publisher.json_file.enabled:
-            try:
-                from src.publishers.json_file_publisher import JsonFilePublisher
-                publishers.append(JsonFilePublisher(
-                    name=f"{config.collector.name}_json_publisher",
-                    json_config=config.publisher.json_file,
-                    publisher_config=config.publisher,
-                ))
-            except ImportError as e:
-                LoggerFactory.get_system_logger().warning(
-                    f"JSON file publisher not available: {e}"
-                )
 
         # RabbitMQ Publisher
         if config.publisher.rabbitmq.enabled:
@@ -355,11 +371,26 @@ async def create_pipeline(
         collector = ComponentFactory.create_collector(config, event_bus)
         processor = ComponentFactory.create_processor(config)
         publishers = ComponentFactory.create_publishers(config)
-        publisher = publishers[0] if publishers else ComponentFactory._create_demo_publisher(config)
+
+        if not publishers:
+            publisher = ComponentFactory._create_demo_publisher(config)
+        elif len(publishers) == 1:
+            publisher = publishers[0]
+        else:
+            # 여러 publisher → MultiPublisher로 래핑
+            publisher = MultiPublisher(
+                name=f"{config.collector.name}_multi_publisher",
+                publishers=publishers,
+                config=config.publisher,
+            )
 
     logger.info(f"Created Collector: {collector.__class__.__name__}")
     logger.info(f"Created Processor: {processor.__class__.__name__}")
-    logger.info(f"Created Publisher: {publisher.__class__.__name__}")
+    if isinstance(publisher, MultiPublisher):
+        for p in publisher._publishers:
+            logger.info(f"Created Publisher: {p.__class__.__name__}")
+    else:
+        logger.info(f"Created Publisher: {publisher.__class__.__name__}")
 
     # 파이프라인 생성
     pipeline = Pipeline(
@@ -441,32 +472,6 @@ async def main(args: argparse.Namespace) -> int:
 
     # Publisher 상태 로깅
     logger.info("Publishers:")
-    db_config = config.publisher.database
-    if db_config.enabled:
-        logger.info(f"  - Database: ENABLED")
-        logger.info(f"      Host: {db_config.host}:{db_config.port}/{db_config.database}")
-        if db_config.master_sync_enabled:
-            logger.info(f"      Master Sync: {db_config.master_sync_schema}")
-    else:
-        logger.info(f"  - Database: DISABLED")
-
-    mqtt_config = config.publisher.mqtt
-    if mqtt_config.enabled:
-        logger.info(f"  - MQTT: ENABLED")
-        logger.info(f"      Host: {mqtt_config.host}:{mqtt_config.port}")
-        if mqtt_config.topic_prefix:
-            logger.info(f"      Topic: {mqtt_config.topic_prefix}")
-    else:
-        logger.info(f"  - MQTT: DISABLED")
-
-    json_file_config = config.publisher.json_file
-    if json_file_config.enabled:
-        logger.info(f"  - JSON File: ENABLED")
-        logger.info(f"      Path: {json_file_config.file_path}")
-        logger.info(f"      Mode: {json_file_config.mode}")
-    else:
-        logger.info(f"  - JSON File: DISABLED")
-
     rmq_config = config.publisher.rabbitmq
     if rmq_config.enabled:
         logger.info(f"  - RabbitMQ: ENABLED")
@@ -474,11 +479,7 @@ async def main(args: argparse.Namespace) -> int:
         logger.info(f"      Exchange: {rmq_config.exchange_name}")
         logger.info(f"      Compression: {rmq_config.compression}")
     else:
-        logger.info(f"  - RabbitMQ: DISABLED")
-
-    # 모두 비활성화면 Log Publisher 사용 안내
-    if not db_config.enabled and not mqtt_config.enabled and not json_file_config.enabled and not rmq_config.enabled:
-        logger.info(f"  - Log: ENABLED (fallback)")
+        logger.info(f"  - RabbitMQ: DISABLED (demo publisher fallback)")
 
     # Dry-run 모드
     if args.dry_run:
@@ -501,42 +502,6 @@ async def main(args: argparse.Namespace) -> int:
                 logger.info(f"  - Group '{group}': {count} tags")
         except Exception as e:
             logger.warning(f"Failed to load tags: {e}")
-
-    # 마스터 테이블 동기화 (DB 활성화 + 동기화 활성화 시)
-    db_config = config.publisher.database
-    if db_config.enabled and db_config.master_sync_enabled:
-        from .services.master_sync import MasterSyncService
-
-        logger.info(f"Starting master table sync to schema '{db_config.master_sync_schema}'...")
-        sync_service = MasterSyncService(
-            db_config=db_config,
-            schema=db_config.master_sync_schema,
-        )
-
-        if await sync_service.connect():
-            try:
-                # 테이블 존재 확인
-                if await sync_service.ensure_tables_exist():
-                    # PLC 마스터 동기화
-                    await sync_service.sync_plc(config.collector)
-
-                    # 태그 마스터 동기화
-                    if tags:
-                        synced = await sync_service.sync_tags(
-                            config.collector.plc_id, tags
-                        )
-                        logger.info(f"Master sync completed: {synced} tags synced")
-                else:
-                    logger.warning(
-                        "Master tables not found, skipping sync. "
-                        "Create tables using scripts/init-db.sql"
-                    )
-            except Exception as e:
-                logger.warning(f"Master sync failed (non-fatal): {e}")
-            finally:
-                await sync_service.disconnect()
-        else:
-            logger.warning("Could not connect for master sync, continuing without sync")
 
     # 파이프라인 매니저 생성
     event_bus = EventBus(enable_history=True)

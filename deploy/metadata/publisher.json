@@ -1,0 +1,738 @@
+{
+  "name": "neuro_publisher",
+  "display_name": "Collector Publisher Service",
+  "description": "RabbitMQ 소비자 → Database(TimescaleDB) / MQTT 포워더 서비스",
+  "version": "0.1.0",
+  "docker_image": "neuro_publisher",
+  "service_type": "publisher",
+  "icon": "database",
+
+  "config_schema": {
+    "groups": [
+      {
+        "key": "rabbitmq",
+        "label": "RabbitMQ 소비자 연결",
+        "description": "메시지 브로커 접속 정보. Collector가 발행한 메시지를 소비합니다",
+        "icon": "message-square",
+        "order": 1,
+        "fields": [
+          {
+            "key": "rabbitmq.host",
+            "label": "호스트",
+            "type": "text",
+            "default": "rabbitmq",
+            "required": true,
+            "description": "RabbitMQ 서버 주소. Docker 네트워크 사용 시 컨테이너 이름 입력",
+            "placeholder": "rabbitmq",
+            "validation": { "max_length": 100 },
+            "env_override": "RABBITMQ_HOST"
+          },
+          {
+            "key": "rabbitmq.port",
+            "label": "포트",
+            "type": "number",
+            "default": 5672,
+            "required": true,
+            "description": "RabbitMQ AMQP 포트 (기본 5672)",
+            "placeholder": "5672",
+            "validation": { "min": 1, "max": 65535, "step": 1 }
+          },
+          {
+            "key": "rabbitmq.virtual_host",
+            "label": "Virtual Host (옵션)",
+            "type": "text",
+            "default": "/",
+            "required": false,
+            "description": "RabbitMQ 가상 호스트. 멀티 테넌트 환경에서 격리용",
+            "placeholder": "/",
+            "validation": { "max_length": 50 }
+          },
+          {
+            "key": "rabbitmq.username",
+            "label": "사용자명",
+            "type": "text",
+            "default": "admin",
+            "required": true,
+            "description": "RabbitMQ 접속 사용자명",
+            "placeholder": "admin",
+            "validation": { "max_length": 50 },
+            "env_override": "RABBITMQ_USER"
+          },
+          {
+            "key": "rabbitmq.password",
+            "label": "비밀번호",
+            "type": "password",
+            "default": "admin",
+            "required": true,
+            "description": "RabbitMQ 접속 비밀번호",
+            "placeholder": "admin",
+            "validation": { "max_length": 100 },
+            "env_override": "RABBITMQ_PASSWORD"
+          },
+          {
+            "key": "rabbitmq.exchange_name",
+            "label": "Exchange 이름",
+            "type": "text",
+            "default": "plc.data",
+            "required": true,
+            "description": "Collector가 데이터를 발행하는 Exchange. Collector 설정과 동일해야 함",
+            "placeholder": "plc.data",
+            "validation": { "pattern": "^[a-zA-Z][a-zA-Z0-9._-]*$", "max_length": 50 }
+          },
+          {
+            "key": "rabbitmq.exchange_type",
+            "label": "Exchange 타입 (옵션)",
+            "type": "select",
+            "default": "topic",
+            "required": false,
+            "description": "Exchange 유형. Collector와 동일하게 설정해야 함",
+            "options": [
+              { "value": "topic", "label": "Topic", "description": "라우팅 키 패턴 매칭 (권장)" },
+              { "value": "direct", "label": "Direct", "description": "정확한 라우팅 키 매칭" },
+              { "value": "fanout", "label": "Fanout", "description": "모든 큐에 브로드캐스트" }
+            ]
+          }
+        ]
+      },
+      {
+        "key": "rabbitmq_queues",
+        "label": "RabbitMQ 큐 설정",
+        "description": "소비할 큐 이름 및 라우팅 키 패턴",
+        "icon": "inbox",
+        "order": 2,
+        "fields": [
+          {
+            "key": "rabbitmq.queue_db",
+            "label": "DB 큐 이름",
+            "type": "text",
+            "default": "queue.db",
+            "required": true,
+            "description": "Database 삽입용 큐 이름. Collector의 RabbitMQ exchange에 바인딩됨",
+            "placeholder": "queue.db",
+            "validation": { "pattern": "^[a-zA-Z][a-zA-Z0-9._-]*$", "max_length": 50 }
+          },
+          {
+            "key": "rabbitmq.queue_mqtt",
+            "label": "MQTT 큐 이름",
+            "type": "text",
+            "default": "queue.mqtt",
+            "required": true,
+            "description": "MQTT 포워딩용 큐 이름. MQTT 비활성 시에도 큐는 생성됨",
+            "placeholder": "queue.mqtt",
+            "validation": { "pattern": "^[a-zA-Z][a-zA-Z0-9._-]*$", "max_length": 50 }
+          },
+          {
+            "key": "rabbitmq.routing_key_pattern",
+            "label": "라우팅 키 패턴",
+            "type": "text",
+            "default": "plc.*.data",
+            "required": true,
+            "description": "큐에 바인딩할 라우팅 키 패턴. '*'은 하나의 단어 매칭, '#'은 다중 단어 매칭",
+            "placeholder": "plc.*.data",
+            "validation": { "pattern": "^[a-zA-Z0-9.*#_-]+$", "max_length": 100 },
+            "hint": "예: plc.*.data (모든 PLC), plc.1.data (PLC 1만)"
+          }
+        ]
+      },
+      {
+        "key": "rabbitmq_advanced",
+        "label": "RabbitMQ 고급 설정 (옵션)",
+        "description": "소비자 성능 및 메시지 직렬화 설정",
+        "icon": "sliders",
+        "order": 3,
+        "collapsed": true,
+        "fields": [
+          {
+            "key": "rabbitmq.prefetch_count",
+            "label": "Prefetch Count",
+            "type": "number",
+            "default": 50,
+            "required": false,
+            "description": "한번에 가져오는 미확인 메시지 수. 높을수록 처리량 증가, 메모리 사용 증가",
+            "placeholder": "50",
+            "suffix": "건",
+            "validation": { "min": 1, "max": 500, "step": 10 },
+            "hint": "DB COPY 배치 크기와 맞추면 효율적 (권장: 50~100)"
+          },
+          {
+            "key": "rabbitmq.heartbeat",
+            "label": "하트비트 (옵션)",
+            "type": "number",
+            "default": 60,
+            "required": false,
+            "description": "RabbitMQ 연결 유지 하트비트 간격. 0이면 비활성",
+            "placeholder": "60",
+            "suffix": "초",
+            "validation": { "min": 0, "max": 600, "step": 10 }
+          },
+          {
+            "key": "rabbitmq.connection_timeout",
+            "label": "연결 타임아웃 (옵션)",
+            "type": "number",
+            "default": 10,
+            "required": false,
+            "description": "RabbitMQ 서버 연결 타임아웃",
+            "placeholder": "10",
+            "suffix": "초",
+            "validation": { "min": 5, "max": 60, "step": 5 }
+          },
+          {
+            "key": "rabbitmq.compression",
+            "label": "압축 방식",
+            "type": "select",
+            "default": "zlib",
+            "required": true,
+            "description": "메시지 역직렬화 시 압축 해제 방식. Collector의 compression 설정과 반드시 동일해야 함",
+            "options": [
+              { "value": "zlib", "label": "zlib 압축", "description": "표준 압축 (Collector 기본값)" },
+              { "value": "gzip", "label": "gzip 압축", "description": "gzip 압축" },
+              { "value": "none", "label": "압축 안함", "description": "비압축 (Collector도 none이어야 함)" }
+            ],
+            "hint": "Collector의 publisher.rabbitmq.compression 값과 반드시 일치시키세요"
+          },
+          {
+            "key": "rabbitmq.encryption_enabled",
+            "label": "암호화 (옵션)",
+            "type": "toggle",
+            "default": false,
+            "required": false,
+            "description": "Fernet 대칭키 복호화 활성화. Collector에서 암호화 사용 시 활성화"
+          },
+          {
+            "key": "rabbitmq.encryption_key",
+            "label": "암호화 키 (옵션)",
+            "type": "password",
+            "default": "",
+            "required": false,
+            "description": "Fernet Base64 키. Collector와 동일한 키 사용",
+            "placeholder": "base64-encoded-fernet-key",
+            "visible_when": { "field": "rabbitmq.encryption_enabled", "value": true },
+            "hint": "python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\" 로 생성"
+          }
+        ]
+      },
+      {
+        "key": "database",
+        "label": "Database 연결 (PostgreSQL/TimescaleDB)",
+        "description": "수집 데이터를 저장할 데이터베이스 연결 정보",
+        "icon": "database",
+        "order": 4,
+        "fields": [
+          {
+            "key": "database.enabled",
+            "label": "Database 활성화",
+            "type": "toggle",
+            "default": true,
+            "required": false,
+            "description": "Database 퍼블리셔 활성화. 비활성 시 DB 관련 설정 무시"
+          },
+          {
+            "key": "database.host",
+            "label": "DB 호스트",
+            "type": "text",
+            "default": "timescaledb",
+            "required": true,
+            "description": "PostgreSQL/TimescaleDB 서버 주소. Docker 네트워크 사용 시 컨테이너 이름",
+            "placeholder": "timescaledb",
+            "validation": { "max_length": 100 },
+            "env_override": "DB_HOST",
+            "visible_when": { "field": "database.enabled", "value": true }
+          },
+          {
+            "key": "database.port",
+            "label": "DB 포트",
+            "type": "number",
+            "default": 5432,
+            "required": true,
+            "description": "PostgreSQL 포트 (기본 5432, TimescaleDB Docker 기본 5432)",
+            "placeholder": "5432",
+            "validation": { "min": 1, "max": 65535, "step": 1 },
+            "env_override": "DB_PORT",
+            "visible_when": { "field": "database.enabled", "value": true }
+          },
+          {
+            "key": "database.database",
+            "label": "데이터베이스명",
+            "type": "text",
+            "default": "collector",
+            "required": true,
+            "description": "데이터가 저장될 데이터베이스 이름",
+            "placeholder": "collector",
+            "validation": { "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$", "max_length": 63 },
+            "env_override": "DB_NAME",
+            "visible_when": { "field": "database.enabled", "value": true }
+          },
+          {
+            "key": "database.user",
+            "label": "DB 사용자",
+            "type": "text",
+            "default": "collector",
+            "required": true,
+            "description": "데이터베이스 접속 사용자. CREATE TABLE, INSERT 권한 필요",
+            "placeholder": "collector",
+            "validation": { "max_length": 63 },
+            "env_override": "DB_USER",
+            "visible_when": { "field": "database.enabled", "value": true }
+          },
+          {
+            "key": "database.password",
+            "label": "DB 비밀번호",
+            "type": "password",
+            "default": "",
+            "required": true,
+            "description": "데이터베이스 접속 비밀번호",
+            "placeholder": "password",
+            "validation": { "max_length": 128 },
+            "env_override": "DB_PASSWORD",
+            "visible_when": { "field": "database.enabled", "value": true }
+          },
+          {
+            "key": "database.schema_name",
+            "label": "스키마명",
+            "type": "text",
+            "default": "public",
+            "required": true,
+            "description": "테이블이 생성될 DB 스키마. 사이트별 분리 시 변경 (예: site_a, factory_1)",
+            "placeholder": "public",
+            "validation": { "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$", "max_length": 63 },
+            "env_override": "DB_SCHEMA",
+            "visible_when": { "field": "database.enabled", "value": true }
+          }
+        ]
+      },
+      {
+        "key": "database_advanced",
+        "label": "Database 고급 설정 (옵션)",
+        "description": "커넥션 풀, 삽입 방식, 스키마 자동 초기화 설정",
+        "icon": "settings",
+        "order": 5,
+        "collapsed": true,
+        "fields": [
+          {
+            "key": "database.insert_method",
+            "label": "삽입 방식",
+            "type": "select",
+            "default": "copy",
+            "required": false,
+            "description": "데이터 삽입 방식. COPY가 가장 빠르며 대량 데이터에 권장",
+            "options": [
+              { "value": "copy", "label": "COPY 프로토콜", "description": "PostgreSQL COPY 명령 (최고 성능, 권장)" },
+              { "value": "batch", "label": "Batch INSERT", "description": "executemany (COPY 불가 시 대안)" }
+            ],
+            "visible_when": { "field": "database.enabled", "value": true }
+          },
+          {
+            "key": "database.pool_size",
+            "label": "최대 커넥션 수 (옵션)",
+            "type": "number",
+            "default": 5,
+            "required": false,
+            "description": "asyncpg 커넥션 풀 최대 크기. Collector 수에 비례하여 설정",
+            "placeholder": "5",
+            "suffix": "개",
+            "validation": { "min": 1, "max": 20, "step": 1 },
+            "visible_when": { "field": "database.enabled", "value": true },
+            "hint": "Collector 1~2대: 3~5, 3~5대: 5~10, 5대 이상: 10~20"
+          },
+          {
+            "key": "database.pool_min_size",
+            "label": "최소 커넥션 수 (옵션)",
+            "type": "number",
+            "default": 2,
+            "required": false,
+            "description": "커넥션 풀 최소 유지 수. 유휴 시에도 이 수만큼 연결 유지",
+            "placeholder": "2",
+            "suffix": "개",
+            "validation": { "min": 1, "max": 10, "step": 1 },
+            "visible_when": { "field": "database.enabled", "value": true }
+          },
+          {
+            "key": "database.table_name",
+            "label": "데이터 테이블명 (옵션)",
+            "type": "text",
+            "default": "plc_data_integrated",
+            "required": false,
+            "description": "PLC 수집 데이터가 저장될 메인 테이블 이름 (TimescaleDB hypertable)",
+            "placeholder": "plc_data_integrated",
+            "validation": { "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$", "max_length": 63 },
+            "visible_when": { "field": "database.enabled", "value": true }
+          },
+          {
+            "key": "database.auto_init_schema",
+            "label": "스키마 자동 생성",
+            "type": "toggle",
+            "default": true,
+            "required": false,
+            "description": "서비스 시작 시 스키마, 테이블, 인덱스를 자동 생성 (IF NOT EXISTS). 운영 환경에서도 안전",
+            "visible_when": { "field": "database.enabled", "value": true },
+            "hint": "마스터 테이블(plc_master, tag_master 등) + 데이터 테이블 + hypertable 자동 생성"
+          },
+          {
+            "key": "database.master_sync_enabled",
+            "label": "마스터 데이터 동기화",
+            "type": "toggle",
+            "default": true,
+            "required": false,
+            "description": "시작 시 Collector config(YAML+CSV)로부터 plc_master, tag_master 테이블 자동 동기화",
+            "visible_when": { "field": "database.enabled", "value": true },
+            "hint": "config 디렉토리의 collector_plc*.yaml + tags_plc*.csv를 읽어 UPSERT"
+          },
+          {
+            "key": "database.master_sync_config_dir",
+            "label": "마스터 동기화 설정 디렉토리 (옵션)",
+            "type": "text",
+            "default": "",
+            "required": false,
+            "description": "Collector config 파일 위치. 빈값이면 CONFIG_PATH의 부모 디렉토리 자동 사용",
+            "placeholder": "/app/config",
+            "visible_when": { "field": "database.master_sync_enabled", "value": true }
+          }
+        ]
+      },
+      {
+        "key": "mqtt",
+        "label": "MQTT 포워더",
+        "description": "수집 데이터를 MQTT 브로커로 포워딩. HMI, 모니터링 시스템 연동용",
+        "icon": "radio",
+        "order": 6,
+        "fields": [
+          {
+            "key": "mqtt.enabled",
+            "label": "MQTT 포워딩 활성화",
+            "type": "toggle",
+            "default": false,
+            "required": false,
+            "description": "MQTT 포워더 활성화. 비활성 시 MQTT 관련 설정 무시"
+          },
+          {
+            "key": "mqtt.host",
+            "label": "MQTT 브로커 호스트",
+            "type": "text",
+            "default": "mqtt-broker",
+            "required": true,
+            "description": "MQTT 브로커 서버 주소",
+            "placeholder": "mqtt-broker",
+            "validation": { "max_length": 100 },
+            "env_override": "MQTT_HOST",
+            "visible_when": { "field": "mqtt.enabled", "value": true }
+          },
+          {
+            "key": "mqtt.port",
+            "label": "MQTT 포트",
+            "type": "number",
+            "default": 1883,
+            "required": true,
+            "description": "MQTT 브로커 포트. 비암호화: 1883, TLS: 8883",
+            "placeholder": "1883",
+            "validation": { "min": 1, "max": 65535, "step": 1 },
+            "visible_when": { "field": "mqtt.enabled", "value": true }
+          },
+          {
+            "key": "mqtt.client_id",
+            "label": "클라이언트 ID (옵션)",
+            "type": "text",
+            "default": "publisher-service",
+            "required": false,
+            "description": "MQTT 클라이언트 식별자. 브로커에서 고유해야 함",
+            "placeholder": "publisher-service",
+            "validation": { "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$", "max_length": 50 },
+            "visible_when": { "field": "mqtt.enabled", "value": true }
+          },
+          {
+            "key": "mqtt.username",
+            "label": "MQTT 사용자명 (옵션)",
+            "type": "text",
+            "default": "",
+            "required": false,
+            "description": "MQTT 브로커 인증 사용자명. 미인증 시 빈값",
+            "placeholder": "",
+            "validation": { "max_length": 50 },
+            "env_override": "MQTT_USER",
+            "visible_when": { "field": "mqtt.enabled", "value": true }
+          },
+          {
+            "key": "mqtt.password",
+            "label": "MQTT 비밀번호 (옵션)",
+            "type": "password",
+            "default": "",
+            "required": false,
+            "description": "MQTT 브로커 인증 비밀번호",
+            "placeholder": "",
+            "validation": { "max_length": 100 },
+            "env_override": "MQTT_PASSWORD",
+            "visible_when": { "field": "mqtt.enabled", "value": true }
+          },
+          {
+            "key": "mqtt.topic",
+            "label": "발행 토픽 (옵션)",
+            "type": "text",
+            "default": "plc/data",
+            "required": false,
+            "description": "데이터 발행 MQTT 토픽. 실제 발행 시 plc_id, tag_id 등이 서브 토픽으로 추가됨",
+            "placeholder": "plc/data",
+            "validation": { "pattern": "^[a-zA-Z0-9/._-]+$", "max_length": 100 },
+            "visible_when": { "field": "mqtt.enabled", "value": true }
+          },
+          {
+            "key": "mqtt.qos",
+            "label": "QoS 레벨 (옵션)",
+            "type": "select",
+            "default": 1,
+            "required": false,
+            "description": "MQTT 메시지 전송 보장 수준",
+            "options": [
+              { "value": 0, "label": "QoS 0", "description": "최대 1회 전송 (빠름, 유실 가능)" },
+              { "value": 1, "label": "QoS 1", "description": "최소 1회 전송 (권장, 중복 가능)" },
+              { "value": 2, "label": "QoS 2", "description": "정확히 1회 전송 (느림, 정확)" }
+            ],
+            "visible_when": { "field": "mqtt.enabled", "value": true }
+          },
+          {
+            "key": "mqtt.use_tls",
+            "label": "TLS 암호화 (옵션)",
+            "type": "toggle",
+            "default": false,
+            "required": false,
+            "description": "TLS 암호화 연결. 활성화 시 포트를 8883으로 변경 권장",
+            "visible_when": { "field": "mqtt.enabled", "value": true }
+          }
+        ]
+      },
+      {
+        "key": "logging",
+        "label": "로깅 설정 (옵션)",
+        "description": "서비스 로그 출력 수준 및 파일 저장 설정",
+        "icon": "file-text",
+        "order": 7,
+        "collapsed": true,
+        "fields": [
+          {
+            "key": "logging.level",
+            "label": "로그 레벨",
+            "type": "select",
+            "default": "INFO",
+            "required": false,
+            "description": "전체 로그 출력 수준",
+            "options": [
+              { "value": "DEBUG", "label": "DEBUG", "description": "개발 디버깅용 (매우 상세)" },
+              { "value": "INFO", "label": "INFO", "description": "일반 운영 (권장)" },
+              { "value": "WARNING", "label": "WARNING", "description": "경고만 표시" },
+              { "value": "ERROR", "label": "ERROR", "description": "오류만 표시" }
+            ]
+          },
+          {
+            "key": "logging.file_path",
+            "label": "로그 파일 경로 (옵션)",
+            "type": "text",
+            "default": "logs/publisher-service.log",
+            "required": false,
+            "description": "로그 파일 저장 경로. 미지정 시 콘솔만 출력",
+            "placeholder": "logs/publisher-service.log"
+          },
+          {
+            "key": "logging.max_size_mb",
+            "label": "로그 파일 최대 크기 (옵션)",
+            "type": "number",
+            "default": 10,
+            "required": false,
+            "description": "로그 파일 회전 기준 크기. 초과 시 새 파일 생성",
+            "placeholder": "10",
+            "suffix": "MB",
+            "validation": { "min": 1, "max": 100, "step": 1 }
+          },
+          {
+            "key": "logging.backup_count",
+            "label": "로그 파일 보관 수 (옵션)",
+            "type": "number",
+            "default": 5,
+            "required": false,
+            "description": "회전된 로그 파일 최대 보관 개수. 초과 시 가장 오래된 파일 삭제",
+            "placeholder": "5",
+            "suffix": "개",
+            "validation": { "min": 1, "max": 30, "step": 1 }
+          }
+        ]
+      }
+    ]
+  },
+
+  "container": {
+    "environment": [
+      {
+        "key": "CONFIG_PATH",
+        "label": "설정 파일 경로",
+        "type": "text",
+        "default": "/app/config/publisher.yaml",
+        "required": true,
+        "description": "컨테이너 내부 YAML 설정 파일 경로",
+        "placeholder": "/app/config/publisher.yaml",
+        "editable": false
+      },
+      {
+        "key": "LOG_LEVEL",
+        "label": "로그 레벨 (환경변수 오버라이드)",
+        "type": "select",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 로그 레벨 오버라이드. 미설정 시 YAML 설정 사용",
+        "options": [
+          { "value": "", "label": "YAML 설정 사용", "description": "publisher.yaml의 logging.level 따름" },
+          { "value": "DEBUG", "label": "DEBUG" },
+          { "value": "INFO", "label": "INFO" },
+          { "value": "WARNING", "label": "WARNING" },
+          { "value": "ERROR", "label": "ERROR" }
+        ]
+      },
+      {
+        "key": "RABBITMQ_HOST",
+        "label": "RabbitMQ 호스트 (환경변수 오버라이드)",
+        "type": "text",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 RabbitMQ 호스트 오버라이드. Docker 네트워크 사용 시 컨테이너명",
+        "placeholder": "rabbitmq"
+      },
+      {
+        "key": "RABBITMQ_USER",
+        "label": "RabbitMQ 사용자 (환경변수 오버라이드)",
+        "type": "text",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 RabbitMQ 사용자 오버라이드",
+        "placeholder": "admin"
+      },
+      {
+        "key": "RABBITMQ_PASSWORD",
+        "label": "RabbitMQ 비밀번호 (환경변수 오버라이드)",
+        "type": "password",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 RabbitMQ 비밀번호 오버라이드",
+        "placeholder": "admin"
+      },
+      {
+        "key": "DB_HOST",
+        "label": "DB 호스트 (환경변수 오버라이드)",
+        "type": "text",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 DB 호스트 오버라이드",
+        "placeholder": "timescaledb"
+      },
+      {
+        "key": "DB_PORT",
+        "label": "DB 포트 (환경변수 오버라이드)",
+        "type": "number",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 DB 포트 오버라이드",
+        "placeholder": "5432"
+      },
+      {
+        "key": "DB_NAME",
+        "label": "DB명 (환경변수 오버라이드)",
+        "type": "text",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 데이터베이스명 오버라이드",
+        "placeholder": "collector"
+      },
+      {
+        "key": "DB_USER",
+        "label": "DB 사용자 (환경변수 오버라이드)",
+        "type": "text",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 DB 사용자 오버라이드",
+        "placeholder": "collector"
+      },
+      {
+        "key": "DB_PASSWORD",
+        "label": "DB 비밀번호 (환경변수 오버라이드)",
+        "type": "password",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 DB 비밀번호 오버라이드",
+        "placeholder": ""
+      },
+      {
+        "key": "DB_SCHEMA",
+        "label": "DB 스키마 (환경변수 오버라이드)",
+        "type": "text",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 DB 스키마 오버라이드",
+        "placeholder": "public"
+      },
+      {
+        "key": "MQTT_HOST",
+        "label": "MQTT 호스트 (환경변수 오버라이드)",
+        "type": "text",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 MQTT 호스트 오버라이드",
+        "placeholder": "mqtt-broker"
+      },
+      {
+        "key": "MQTT_USER",
+        "label": "MQTT 사용자 (환경변수 오버라이드)",
+        "type": "text",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 MQTT 사용자 오버라이드",
+        "placeholder": ""
+      },
+      {
+        "key": "MQTT_PASSWORD",
+        "label": "MQTT 비밀번호 (환경변수 오버라이드)",
+        "type": "password",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 MQTT 비밀번호 오버라이드",
+        "placeholder": ""
+      }
+    ],
+    "volumes": [
+      {
+        "container_path": "/app/config",
+        "label": "설정 파일",
+        "description": "publisher.yaml + collector_plc*.yaml + tags_plc*.csv (마스터 동기화용)",
+        "host_path_hint": "/opt/collector/config",
+        "mode": "ro",
+        "required": true
+      },
+      {
+        "container_path": "/app/logs",
+        "label": "로그 파일",
+        "description": "서비스 로그 파일 저장 디렉토리",
+        "host_path_hint": "/opt/collector/logs/publisher",
+        "mode": "rw",
+        "required": false
+      }
+    ],
+    "ports": [],
+    "restart_policy": "unless-stopped",
+    "network": "collector-net"
+  },
+
+  "depends_on": ["rabbitmq"],
+
+  "tables": {
+    "description": "auto_init_schema 활성화 시 자동 생성되는 테이블 목록",
+    "master": [
+      { "name": "plc_master", "description": "PLC 장비 마스터 (plc_id, name, ip, protocol 등)" },
+      { "name": "tag_master", "description": "태그 마스터 (tag_id, tag_name, data_type, address 등)" },
+      { "name": "collection_group_master", "description": "수집 그룹 마스터 (group_name, interval_ms 등)" },
+      { "name": "quality_master", "description": "품질 코드 마스터 (quality_code, description)" },
+      { "name": "event_master", "description": "이벤트 정의 마스터" },
+      { "name": "log_trigger_master", "description": "로그 트리거 조건 마스터" }
+    ],
+    "data": [
+      { "name": "tag_latest", "description": "태그별 최신값 (UPSERT, PK: plc_id+tag_id)" },
+      { "name": "plc_data_integrated", "description": "PLC 수집 데이터 통합 테이블 (TimescaleDB hypertable)" },
+      { "name": "log_data", "description": "로그 데이터 테이블" },
+      { "name": "event_history", "description": "이벤트 발생 이력" },
+      { "name": "alarm_history", "description": "알람 발생 이력" }
+    ]
+  }
+}

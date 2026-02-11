@@ -114,35 +114,19 @@ class ComponentFactory:
         """
         publishers = []
 
-        # Database Publisher
-        if config.publisher.database.enabled:
-            db_type = config.publisher.database.type.lower()
-            publisher_cls = PublisherRegistry.get_publisher(db_type)
+        # RabbitMQ Publisher
+        if config.publisher.rabbitmq.enabled:
+            publisher_cls = PublisherRegistry.get_publisher('rabbitmq')
 
             if publisher_cls is None:
                 logger.warning(
-                    f"Database publisher '{db_type}' not available. "
-                    f"Install with: pip install simple-collector[database]"
+                    "RabbitMQ publisher not available. "
+                    "Install with: pip install simple-collector[rabbitmq]"
                 )
             else:
                 publishers.append(publisher_cls(
-                    name=f"{config.collector.name}_db_publisher",
-                    config=config.publisher.database,
-                ))
-
-        # MQTT Publisher
-        if config.publisher.mqtt.enabled:
-            publisher_cls = PublisherRegistry.get_publisher('mqtt')
-
-            if publisher_cls is None:
-                logger.warning(
-                    "MQTT publisher not available. "
-                    "Install with: pip install simple-collector[mqtt]"
-                )
-            else:
-                publishers.append(publisher_cls(
-                    name=f"{config.collector.name}_mqtt_publisher",
-                    config=config.publisher.mqtt,
+                    name=f"{config.collector.name}_rmq_publisher",
+                    config=config.publisher.rabbitmq,
                 ))
 
         return publishers
@@ -163,14 +147,9 @@ class ComponentFactory:
             if not ProtocolRegistry.is_available(protocol):
                 missing.append(f"pip install simple-collector[{protocol}]")
 
-        # Database 확인
-        if config.publisher.database.enabled:
-            if not PublisherRegistry.is_available('database'):
-                missing.append("pip install simple-collector[database]")
-
-        # MQTT 확인
-        if config.publisher.mqtt.enabled:
-            if not PublisherRegistry.is_available('mqtt'):
-                missing.append("pip install simple-collector[mqtt]")
+        # RabbitMQ 확인
+        if config.publisher.rabbitmq.enabled:
+            if not PublisherRegistry.is_available('rabbitmq'):
+                missing.append("pip install simple-collector[rabbitmq]")
 
         return missing

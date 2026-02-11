@@ -1,0 +1,83 @@
+# Simple Collector - Modbus Docker Test Configuration
+# ============================================================
+# 실제 PLC (192.168.0.10:502) → Docker 컨테이너 → RabbitMQ
+
+collector:
+  plc_id: 2
+  name: "Modbus_Docker"
+  tags_file: "config/tags_modbus_docker.csv"
+
+  protocol:
+    type: "modbus"
+    host: "192.168.0.10"
+    port: 502
+    unit_id: 1
+    timeout_ms: 3000
+    reconnect_interval_ms: 5000
+
+    extra:
+      mode: "tcp"
+      byte_order: "big"
+      word_order: "big"
+      max_address_gap: 100
+
+  collection_groups:
+    - name: "fast"
+      interval_ms: 2000
+      timeout_ms: 5000
+      retry_count: 2
+      retry_delay_ms: 500
+    - name: "slow"
+      interval_ms: 5000
+      timeout_ms: 5000
+      retry_count: 2
+      retry_delay_ms: 1000
+
+    # 알람 그룹: 값 변경 시에만 발행 (on_change 모드)
+    - name: "alm"
+      interval_ms: 1000
+      timeout_ms: 5000
+      retry_count: 2
+      retry_delay_ms: 500
+      mode: "on_change"
+      deadband: 0
+
+    # 로그 그룹: 주기적 수집 (polling)
+    - name: "log"
+      interval_ms: 5000
+      timeout_ms: 5000
+      retry_count: 2
+      retry_delay_ms: 1000
+
+buffer:
+  max_size: 10000
+  flush_threshold: 100
+  flush_interval_ms: 3000
+
+publisher:
+  batch_size: 100
+  retry_count: 3
+  retry_delay_ms: 1000
+
+  rabbitmq:
+    enabled: true
+    host: "192.168.0.10"
+    port: 5672
+    virtual_host: "/"
+    username: "admin"
+    password: "admin"
+    exchange_name: "plc.data"
+    exchange_type: "topic"
+    routing_key_prefix: "plc"
+    compression: "zlib"
+    encryption_enabled: false
+    heartbeat: 60
+    connection_timeout: 10
+    delivery_mode: 2
+
+
+logging:
+  level: "DEBUG"
+  collection_level: "DEBUG"
+  publish_level: "DEBUG"
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"

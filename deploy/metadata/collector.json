@@ -1,0 +1,50 @@
+{
+  "name": "simple-collector",
+  "display_name": "Simple Collector",
+  "description": "Industrial PLC Data Collector - Modbus/MC Protocol",
+  "version": "0.2.3-beta",
+  "service_type": "collector",
+  "icon": "radio-tower",
+  "environment": [
+    {
+      "key": "CONFIG_PATH",
+      "default": "/app/config/collector.yaml",
+      "description": "YAML config file path",
+      "required": true
+    },
+    {
+      "key": "LOG_LEVEL",
+      "default": "INFO",
+      "description": "Log level",
+      "required": false,
+      "options": ["DEBUG", "VERBOSE", "INFO", "WARNING", "ERROR"]
+    },
+    {
+      "key": "RABBITMQ_HOST",
+      "default": "rabbitmq",
+      "description": "RabbitMQ host",
+      "required": false
+    },
+    {
+      "key": "RABBITMQ_USER",
+      "default": "collector",
+      "description": "RabbitMQ username",
+      "required": false
+    },
+    {
+      "key": "RABBITMQ_PASSWORD",
+      "default": "",
+      "description": "RabbitMQ password",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "volumes": [
+    {"container_path": "/app/config", "description": "Config files (YAML)", "mode": "ro"},
+    {"container_path": "/app/data", "description": "Data storage (JSON file publisher)", "mode": "rw"},
+    {"container_path": "/app/logs", "description": "Log files", "mode": "rw"}
+  ],
+  "ports": [],
+  "depends_on": ["rabbitmq"],
+  "network": "collector-net"
+}

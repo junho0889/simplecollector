@@ -7,18 +7,13 @@ pyyaml>=6.0.1          # YAML 파싱
 python-dotenv>=1.0.0   # 환경변수 관리
 
 # Async / Message Broker
-aiomqtt>=2.0.0         # MQTT 비동기 클라이언트 (asyncio-mqtt 후속)
-paho-mqtt>=2.0.0       # MQTT 클라이언트 (aiomqtt 폴백용)
 aio-pika>=9.4.0        # RabbitMQ 비동기 클라이언트 (AMQP 0-9-1)
-
-# Database
-asyncpg>=0.29.0        # PostgreSQL 비동기 드라이버
 
 # Industrial Protocols
 # pyserial>=3.5        # Modbus RTU 시리얼 모드 (선택, TCP/RTU-over-TCP는 불필요)
 
 # Security
-cryptography>=41.0.0   # 암호화 (MQTT 페이로드)
+cryptography>=41.0.0   # Fernet 암호화 (RabbitMQ 페이로드, OPC UA 인증서)
 
 # Development (프로덕션에서는 제외)
 # pytest>=7.4.0

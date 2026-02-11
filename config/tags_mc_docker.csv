@@ -1,0 +1,17 @@
+tag_id,tag_name,memory,address,data_type,collection_group,scale,offset,decimals,word_length,format,unit,description
+1,Current_Model,D,900,string,fast,1.0,0.0,,10,,,현재 모델
+2,Cycle_Time,D,216,uint32,fast,0.1,0.0,1,,,,CYCLE TIME
+3,Yield_Rate,D,820,float32,fast,1.0,0.0,1,,,,직행률
+4,NG_Total,D,816,uint32,fast,1.0,0.0,0,,,,NG 총수량
+5,Work_Count,D,796,uint32,fast,1.0,0.0,0,,,,작업수
+6,Good_Count,D,798,uint32,fast,1.0,0.0,0,,,,양품적재수
+100,ALM_EMG_Stop,M,100,bool,alm,1,0,,,,,비상정지 알람
+101,ALM_Motor_OL,M,101,bool,alm,1,0,,,,,모터 과부하 알람
+102,ALM_Temp_High,M,102,bool,alm,1,0,,,,,온도 상한 알람
+103,ALM_Pressure_Low,M,103,bool,alm,1,0,,,,,압력 하한 알람
+104,ALM_Sensor_Err,M,104,bool,alm,1,0,,,,,센서 이상 알람
+200,LOG_Temperature,D,500,float32,log,0.1,0.0,1,,,℃,설비 온도
+201,LOG_Pressure,D,502,float32,log,0.01,0.0,2,,,MPa,설비 압력
+202,LOG_Voltage,D,504,float32,log,0.1,0.0,1,,,V,전압
+203,LOG_Current,D,506,float32,log,0.01,0.0,2,,,A,전류
+204,LOG_Motor_RPM,D,508,uint32,log,1.0,0.0,0,,,RPM,모터 회전수

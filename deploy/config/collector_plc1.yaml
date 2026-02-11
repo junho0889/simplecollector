@@ -1,0 +1,84 @@
+# Collector PLC1 - MC Protocol
+# ============================================================
+# TODO: host, port, tags_file 현장에 맞게 수정
+
+collector:
+  plc_id: 4
+  name: "PLC1"
+  tags_file: "config/tags_plc1.csv"
+
+  protocol:
+    type: "mc_protocol"
+    host: "192.168.0.4"     # ← PLC1 IP
+    port: 5007               # ← PLC1 Port
+    unit_id: 1
+    timeout_ms: 5000
+    reconnect_interval_ms: 3000
+
+    extra:
+      plc_series: "iq-r"
+      frame_type: "binary_3e"
+      network_no: 0
+      pc_no: 0xFF
+      unit_io: 0x03FF
+      unit_station: 0
+      max_address_gap: 200
+
+  collection_groups:
+    - name: "fast"
+      interval_ms: 1000
+      timeout_ms: 5000
+      retry_count: 2
+      retry_delay_ms: 500
+
+# ── 알람 (1초 스캔, 값 변경 시에만 발행) ──
+    - name: "alm"
+      interval_ms: 500
+      timeout_ms: 5000
+      retry_count: 2
+      retry_delay_ms: 500
+      mode: "on_change"      # 핵심: 이전값과 비교하여 변경분만 발행
+      deadband: 0             # 0 = 모든 변화 감지 (bool ON/OFF)
+
+    # ── 로그 (5초 주기, 무조건 수집) ──
+    - name: "log"
+      interval_ms: 1000
+      timeout_ms: 5000
+      retry_count: 2
+      retry_delay_ms: 1000
+      # mode 생략 = "polling" (기본값, 매 주기 전부 발행)
+
+buffer:
+  max_size: 10000
+  flush_threshold: 1000
+  flush_interval_ms: 3000
+
+publisher:
+  batch_size: 1100
+  retry_count: 3
+  retry_delay_ms: 1000
+
+  database:
+    enabled: false               # DB 직접 연결 안 함 (Publisher 서비스가 처리)
+
+  rabbitmq:
+    enabled: true
+    host: "rabbitmq"
+    port: 5672
+    virtual_host: "/"
+    username: "admin"
+    password: "admin"
+    exchange_name: "plc.data"
+    exchange_type: "topic"
+    routing_key_prefix: "plc"
+    compression: "zlib"
+    encryption_enabled: false
+    heartbeat: 60
+    connection_timeout: 10
+    delivery_mode: 2
+
+logging:
+  level: "INFO"
+  collection_level: "INFO"
+  publish_level: "INFO"
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
