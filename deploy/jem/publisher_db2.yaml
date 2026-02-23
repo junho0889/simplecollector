@@ -1,0 +1,68 @@
+# ============================================================================
+# Publisher DB2 — 원격 TimescaleDB (10.8.0.2:5432)
+# ============================================================================
+# 10개 PLC 데이터를 별도 큐(*.copy)로 복사하여 원격 DB에 저장
+# 큐: queue.db.copy (COPY), queue.monitor.copy (UPSERT)
+# RabbitMQ에서 동일 exchange에 바인딩된 별도 큐로 메시지 복사 수신
+
+rabbitmq:
+  host: "${RABBITMQ_HOST:rabbitmq}"
+  port: 5672
+  virtual_host: "/"
+  username: "${RABBITMQ_USER:admin}"
+  password: "${RABBITMQ_PASSWORD:admin}"
+  exchange_name: "plc.data"
+  exchange_type: "topic"
+  queue_db: "queue.db.copy"
+  queue_mqtt: "queue.mqtt.copy"
+  queue_monitor: "queue.monitor.copy"
+  routing_key_pattern: "plc.*.data"
+  prefetch_count: 50
+  monitor_message_ttl: 30000
+  monitor_max_length: 10000
+  heartbeat: 60
+  connection_timeout: 10
+  compression: "zlib"
+  encryption_enabled: false
+  encryption_key: ""
+
+database:
+  enabled: true
+  host: "10.8.0.2"
+  port: 5432
+  database: "neurosense"
+  user: "user"
+  password: "neuro0901"
+  pool_size: 5
+  pool_min_size: 2
+  schema_name: "jem_jh02"
+  insert_method: "copy"
+  auto_init_schema: true
+  master_sync_enabled: true
+  collection_groups:
+    - name: "plc_data"
+      mode: "all"
+      retention_period: "1 year"
+      compression_after: "1 day"
+    - name: "alm"
+      mode: "latest"
+      retention_period: "1 year"
+      compression_after: "1 day"
+    - name: "log"
+      mode: "all"
+      retention_period: "1 year"
+      compression_after: "1 day"
+  custom_sql_path: "custom_init.sql"
+  compression_after: "1 day"
+  compression_segmentby: "plc_id, tag_id"
+  compression_orderby: "timestamp DESC"
+  retention_period: "1 year"
+
+mqtt:
+  enabled: false
+
+logging:
+  level: "INFO"
+  file_path: "logs/publisher-db2.log"
+  max_size_mb: 10
+  backup_count: 5

@@ -74,6 +74,7 @@ nul
 
 # Docker images
 *.tar
+*.tar.gz
 
 # Output files
 output.json
