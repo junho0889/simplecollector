@@ -212,6 +212,19 @@ class RabbitMQPublisher(BasePublisher):
 
             # 직렬화: List[ProcessedData] → compressed bytes
             dict_list = [item.to_dict() for item in data]
+
+            # VERBOSE: 압축/암호화 이전 원본 값 로깅
+            if logger.isEnabledFor(VERBOSE):
+                for item in data:
+                    logger.log(
+                        VERBOSE,
+                        f"[{self._name}] tag={item.tag_id} "
+                        f"type={item.data_type.value} "
+                        f"v_int={item.v_int} v_bigint={item.v_bigint} "
+                        f"v_float={item.v_float} v_bool={item.v_bool} "
+                        f"value={item.value}"
+                    )
+
             body = self._serializer.serialize(dict_list)
 
             # Delivery mode

@@ -122,7 +122,7 @@ class TagDefinition:
         description: 태그 설명
         collection_group: 수집 그룹 (같은 주기로 수집할 태그 그룹핑)
         memory: 메모리 영역 (D, M, W, X, Y 등) - CSV 분리용
-        decimals: 소수점 자릿수 (float 표시용)
+        decimals: 고정소수점 자릿수 (raw / 10^decimals 변환)
         string_length: 문자열 최대 길이
         word_length: 읽을 워드 수 (string, multi-word용)
         format: 출력 변환 포맷 (예: "float32" - int를 float로 변환)
@@ -197,7 +197,7 @@ class TagDefinition:
             스케일링이 적용된 값: (raw_value * scale) + offset
             STRING 타입은 스케일링 없이 그대로 반환
             BOOL 타입은 커스텀 임계값과 반전 적용
-            decimals가 설정된 경우 소수점 반올림 적용
+            decimals가 설정된 경우 고정소수점 변환 (raw / 10^decimals)
         """
         if raw_value is None:
             return None
@@ -218,9 +218,12 @@ class TagDefinition:
         # 스케일링: (raw * scale) + offset
         scaled = (raw_value * self.scale) + self.offset
 
-        # decimals 적용: 소수점 반올림
-        if self.decimals is not None:
-            scaled = round(scaled, self.decimals)
+        # decimals 적용: 고정소수점 변환 (PLC 관례: raw / 10^decimals)
+        # 예) decimals=2: 3061.11 → 30.6111 → round → 30.61
+        if self.decimals is not None and self.decimals > 0:
+            scaled = round(scaled / (10 ** self.decimals), self.decimals)
+        elif self.decimals == 0:
+            scaled = round(scaled)
 
         return scaled
 

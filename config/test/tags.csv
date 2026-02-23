@@ -1,6 +1,0 @@
-tag_id,tag_name,address,data_type,collection_group,scale,offset,description
-1,temperature,40001,UINT16,fast,0.1,0,온도 센서
-2,pressure,40002,UINT16,fast,0.01,0,압력 센서
-3,speed,40003,INT16,fast,1,0,속도
-4,counter,40004,UINT32,fast,1,0,생산 카운터 (2워드)
-5,setpoint,40006,FLOAT32,fast,1,0,설정값 (2워드)

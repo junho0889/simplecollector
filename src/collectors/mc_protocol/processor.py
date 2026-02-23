@@ -24,13 +24,14 @@ Example:
     processed_list = await processor.process(collected_data)
 """
 
+import json
 import struct
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from ...processors.base import BaseProcessor
 from ...core.interfaces import CollectedData, ProcessedData, TagDefinition, DataType
-from ...utils.logging import LoggerFactory
+from ...utils.logging import LoggerFactory, VERBOSE
 
 logger = LoggerFactory.get_collection_logger()
 
@@ -133,6 +134,15 @@ class McProtocolProcessor(BaseProcessor):
             f"'{data.collection_group}'"
         )
 
+        # VERBOSE: 그룹 전체 파싱 결과를 JSON으로 출력
+        if results and logger.isEnabledFor(VERBOSE):
+            snapshot = {tag.tag_name: value for tag, value in results}
+            logger.log(
+                VERBOSE,
+                f"[{self._name}] [{data.collection_group}] "
+                f"{json.dumps(snapshot, ensure_ascii=False)}"
+            )
+
         return results
 
     def _extract_value(
@@ -160,32 +170,26 @@ class McProtocolProcessor(BaseProcessor):
 
         # 데이터 타입에 따른 값 추출
         if data_type == DataType.BOOL:
-            return self._extract_bool(device_data, address, device)
-
+            value = self._extract_bool(device_data, address, device)
         elif data_type == DataType.INT16:
             raw = device_data.get(address)
-            if raw is not None:
-                return struct.unpack('<h', struct.pack('<H', raw))[0]
-
+            value = struct.unpack('<h', struct.pack('<H', raw))[0] if raw is not None else None
         elif data_type == DataType.UINT16:
-            return device_data.get(address)
-
+            value = device_data.get(address)
         elif data_type == DataType.INT32:
-            return self._extract_int32(device_data, address)
-
+            value = self._extract_int32(device_data, address)
         elif data_type == DataType.UINT32:
-            return self._extract_uint32(device_data, address)
-
+            value = self._extract_uint32(device_data, address)
         elif data_type == DataType.FLOAT32:
-            return self._extract_float32(device_data, address)
-
+            value = self._extract_float32(device_data, address)
         elif data_type == DataType.FLOAT64:
-            return self._extract_float64(device_data, address)
-
+            value = self._extract_float64(device_data, address)
         elif data_type == DataType.STRING:
-            return self._extract_string(device_data, address, word_count)
+            value = self._extract_string(device_data, address, word_count)
+        else:
+            value = None
 
-        return None
+        return value
 
     def _parse_address(self, address: str) -> Tuple[str, int]:
         """

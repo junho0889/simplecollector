@@ -1,0 +1,68 @@
+# ============================================================================
+# MC Protocol Full Pipeline Test
+# ============================================================================
+# MC Simulator(5000) → simpleCollector → RabbitMQ → collector-publisher → DB
+#
+# 사전 조건: rabbitmq-test(5672), testdb(5433) 컨테이너 실행 중
+#
+# 사용법 (simpleCollector 루트에서):
+#   docker compose -f tests/mc_protocol_test/docker-compose.test.yml up --build
+#   docker compose -f tests/mc_protocol_test/docker-compose.test.yml down
+#   docker compose -f tests/mc_protocol_test/docker-compose.test.yml logs -f
+# ============================================================================
+
+services:
+  # MC Protocol Simulator (가상 PLC, port 5000)
+  mc-simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile.simulator
+    container_name: mc-simulator-test
+    networks:
+      - test-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost',5000)); s.close()"]
+      interval: 3s
+      timeout: 2s
+      retries: 5
+      start_period: 3s
+
+  # simpleCollector (MC Protocol → RabbitMQ)
+  collector:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    container_name: collector-mc-test
+    depends_on:
+      mc-simulator:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: ["--config", "/app/config/collector_test.yaml"]
+    volumes:
+      - ./config:/app/config:ro
+    networks:
+      - test-net
+    restart: on-failure
+
+  # collector-publisher (RabbitMQ → TimescaleDB)
+  publisher:
+    build:
+      context: ../../../collector-publisher
+      dockerfile: Dockerfile
+    container_name: publisher-test
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: ["--config", "/app/config/publisher_test.yaml"]
+    volumes:
+      - ./config:/app/config:ro
+      - ./config:/app/collector-config:ro
+    networks:
+      - test-net
+    restart: on-failure
+
+networks:
+  test-net:
+    driver: bridge
