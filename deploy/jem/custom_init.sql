@@ -47,50 +47,36 @@ CREATE TRIGGER trg_{group}_master_updated_at
 -- ============================================================================
 -- 3. alm_history 테이블 + 트리거
 -- ============================================================================
--- 목적: alm 그룹 태그의 값이 변경될 때마다 변경 이력을 기록한다.
---       alm_latest 테이블의 UPSERT 시 이전 값과 비교하여,
+-- 목적: alm 그룹 태그의 v_bool 값이 변경될 때마다 이력을 기록한다.
+--       alm_latest 테이블의 UPSERT 시 이전 v_bool과 비교하여,
 --       값이 달라진 경우에만 alm_history에 INSERT 한다.
+--       시간순 정렬 시 이전 행의 v_bool이 곧 prev 역할을 하므로
+--       prev/curr 분리 없이 현재 값만 저장한다.
 --
 -- 동작 방식:
 --   1) alm_latest에 UPSERT(INSERT ... ON CONFLICT UPDATE) 발생
---   2) BEFORE UPDATE 트리거가 OLD(이전값)와 NEW(새 값)를 비교
---   3) v_bool, v_int, v_bigint, v_float, v_text 중 하나라도 변경되면
---      OLD 값을 prev_* 컬럼에, NEW 값을 curr_* 컬럼에 기록
---   4) INSERT 시에는 이전 값이 없으므로 AFTER INSERT 트리거로
---      첫 값을 curr_* 에만 기록 (prev_* 는 NULL)
+--   2) BEFORE UPDATE 트리거가 OLD.v_bool과 NEW.v_bool을 비교
+--   3) v_bool이 변경되면 alm_history에 INSERT
+--   4) INSERT 시에는 AFTER INSERT 트리거로 첫 값 기록
 -- ============================================================================
 
 -- alm_history 테이블
 CREATE TABLE IF NOT EXISTS {schema}.alm_history (
-    id              BIGSERIAL       PRIMARY KEY,
-    event_time      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),  -- 변경 감지 시각
-    timestamp       TIMESTAMPTZ     NOT NULL,                -- PLC 수집 시각
+    timestamp       TIMESTAMPTZ     NOT NULL DEFAULT NOW(),  -- 변경 감지 시각
     plc_id          SMALLINT        NOT NULL,
     tag_id          INTEGER         NOT NULL,
-    tag_name        VARCHAR(100),                            -- 조회 편의용 (비정규화)
-    -- 이전 값
-    prev_v_bool     BOOLEAN,
-    prev_v_int      INTEGER,
-    prev_v_bigint   BIGINT,
-    prev_v_float    DOUBLE PRECISION,
-    prev_v_text     TEXT,
-    -- 현재 값 (변경 후)
-    curr_v_bool     BOOLEAN,
-    curr_v_int      INTEGER,
-    curr_v_bigint   BIGINT,
-    curr_v_float    DOUBLE PRECISION,
-    curr_v_text     TEXT
+    v_bool          BOOLEAN                                  -- 알람 상태 (TRUE=발생, FALSE=해제)
 );
 
 -- 인덱스: 시간순 조회, PLC+태그별 조회
 CREATE INDEX IF NOT EXISTS idx_alm_history_time
-    ON {schema}.alm_history (event_time DESC);
+    ON {schema}.alm_history (timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_alm_history_plc_tag
-    ON {schema}.alm_history (plc_id, tag_id, event_time DESC);
+    ON {schema}.alm_history (plc_id, tag_id, timestamp DESC);
 
 -- TimescaleDB hypertable 변환 (대량 이력 저장 시 성능 최적화)
 SELECT create_hypertable(
-    '{schema}.alm_history', 'event_time',
+    '{schema}.alm_history', 'timestamp',
     chunk_time_interval => INTERVAL '1 day',
     if_not_exists => TRUE,
     migrate_data => TRUE
@@ -100,7 +86,7 @@ SELECT create_hypertable(
 ALTER TABLE {schema}.alm_history SET (
     timescaledb.compress,
     timescaledb.compress_segmentby = 'plc_id, tag_id',
-    timescaledb.compress_orderby   = 'event_time DESC'
+    timescaledb.compress_orderby   = 'timestamp DESC'
 );
 SELECT add_compression_policy(
     '{schema}.alm_history',
@@ -115,32 +101,13 @@ SELECT add_retention_policy(
     if_not_exists => TRUE
 );
 
--- 트리거 함수: alm_latest UPDATE 시 값 변경 감지 → alm_history INSERT
+-- 트리거 함수: alm_latest UPDATE 시 v_bool 변경 감지 → alm_history INSERT
 CREATE OR REPLACE FUNCTION {schema}.fn_alm_history_on_update()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- v_bool, v_int, v_bigint, v_float, v_text 중 하나라도 변경되면 기록
-    IF (OLD.v_bool    IS DISTINCT FROM NEW.v_bool)    OR
-       (OLD.v_int     IS DISTINCT FROM NEW.v_int)     OR
-       (OLD.v_bigint  IS DISTINCT FROM NEW.v_bigint)  OR
-       (OLD.v_float   IS DISTINCT FROM NEW.v_float)   OR
-       (OLD.v_text    IS DISTINCT FROM NEW.v_text)
-    THEN
-        INSERT INTO {schema}.alm_history (
-            event_time, timestamp, plc_id, tag_id, tag_name,
-            prev_v_bool, prev_v_int, prev_v_bigint, prev_v_float, prev_v_text,
-            curr_v_bool, curr_v_int, curr_v_bigint, curr_v_float, curr_v_text
-        )
-        SELECT
-            NOW(),
-            NEW.timestamp,
-            NEW.plc_id,
-            NEW.tag_id,
-            m.tag_name,
-            OLD.v_bool, OLD.v_int, OLD.v_bigint, OLD.v_float, OLD.v_text,
-            NEW.v_bool, NEW.v_int, NEW.v_bigint, NEW.v_float, NEW.v_text
-        FROM {schema}.alm_master m
-        WHERE m.plc_id = NEW.plc_id AND m.tag_id = NEW.tag_id;
+    IF (OLD.v_bool IS DISTINCT FROM NEW.v_bool) THEN
+        INSERT INTO {schema}.alm_history (timestamp, plc_id, tag_id, v_bool)
+        VALUES (NOW(), NEW.plc_id, NEW.tag_id, NEW.v_bool);
     END IF;
 
     RETURN NEW;
@@ -151,21 +118,8 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION {schema}.fn_alm_history_on_insert()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO {schema}.alm_history (
-        event_time, timestamp, plc_id, tag_id, tag_name,
-        prev_v_bool, prev_v_int, prev_v_bigint, prev_v_float, prev_v_text,
-        curr_v_bool, curr_v_int, curr_v_bigint, curr_v_float, curr_v_text
-    )
-    SELECT
-        NOW(),
-        NEW.timestamp,
-        NEW.plc_id,
-        NEW.tag_id,
-        m.tag_name,
-        NULL, NULL, NULL, NULL, NULL,
-        NEW.v_bool, NEW.v_int, NEW.v_bigint, NEW.v_float, NEW.v_text
-    FROM {schema}.alm_master m
-    WHERE m.plc_id = NEW.plc_id AND m.tag_id = NEW.tag_id;
+    INSERT INTO {schema}.alm_history (timestamp, plc_id, tag_id, v_bool)
+    VALUES (NOW(), NEW.plc_id, NEW.tag_id, NEW.v_bool);
 
     RETURN NEW;
 END;
@@ -195,50 +149,36 @@ CREATE TRIGGER trg_alm_history_insert
 -- 사용 시나리오:
 --   M 메모리 태그가 설비 동작 완료/이벤트 발생 신호로 사용될 때,
 --   그 시점의 log 그룹 전체 데이터(온도, 압력, 전류 등)를
---   한 묶음(snapshot_id)으로 기록하여 나중에 이벤트별 분석 가능.
+--   한 묶음으로 기록하여 나중에 이벤트별 분석 가능.
 --
 -- 동작 방식:
 --   1) log_latest 테이블에 UPSERT 발생
 --   2) BEFORE UPDATE 트리거가 실행됨
 --   3) 해당 태그가 M 메모리인지 log_master에서 확인
 --   4) M 메모리이고 v_bool이 FALSE→TRUE (rising edge)이면
---   5) 동일 PLC의 log_latest 전체를 snapshot_id로 묶어 저장
---   6) snapshot_id = '{plc_id}_{timestamp}' 형식으로 생성
+--   5) 동일 PLC의 log_latest 전체를 동일 timestamp로 저장
 -- ============================================================================
 
 -- log_snapshot_history 테이블
 CREATE TABLE IF NOT EXISTS {schema}.log_snapshot_history (
-    id              BIGSERIAL,
-    snapshot_id     VARCHAR(100)    NOT NULL,      -- 스냅샷 식별자 (PLC별 이벤트 묶음)
-    snapshot_time   TIMESTAMPTZ     NOT NULL DEFAULT NOW(),  -- 스냅샷 시각
-    trigger_plc_id  SMALLINT        NOT NULL,      -- 트리거 발생 PLC
-    trigger_tag_id  INTEGER         NOT NULL,      -- 트리거 발생 태그 (M 메모리)
-    trigger_tag_name VARCHAR(100),                 -- 트리거 태그 이름
-    -- 스냅샷 대상 태그 정보
+    timestamp       TIMESTAMPTZ     NOT NULL DEFAULT NOW(),  -- 스냅샷 시각
     plc_id          SMALLINT        NOT NULL,
     tag_id          INTEGER         NOT NULL,
-    tag_name        VARCHAR(100),
-    memory          VARCHAR(10),
-    timestamp       TIMESTAMPTZ,
     v_bool          BOOLEAN,
     v_int           INTEGER,
     v_bigint        BIGINT,
-    v_float         DOUBLE PRECISION,
-    v_text          TEXT,
-    quality_code    SMALLINT
+    v_float         DOUBLE PRECISION
 );
 
 -- 인덱스
 CREATE INDEX IF NOT EXISTS idx_log_snapshot_time
-    ON {schema}.log_snapshot_history (snapshot_time DESC);
-CREATE INDEX IF NOT EXISTS idx_log_snapshot_id
-    ON {schema}.log_snapshot_history (snapshot_id);
-CREATE INDEX IF NOT EXISTS idx_log_snapshot_trigger
-    ON {schema}.log_snapshot_history (trigger_plc_id, trigger_tag_id, snapshot_time DESC);
+    ON {schema}.log_snapshot_history (timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_log_snapshot_plc_tag
+    ON {schema}.log_snapshot_history (plc_id, tag_id, timestamp DESC);
 
 -- TimescaleDB hypertable 변환
 SELECT create_hypertable(
-    '{schema}.log_snapshot_history', 'snapshot_time',
+    '{schema}.log_snapshot_history', 'timestamp',
     chunk_time_interval => INTERVAL '1 day',
     if_not_exists => TRUE,
     migrate_data => TRUE
@@ -247,8 +187,8 @@ SELECT create_hypertable(
 -- 압축 정책 (1일 후)
 ALTER TABLE {schema}.log_snapshot_history SET (
     timescaledb.compress,
-    timescaledb.compress_segmentby = 'trigger_plc_id, trigger_tag_id',
-    timescaledb.compress_orderby   = 'snapshot_time DESC'
+    timescaledb.compress_segmentby = 'plc_id, tag_id',
+    timescaledb.compress_orderby   = 'timestamp DESC'
 );
 SELECT add_compression_policy(
     '{schema}.log_snapshot_history',
@@ -268,12 +208,11 @@ CREATE OR REPLACE FUNCTION {schema}.fn_log_snapshot_on_update()
 RETURNS TRIGGER AS $$
 DECLARE
     v_memory        VARCHAR(10);
-    v_tag_name      VARCHAR(100);
-    v_snapshot_id   VARCHAR(100);
+    v_now           TIMESTAMPTZ;
 BEGIN
     -- M 메모리 태그인지 확인
-    SELECT memory, tag_name
-    INTO v_memory, v_tag_name
+    SELECT memory
+    INTO v_memory
     FROM {schema}.log_master
     WHERE plc_id = NEW.plc_id AND tag_id = NEW.tag_id;
 
@@ -284,34 +223,19 @@ BEGIN
 
     -- Rising edge 감지: v_bool이 FALSE(또는 NULL) → TRUE
     IF (NEW.v_bool = TRUE) AND (OLD.v_bool IS DISTINCT FROM TRUE) THEN
-        -- 스냅샷 ID 생성: plc{plc_id}_{timestamp}
-        v_snapshot_id := 'plc' || NEW.plc_id || '_' || TO_CHAR(NOW(), 'YYYYMMDD_HH24MISS_US');
+        v_now := NOW();
 
         -- 해당 PLC의 log 그룹 전체 최신값을 스냅샷으로 저장
         INSERT INTO {schema}.log_snapshot_history (
-            snapshot_id, snapshot_time,
-            trigger_plc_id, trigger_tag_id, trigger_tag_name,
-            plc_id, tag_id, tag_name, memory,
-            timestamp,
-            v_bool, v_int, v_bigint, v_float, v_text,
-            quality_code
+            timestamp, plc_id, tag_id,
+            v_bool, v_int, v_bigint, v_float
         )
         SELECT
-            v_snapshot_id,
-            NOW(),
-            NEW.plc_id,
-            NEW.tag_id,
-            v_tag_name,
+            v_now,
             l.plc_id,
             l.tag_id,
-            m.tag_name,
-            m.memory,
-            l.timestamp,
-            l.v_bool, l.v_int, l.v_bigint, l.v_float, l.v_text,
-            l.quality_code
+            l.v_bool, l.v_int, l.v_bigint, l.v_float
         FROM {schema}.log_latest l
-        LEFT JOIN {schema}.log_master m
-            ON l.plc_id = m.plc_id AND l.tag_id = m.tag_id
         WHERE l.plc_id = NEW.plc_id;
     END IF;
 

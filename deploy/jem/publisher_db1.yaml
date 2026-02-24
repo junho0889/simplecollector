@@ -48,7 +48,7 @@ database:
       retention_period: "1 year"
       compression_after: "1 day"
     - name: "log"
-      mode: "all"
+      mode: "latest"
       retention_period: "1 year"
       compression_after: "1 day"
   custom_sql_path: "custom_init.sql"
