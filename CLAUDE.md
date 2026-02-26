@@ -45,13 +45,18 @@ PLC ← Protocol (MC/Modbus) → Collector → Buffer → Processor → Publishe
 ### Tag Scaling (`TagDefinition.apply_scaling()`)
 ```python
 scaled = (raw_value * scale) + offset
-# decimals: 고정소수점 변환 (PLC 관례)
-# decimals=2 → raw / 100 → round(2)
-# 예) PLC raw 3061.11, decimals=2 → 30.61
+# decimals 적용 (타입별 분기):
+# - 정수 타입(uint16, int32 등): 고정소수점 변환 (÷10^decimals)
+#   예) uint16, decimals=2: raw 3061 → 30.61
+# - float 타입(float32, float64): 단순 반올림
+#   예) float32, decimals=1: raw 69.1 → 69.1 (그대로)
 if decimals > 0:
-    scaled = round(scaled / (10 ** decimals), decimals)
+    if data_type in (FLOAT32, FLOAT64):
+        scaled = round(scaled, decimals)
+    else:
+        scaled = round(scaled / (10 ** decimals), decimals)
 ```
-**주의**: `decimals`는 단순 반올림이 아니라 `÷10^decimals` 변환임 (PLC/HMI 업계 표준)
+**주의**: 정수 타입의 `decimals`는 `÷10^decimals` 변환 (PLC/HMI 업계 표준), float는 round만
 
 ### Collection Groups
 태그를 그룹별로 나눠 다른 주기/방식으로 수집:
@@ -106,6 +111,28 @@ docker run -v ./config:/app/config neuro_collector_mc:mc-latest
 - ~262 tags/sec (262 active tags × 1초)
 - ~35MB RAM
 - ~168 bytes/row average
+
+## Build & Deploy (JEM)
+
+### 빌드 스크립트
+```bash
+# 전체 빌드 (collector + publisher → ARM64 tar)
+python build_deploy.py
+
+# 개별 빌드
+python build_deploy.py --collector
+python build_deploy.py --publisher
+```
+- 출력: `deploy/jem/neuro_collector_mc.tar`, `deploy/jem/neuro_publisher.tar`
+- 플랫폼: `linux/arm64` (라즈베리파이)
+
+### 소스 수정 후 필수 작업
+**소스 코드(`src/` 또는 `collector-publisher/src/`)를 수정한 경우 반드시 아래 두 가지를 수행할 것:**
+
+1. **커밋**: 변경 내용을 커밋한다
+2. **빌드**: `python build_deploy.py` 를 실행하여 배포용 tar 파일을 갱신한다
+
+> 설정 파일(`deploy/jem/*.yaml`, `*.csv`, `*.sql`)만 변경한 경우에는 빌드 불필요. 커밋만 수행.
 
 ## Git Workflow
 - 개발 단계: 큰 변경 시 자동 commit + push

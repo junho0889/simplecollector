@@ -1,4 +1,4 @@
-# ============================================================================
+﻿# ============================================================================
 # PLC-B: YOKE 조립
 # ============================================================================
 # 192.168.0.2:5007 → RabbitMQ Exchange: PLC_B
@@ -32,8 +32,6 @@ collector:
       timeout_ms: 5000
       retry_count: 2
       retry_delay_ms: 500
-      mode: "on_change"
-      deadband: 0
 
     - name: "alm"
       interval_ms: 500
@@ -42,12 +40,6 @@ collector:
       retry_delay_ms: 500
       mode: "on_change"
       deadband: 0
-
-    - name: "log"
-      interval_ms: 1000
-      timeout_ms: 5000
-      retry_count: 2
-      retry_delay_ms: 500
 
 buffer:
   max_size: 10000
