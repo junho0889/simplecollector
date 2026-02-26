@@ -297,8 +297,6 @@ class BaseProcessor(IProcessor):
         Returns:
             ProcessedData 인스턴스
         """
-        # Raw 바이트 값 계산
-        v_byte = self._calculate_raw_byte(raw_value, tag.data_type)
         quality_code = 1 if raw_value is not None else 0
 
         # 타입별 값 초기화 (None)
@@ -328,7 +326,6 @@ class BaseProcessor(IProcessor):
             tag_id=tag.tag_id,
             data_type=tag.data_type,
             v_bool=v_bool,
-            v_byte=v_byte,
             v_int=v_int,
             v_bigint=v_bigint,
             v_float=v_float,

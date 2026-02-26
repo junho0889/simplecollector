@@ -18,6 +18,7 @@ rabbitmq:
   queue_monitor: "queue.monitor.copy"
   routing_key_pattern: "plc.*.data"
   prefetch_count: 50
+  monitor_prefetch: 30
   monitor_message_ttl: 30000
   monitor_max_length: 10000
   heartbeat: 60
@@ -45,10 +46,6 @@ database:
       retention_period: "1 year"
       compression_after: "1 day"
     - name: "alm"
-      mode: "latest"
-      retention_period: "1 year"
-      compression_after: "1 day"
-    - name: "log"
       mode: "latest"
       retention_period: "1 year"
       compression_after: "1 day"

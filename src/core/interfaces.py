@@ -218,10 +218,16 @@ class TagDefinition:
         # 스케일링: (raw * scale) + offset
         scaled = (raw_value * self.scale) + self.offset
 
-        # decimals 적용: 고정소수점 변환 (PLC 관례: raw / 10^decimals)
-        # 예) decimals=2: 3061.11 → 30.6111 → round → 30.61
+        # decimals 적용
+        # - 정수 타입: 고정소수점 변환 (PLC 관례: raw / 10^decimals)
+        #   예) uint16, decimals=2: raw 3061 → 30.61
+        # - float 타입: 단순 반올림 (이미 소수점이 있는 값)
+        #   예) float32, decimals=1: raw 69.1 → 69.1 (그대로)
         if self.decimals is not None and self.decimals > 0:
-            scaled = round(scaled / (10 ** self.decimals), self.decimals)
+            if self.data_type in (DataType.FLOAT32, DataType.FLOAT64):
+                scaled = round(scaled, self.decimals)
+            else:
+                scaled = round(scaled / (10 ** self.decimals), self.decimals)
         elif self.decimals == 0:
             scaled = round(scaled)
 
@@ -372,18 +378,14 @@ class ProcessedData:
         """딕셔너리로 변환 (JSON/MQTT 직렬화용)."""
         result = {
             "source_time": self.source_time.isoformat(timespec='milliseconds'),
-            "server_time": self.server_time.isoformat(timespec='milliseconds'),
             "plc_id": self.plc_id,
             "tag_id": self.tag_id,
-            "data_type": self.data_type.value,
             "quality": self.quality_code,
         }
 
         # 값 추가 (None이 아닌 것만)
         if self.v_bool is not None:
             result["v_bool"] = self.v_bool
-        if self.v_byte is not None:
-            result["v_byte"] = self.v_byte
         if self.v_int is not None:
             result["v_int"] = self.v_int
         if self.v_bigint is not None:
@@ -392,9 +394,6 @@ class ProcessedData:
             result["v_float"] = round(self.v_float, 6) if isinstance(self.v_float, float) else self.v_float
         if self.v_text is not None:
             result["v_text"] = self.v_text
-
-        # 단일 value 필드 (대표값)
-        result["value"] = self.value
 
         # 수집 그룹 (publisher에서 테이블 라우팅용)
         if self.collection_group != "default":
