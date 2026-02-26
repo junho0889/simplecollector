@@ -7,6 +7,9 @@ collector:
   plc_id: 10
   name: "PLC-L"
   description: "동작검사 및 CASE and TER 검사"
+  site: "진영전기"
+  area: "릴레이 생산"
+  line: "JH-2HO"
   tags_file: "config/tags_09_PLC-L.csv"
 
   protocol:

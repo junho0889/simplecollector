@@ -7,6 +7,9 @@ collector:
   plc_id: 9
   name: "PLC-K"
   description: "LASER 날인"
+  site: "진영전기"
+  area: "릴레이 생산"
+  line: "JH-2HO"
   tags_file: "config/tags_08_PLC-K.csv"
 
   protocol:

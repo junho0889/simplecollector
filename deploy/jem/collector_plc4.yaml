@@ -7,6 +7,9 @@ collector:
   plc_id: 4
   name: "PLC-D"
   description: "중간 검사"
+  site: "진영전기"
+  area: "릴레이 생산"
+  line: "JH-2HO"
   tags_file: "config/tags_10_PLC-D.csv"
 
   protocol:

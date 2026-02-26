@@ -7,6 +7,9 @@ collector:
   plc_id: 5
   name: "PLC-EFG"
   description: "AIR 청소"
+  site: "진영전기"
+  area: "릴레이 생산"
+  line: "JH-2HO"
   tags_file: "config/tags_01_PLC-EFG.csv"
 
   protocol:

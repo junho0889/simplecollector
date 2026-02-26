@@ -7,6 +7,9 @@ collector:
   plc_id: 3
   name: "PLC-C"
   description: "TER 조립"
+  site: "진영전기"
+  area: "릴레이 생산"
+  line: "JH-2HO"
   tags_file: "config/tags_05_PLC-C.csv"
 
   protocol:

@@ -7,6 +7,9 @@ collector:
   plc_id: 7
   name: "PLC-I"
   description: "예비납땜"
+  site: "진영전기"
+  area: "릴레이 생산"
+  line: "JH-2HO"
   tags_file: "config/tags_07_PLC-I.csv"
 
   protocol:

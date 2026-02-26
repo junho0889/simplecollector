@@ -7,6 +7,9 @@ collector:
   plc_id: 2
   name: "PLC-B"
   description: "YOKE 조립"
+  site: "진영전기"
+  area: "릴레이 생산"
+  line: "JH-2HO"
   tags_file: "config/tags_02_PLC-B.csv"
 
   protocol:

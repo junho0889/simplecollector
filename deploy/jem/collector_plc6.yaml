@@ -7,6 +7,9 @@ collector:
   plc_id: 6
   name: "PLC-H"
   description: "1차 SEAL 도포 및 건조"
+  site: "진영전기"
+  area: "릴레이 생산"
+  line: "JH-2HO"
   tags_file: "config/tags_06_PLC-H.csv"
 
   protocol:
