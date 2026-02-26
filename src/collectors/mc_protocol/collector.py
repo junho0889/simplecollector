@@ -238,8 +238,8 @@ class DeviceCode:
 
     @classmethod
     def get_address_base(cls, device_name: str) -> int:
-        """주소 진법 조회."""
-        info = cls.DEVICE_INFO.get(device_name.upper())
+        """주소 진법 조회 (현재 시리즈 기준)."""
+        info = cls._current_device_info.get(device_name.upper())
         return info[2] if info else 10
 
 
@@ -887,11 +887,16 @@ class McProtocolCollector(BaseCollector):
                                     bit_value = (word_value >> bit_pos) & 0x01
                                     result[bit_addr] = bit_value
                 elif is_bit:
-                    # 일반 비트 디바이스 (M, X, Y): 각 비트당 1바이트
+                    # 일반 비트 디바이스 (M, X, Y): Binary 응답은 1바이트에 2비트 패킹
+                    # 하위 니블(bit 0-3) = 짝수 번째, 상위 니블(bit 4-7) = 홀수 번째
                     for i in range(read_count):
-                        if i < len(response):
-                            bit_value = response[i] & 0x01
-                            result[read_group.start_address + i] = bit_value
+                        byte_idx = i // 2
+                        if byte_idx < len(response):
+                            if i % 2 == 0:
+                                bit_value = response[byte_idx] & 0x0F
+                            else:
+                                bit_value = (response[byte_idx] >> 4) & 0x0F
+                            result[read_group.start_address + i] = bit_value & 0x01
                 else:
                     # 워드 디바이스: 각 워드를 순서대로 저장
                     for i in range(read_count):
