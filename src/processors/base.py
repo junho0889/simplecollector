@@ -553,6 +553,11 @@ class BaseProcessor(IProcessor):
                 EventType.DATA_COLLECTED,
                 self._on_data_collected
             )
+            # 재연결 시 on_change 캐시 초기화 (stale 값 방지)
+            self._connected_unsubscribe = self._event_bus.subscribe(
+                EventType.COLLECTOR_CONNECTED,
+                self._on_collector_connected
+            )
 
         logger.info(f"[{self._name}] Processor started")
 
@@ -566,6 +571,9 @@ class BaseProcessor(IProcessor):
         if self._event_unsubscribe:
             self._event_unsubscribe()
             self._event_unsubscribe = None
+        if hasattr(self, '_connected_unsubscribe') and self._connected_unsubscribe:
+            self._connected_unsubscribe()
+            self._connected_unsubscribe = None
 
         await super().stop()
         logger.info(f"[{self._name}] Processor stopped")
@@ -573,6 +581,15 @@ class BaseProcessor(IProcessor):
     # =========================================================================
     # Event Handler
     # =========================================================================
+
+    async def _on_collector_connected(self, event: Event) -> None:
+        """재연결 시 on_change 값 캐시 초기화 (stale 값 방지)."""
+        cache_size = len(self._value_cache)
+        self._value_cache.clear()
+        logger.info(
+            f"[{self._name}] Value cache cleared on reconnect "
+            f"({cache_size} entries)"
+        )
 
     async def _on_data_collected(self, event: Event) -> None:
         """

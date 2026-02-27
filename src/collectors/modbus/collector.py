@@ -10,14 +10,18 @@ Supported Modes:
     - RTU over TCP: RTU 프레임을 TCP로 전송 (게이트웨이용)
 
 Supported Function Codes:
+    - FC01: Read Coils (비트 출력 영역)
+    - FC02: Read Discrete Inputs (비트 입력 영역)
     - FC03: Read Holding Registers
     - FC04: Read Input Registers
 
 Address Format:
-    - D0, D100: Holding Register (D 접두사)
-    - I0, I100: Input Register (I 접두사)
-    - HR0, HR100: Holding Register (HR 접두사)
-    - IR0, IR100: Input Register (IR 접두사)
+    - C0, C100: Coil (C 접두사, FC01)
+    - DI0, DI100: Discrete Input (DI 접두사, FC02)
+    - D0, D100: Holding Register (D 접두사, FC03)
+    - I0, I100: Input Register (I 접두사, FC04)
+    - HR0, HR100: Holding Register (HR 접두사, FC03)
+    - IR0, IR100: Input Register (IR 접두사, FC04)
     - 숫자만: Holding Register로 간주
 
 Connection Stability:
@@ -183,12 +187,14 @@ class ModbusTransport(ABC):
 
         Args:
             unit_id: Slave ID
-            function_code: FC03 or FC04
-            start_address: 시작 레지스터 주소
-            quantity: 읽을 레지스터 수
+            function_code: FC01~FC04
+            start_address: 시작 주소 (레지스터 or coil)
+            quantity: 읽을 수 (레지스터 수 or coil 수)
 
         Returns:
-            레지스터 데이터 bytes (big-endian, 레지스터당 2바이트)
+            응답 데이터 bytes.
+            FC01/FC02: bit-packed (1바이트=8비트, LSB first)
+            FC03/FC04: big-endian (레지스터당 2바이트)
             실패 시 None
         """
         ...
@@ -774,14 +780,18 @@ class ModbusCollector(BaseCollector):
     RTU 시리얼은 pyserial 필요 (lazy import).
 
     Supported Registers:
+        - Coils (Function Code 01, 비트 출력)
+        - Discrete Inputs (Function Code 02, 비트 입력)
         - Holding Registers (Function Code 03)
         - Input Registers (Function Code 04)
 
     Address Format:
-        - D0, D100: Holding Register
-        - I0, I100: Input Register
-        - HR0, HR100: Holding Register
-        - IR0, IR100: Input Register
+        - C0, C100: Coil (FC01)
+        - DI0, DI100: Discrete Input (FC02)
+        - D0, D100: Holding Register (FC03)
+        - I0, I100: Input Register (FC04)
+        - HR0, HR100: Holding Register (FC03)
+        - IR0, IR100: Input Register (FC04)
         - 숫자만: Holding Register로 간주
     """
 
@@ -795,8 +805,13 @@ class ModbusCollector(BaseCollector):
     ABSOLUTE_MAX_GAP = 500
 
     # Function Codes
+    FC_READ_COILS = 0x01
+    FC_READ_DISCRETE_INPUTS = 0x02
     FC_READ_HOLDING = 0x03
     FC_READ_INPUT = 0x04
+
+    # 한 번에 읽을 수 있는 최대 Coil 수 (Modbus 표준: FC01/FC02)
+    MAX_COILS_PER_READ = 2000
 
     def __init__(
         self,
@@ -927,16 +942,21 @@ class ModbusCollector(BaseCollector):
         if not tags:
             return []
 
-        parsed_tags: List[Tuple[int, str, TagDefinition]] = []
+        parsed_tags: List[Tuple[int, str, TagDefinition, int]] = []
         for tag in tags:
             address, reg_type = self._parse_address(tag.address)
-            size = self._get_register_size(tag.data_type)
+            size = self._get_register_size(tag.data_type, tag)
             parsed_tags.append((address, reg_type, tag, size))
 
+        # 4종 레지스터 타입별 분류
+        coil_tags = [(a, t, s) for a, rt, t, s in parsed_tags if rt == 'coil']
+        discrete_tags = [(a, t, s) for a, rt, t, s in parsed_tags if rt == 'discrete']
         holding_tags = [(a, t, s) for a, rt, t, s in parsed_tags if rt == 'holding']
         input_tags = [(a, t, s) for a, rt, t, s in parsed_tags if rt == 'input']
 
         groups: List[ReadGroup] = []
+        groups.extend(self._create_read_groups(coil_tags, 'coil'))
+        groups.extend(self._create_read_groups(discrete_tags, 'discrete'))
         groups.extend(self._create_read_groups(holding_tags, 'holding'))
         groups.extend(self._create_read_groups(input_tags, 'input'))
 
@@ -952,13 +972,20 @@ class ModbusCollector(BaseCollector):
 
         Args:
             tags: (주소, 태그, 크기) 튜플 리스트
-            reg_type: 레지스터 타입
+            reg_type: 레지스터 타입 ('holding', 'input', 'coil', 'discrete')
 
         Returns:
             ReadGroup 리스트
         """
         if not tags:
             return []
+
+        # coil/discrete는 비트 단위 → 최대 2000, 레지스터는 최대 125
+        max_per_read = (
+            self.MAX_COILS_PER_READ
+            if reg_type in ('coil', 'discrete')
+            else self.MAX_REGISTERS_PER_READ
+        )
 
         sorted_tags = sorted(tags, key=lambda x: x[0])
         groups: List[ReadGroup] = []
@@ -975,7 +1002,7 @@ class ModbusCollector(BaseCollector):
             gap = address - prev_end
             total_size = address + size - current_group.start_address
 
-            if gap <= self._max_address_gap and total_size <= self.MAX_REGISTERS_PER_READ:
+            if gap <= self._max_address_gap and total_size <= max_per_read:
                 current_group.add_tag(address, tag, size)
             else:
                 groups.append(current_group)
@@ -1002,14 +1029,20 @@ class ModbusCollector(BaseCollector):
         주소 문자열 파싱.
 
         Args:
-            address: 주소 문자열 (예: "D0", "I100", "100")
+            address: 주소 문자열 (예: "D0", "I100", "C0", "DI50", "100")
 
         Returns:
             (레지스터 주소, 레지스터 타입) 튜플
+            타입: 'holding', 'input', 'coil', 'discrete'
         """
         address = address.strip().upper()
 
-        if address.startswith('D'):
+        # DI를 D보다 먼저 검사 (longest prefix match)
+        if address.startswith('DI'):
+            return int(address[2:]), 'discrete'
+        elif address.startswith('C'):
+            return int(address[1:]), 'coil'
+        elif address.startswith('D'):
             return int(address[1:]), 'holding'
         elif address.startswith('I'):
             return int(address[1:]), 'input'
@@ -1020,16 +1053,23 @@ class ModbusCollector(BaseCollector):
         else:
             return int(address), 'holding'
 
-    def _get_register_size(self, data_type: DataType) -> int:
+    def _get_register_size(
+        self, data_type: DataType, tag: Optional[TagDefinition] = None
+    ) -> int:
         """
-        데이터 타입에 따른 레지스터 크기 반환.
+        데이터 타입에 따른 레지스터/coil 크기 반환.
 
         Args:
             data_type: 데이터 타입
+            tag: 태그 정의 (STRING의 word_length 참조용)
 
         Returns:
-            필요한 레지스터 수 (16비트 단위)
+            필요한 레지스터 수 (레지스터: 16비트 단위, coil: 1비트 단위)
         """
+        # STRING은 word_length로 크기 결정
+        if data_type == DataType.STRING and tag and tag.word_length:
+            return tag.word_length
+
         size_map = {
             DataType.BOOL: 1,
             DataType.INT16: 1,
@@ -1111,23 +1151,37 @@ class ModbusCollector(BaseCollector):
 
         source_time = datetime.now()
         all_registers: Dict[str, Dict[int, int]] = {
+            'coil': {},
+            'discrete': {},
             'holding': {},
             'input': {},
         }
 
         try:
+            # 부분 실패 허용: 이미 읽은 데이터 유지
+            failed_groups = 0
             for rg in read_groups:
                 registers = await self._read_group(rg)
                 if registers is not None:
                     all_registers[rg.register_type].update(registers)
                 else:
-                    self._consecutive_failures += 1
-                    if self._consecutive_failures >= self._max_consecutive_failures:
-                        logger.error(
-                            f"[{self._name}] Too many failures, marking connection as error"
-                        )
-                        self._state = ConnectionState.ERROR
-                    return None
+                    failed_groups += 1
+
+            # 전체 실패 시에만 None 반환
+            if failed_groups == len(read_groups):
+                self._consecutive_failures += 1
+                if self._consecutive_failures >= self._max_consecutive_failures:
+                    logger.error(
+                        f"[{self._name}] Too many failures, marking connection as error"
+                    )
+                    self._state = ConnectionState.ERROR
+                return None
+
+            if failed_groups > 0:
+                logger.warning(
+                    f"[{self._name}] Partial read: {failed_groups}/{len(read_groups)} "
+                    f"groups failed in '{group}' (returning {len(read_groups) - failed_groups} groups)"
+                )
 
             self._consecutive_failures = 0
 
@@ -1153,6 +1207,7 @@ class ModbusCollector(BaseCollector):
         단일 ReadGroup 읽기.
 
         Transport에서 받은 raw bytes를 {주소: 값} dict로 변환.
+        FC01/FC02(비트)는 bit-packed 응답, FC03/FC04(레지스터)는 2바이트 big-endian.
 
         Args:
             read_group: 읽기 그룹
@@ -1162,9 +1217,13 @@ class ModbusCollector(BaseCollector):
         """
         try:
             count = read_group.register_count
-            fc = (self.FC_READ_HOLDING
-                  if read_group.register_type == 'holding'
-                  else self.FC_READ_INPUT)
+            fc_map = {
+                'coil': self.FC_READ_COILS,
+                'discrete': self.FC_READ_DISCRETE_INPUTS,
+                'holding': self.FC_READ_HOLDING,
+                'input': self.FC_READ_INPUT,
+            }
+            fc = fc_map[read_group.register_type]
 
             register_data = await self._transport.send_request(
                 unit_id=self._unit_id,
@@ -1176,8 +1235,13 @@ class ModbusCollector(BaseCollector):
             if register_data is None:
                 return None
 
-            # bytes → register dict
-            # Modbus 레지스터 데이터는 항상 big-endian, 레지스터당 2바이트
+            # 비트 영역(coil/discrete): bit-packed 응답 파싱
+            if read_group.register_type in ('coil', 'discrete'):
+                return self._parse_bit_response(
+                    register_data, read_group.start_address, count
+                )
+
+            # 레지스터 영역(holding/input): 2바이트 big-endian
             registers: Dict[int, int] = {}
             for i in range(count):
                 offset = i * 2
@@ -1198,3 +1262,31 @@ class ModbusCollector(BaseCollector):
         except Exception as e:
             logger.error(f"[{self._name}] Read error: {e}")
             return None
+
+    def _parse_bit_response(
+        self, data: bytes, start_address: int, count: int
+    ) -> Dict[int, int]:
+        """
+        FC01/FC02 비트 packed 응답 → {주소: 0 or 1} dict.
+
+        Modbus 비트 응답 형식:
+            1바이트 = 8비트, LSB first.
+            예: 바이트 0xCD = 11001101
+                → bit0=1, bit1=0, bit2=1, bit3=1, bit4=0, bit5=0, bit6=1, bit7=1
+
+        Args:
+            data: 응답 바이트 데이터
+            start_address: 시작 coil/discrete 주소
+            count: 읽은 비트 수
+
+        Returns:
+            {주소: 0 or 1} 딕셔너리
+        """
+        result: Dict[int, int] = {}
+        for i in range(count):
+            byte_idx = i // 8
+            bit_idx = i % 8
+            if byte_idx < len(data):
+                bit_value = (data[byte_idx] >> bit_idx) & 1
+                result[start_address + i] = bit_value
+        return result

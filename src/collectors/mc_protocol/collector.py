@@ -772,7 +772,8 @@ class McProtocolCollector(BaseCollector):
         all_data: Dict[str, Dict[int, int]] = {}
 
         try:
-            # 각 ReadGroup 읽기
+            # 각 ReadGroup 읽기 (부분 실패 허용: 이미 읽은 데이터 유지)
+            failed_groups = 0
             for rg in read_groups:
                 data = await self._read_group(rg)
                 if data is not None:
@@ -780,16 +781,25 @@ class McProtocolCollector(BaseCollector):
                         all_data[rg.device] = {}
                     all_data[rg.device].update(data)
                 else:
-                    # 읽기 실패
-                    self._consecutive_failures += 1
-                    if self._consecutive_failures >= self._max_consecutive_failures:
-                        logger.error(
-                            f"[{self._name}] Too many failures, marking connection as error"
-                        )
-                        self._state = ConnectionState.ERROR
-                    return None
+                    failed_groups += 1
 
-            # 성공
+            # 전체 실패 시에만 None 반환
+            if failed_groups == len(read_groups):
+                self._consecutive_failures += 1
+                if self._consecutive_failures >= self._max_consecutive_failures:
+                    logger.error(
+                        f"[{self._name}] Too many failures, marking connection as error"
+                    )
+                    self._state = ConnectionState.ERROR
+                return None
+
+            if failed_groups > 0:
+                logger.warning(
+                    f"[{self._name}] Partial read: {failed_groups}/{len(read_groups)} "
+                    f"groups failed in '{group}' (returning {len(read_groups) - failed_groups} groups)"
+                )
+
+            # 성공 (부분 포함)
             self._consecutive_failures = 0
 
             return CollectedData(

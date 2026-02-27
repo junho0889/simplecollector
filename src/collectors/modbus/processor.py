@@ -2,22 +2,24 @@
 Modbus Data Processor
 =====================
 
-Modbus 레지스터 데이터를 파싱하고 스케일링을 적용합니다.
+Modbus 레지스터/비트 데이터를 파싱하고 스케일링을 적용합니다.
 
 Features:
-    - 다양한 데이터 타입 지원 (INT16, UINT16, INT32, FLOAT32 등)
+    - 4종 레지스터 타입 지원 (Coil, Discrete Input, Holding, Input)
+    - 다양한 데이터 타입 지원 (INT16, UINT16, INT32, FLOAT32, STRING 등)
     - 바이트 오더 설정 (Big/Little Endian)
     - 워드 오더 설정 (32비트 이상 데이터용)
     - 효율적인 메모리 사용
 
 Data Type Parsing:
-    - BOOL: 레지스터 값 != 0
+    - BOOL: 레지스터/coil 값 != 0
     - INT16: 부호 있는 16비트 정수
     - UINT16: 부호 없는 16비트 정수
     - INT32: 부호 있는 32비트 정수 (2 레지스터)
     - UINT32: 부호 없는 32비트 정수 (2 레지스터)
     - FLOAT32: IEEE 754 단정밀도 부동소수점 (2 레지스터)
     - FLOAT64: IEEE 754 배정밀도 부동소수점 (4 레지스터)
+    - STRING: ASCII 문자열 (N 레지스터, 레지스터당 2문자)
 
 Example:
     processor = ModbusProcessor("modbus_processor")
@@ -94,8 +96,17 @@ class ModbusProcessor(BaseProcessor):
 
         # 레지스터 데이터 추출
         registers = data.metadata.get('registers', {})
+        coil_regs = registers.get('coil', {})
+        discrete_regs = registers.get('discrete', {})
         holding_regs = registers.get('holding', {})
         input_regs = registers.get('input', {})
+
+        reg_map = {
+            'coil': coil_regs,
+            'discrete': discrete_regs,
+            'holding': holding_regs,
+            'input': input_regs,
+        }
 
         for tag in tags:
             try:
@@ -103,10 +114,10 @@ class ModbusProcessor(BaseProcessor):
                 address, reg_type = self._parse_address(tag.address)
 
                 # 레지스터 선택
-                regs = holding_regs if reg_type == 'holding' else input_regs
+                regs = reg_map.get(reg_type, holding_regs)
 
                 # 값 파싱
-                value = self._parse_value(regs, address, tag.data_type)
+                value = self._parse_value(regs, address, tag.data_type, tag)
 
                 if value is not None:
                     results.append((tag, value))
@@ -132,10 +143,16 @@ class ModbusProcessor(BaseProcessor):
 
         Returns:
             (레지스터 주소, 레지스터 타입) 튜플
+            타입: 'holding', 'input', 'coil', 'discrete'
         """
         address = address.strip().upper()
 
-        if address.startswith('D'):
+        # DI를 D보다 먼저 검사 (longest prefix match)
+        if address.startswith('DI'):
+            return int(address[2:]), 'discrete'
+        elif address.startswith('C'):
+            return int(address[1:]), 'coil'
+        elif address.startswith('D'):
             return int(address[1:]), 'holding'
         elif address.startswith('I'):
             return int(address[1:]), 'input'
@@ -150,7 +167,8 @@ class ModbusProcessor(BaseProcessor):
         self,
         registers: Dict[int, int],
         address: int,
-        data_type: DataType
+        data_type: DataType,
+        tag: Optional[TagDefinition] = None,
     ) -> Optional[Any]:
         """
         레지스터에서 값 파싱.
@@ -159,6 +177,7 @@ class ModbusProcessor(BaseProcessor):
             registers: {주소: 값} 딕셔너리
             address: 시작 주소
             data_type: 데이터 타입
+            tag: 태그 정의 (STRING의 word_length 참조용)
 
         Returns:
             파싱된 값, 실패 시 None
@@ -178,6 +197,8 @@ class ModbusProcessor(BaseProcessor):
                 return self._parse_float32(registers, address)
             elif data_type == DataType.FLOAT64:
                 return self._parse_float64(registers, address)
+            elif data_type == DataType.STRING:
+                return self._parse_string(registers, address, tag)
             else:
                 # 기본값: UINT16
                 return self._parse_uint16(registers, address)
@@ -265,3 +286,45 @@ class ModbusProcessor(BaseProcessor):
 
         data = struct.pack('>HHHH', *words)
         return struct.unpack(f'{self._byte_prefix}d', data)[0]
+
+    def _parse_string(
+        self,
+        registers: Dict[int, int],
+        address: int,
+        tag: Optional[TagDefinition] = None,
+    ) -> Optional[str]:
+        """
+        STRING 파싱 (레지스터 → ASCII 문자열).
+
+        Modbus 표준: 1 레지스터(16비트) = 2 ASCII 문자 (big-endian, 상위바이트 먼저).
+        word_length로 읽을 레지스터 수를 결정합니다.
+
+        Args:
+            registers: {주소: 값} 딕셔너리
+            address: 시작 주소
+            tag: 태그 정의 (word_length 참조)
+
+        Returns:
+            파싱된 문자열, 실패 시 None
+        """
+        word_count = 1
+        if tag and tag.word_length:
+            word_count = tag.word_length
+
+        if address not in registers:
+            return None
+
+        chars: list = []
+        for i in range(word_count):
+            addr = address + i
+            if addr not in registers:
+                break
+            reg_val = registers[addr]
+            high_byte = (reg_val >> 8) & 0xFF
+            low_byte = reg_val & 0xFF
+            if high_byte:
+                chars.append(chr(high_byte))
+            if low_byte:
+                chars.append(chr(low_byte))
+
+        return ''.join(chars).rstrip('\x00')

@@ -532,32 +532,49 @@ class BaseCollector(ICollector):
 
     async def _reconnect_loop(self) -> None:
         """
-        재연결 루프.
+        재연결 루프 (지수 백오프, 최대 5초).
 
-        연결이 끊어진 경우 주기적으로 재연결을 시도합니다.
+        연결이 끊어진 경우 지수 백오프로 재연결을 시도합니다.
+        성공 시 백오프가 초기값으로 리셋됩니다.
         """
         if not self._protocol_config:
             return
 
-        interval = self._protocol_config.reconnect_interval_ms / 1000.0
+        BACKOFF_INITIAL = 1.0   # 초기 대기 (초)
+        BACKOFF_MAX = 5.0       # 최대 대기 (초, 하드캡)
+        BACKOFF_FACTOR = 2.0    # 배수
+
+        backoff = BACKOFF_INITIAL
+        attempt = 0
 
         while self._is_running:
             try:
-                await asyncio.sleep(interval)
+                await asyncio.sleep(backoff)
 
                 if self._state != ConnectionState.CONNECTED:
-                    logger.info(f"[{self._name}] Attempting reconnection...")
+                    attempt += 1
+                    logger.info(
+                        f"[{self._name}] Attempting reconnection "
+                        f"(attempt={attempt}, backoff={backoff:.1f}s)..."
+                    )
                     self._state = ConnectionState.RECONNECTING
 
                     if await self.connect():
                         logger.info(f"[{self._name}] Reconnected successfully")
+                        backoff = BACKOFF_INITIAL
+                        attempt = 0
                     else:
-                        logger.warning(f"[{self._name}] Reconnection failed")
+                        logger.warning(
+                            f"[{self._name}] Reconnection failed "
+                            f"(next backoff={min(backoff * BACKOFF_FACTOR, BACKOFF_MAX):.1f}s)"
+                        )
+                        backoff = min(backoff * BACKOFF_FACTOR, BACKOFF_MAX)
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error(f"[{self._name}] Reconnection error: {e}")
+                backoff = min(backoff * BACKOFF_FACTOR, BACKOFF_MAX)
 
     # =========================================================================
     # Event Emission
