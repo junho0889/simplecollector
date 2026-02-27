@@ -15,7 +15,7 @@ collector:
   protocol:
     type: "mc_protocol"
     host: "mc-simulator"
-    port: 50010
+    port: 5010
     unit_id: 1
     timeout_ms: 5000
     reconnect_interval_ms: 3000
