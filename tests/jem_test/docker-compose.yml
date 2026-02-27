@@ -1,0 +1,334 @@
+# ============================================================================
+# JEM 테스트 환경 — docker-compose.yml
+# ============================================================================
+# 구성:
+#   - rabbitmq: 메시지 브로커 (AMQP)
+#   - timescaledb: 시계열 DB (PostgreSQL + TimescaleDB)
+#   - mc-simulator: MC Protocol 시뮬레이터 (10개 PLC 에뮬레이션)
+#   - simpleCollector x10 (PLC-A ~ PLC-L)
+#   - collector-publisher x1 (테스트용 단일 DB)
+#
+# 네트워크:
+#   - jem-test-net: 내부 브리지 네트워크 (테스트 격리)
+#
+# 볼륨 구조:
+#   collector: 개별 YAML + CSV 마운트 -> /app/config/
+#   publisher: config/ 폴더 전체 마운트 -> /app/config/
+#              (master_sync가 collector_plc*.yaml + tags CSV를 스캔)
+# ============================================================================
+
+networks:
+  jem-test-net:
+    driver: bridge
+
+services:
+
+  # ========================================================================
+  # Infrastructure
+  # ========================================================================
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: jem-test-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    networks:
+      - jem-test-net
+    restart: unless-stopped
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: jem-test-timescaledb
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: neurosense
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: neuro0901
+    volumes:
+      - D:/jem_test_data/timescaledb:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d neurosense"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    networks:
+      - jem-test-net
+    restart: unless-stopped
+
+  # ========================================================================
+  # MC Protocol Simulator
+  # ========================================================================
+
+  mc-simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile.simulator
+    container_name: jem-test-mc-simulator
+    volumes:
+      - ./mc_simulator.py:/app/mc_simulator.py:ro
+      - ./test_data.csv:/app/test_data.csv:ro
+      - ./config/:/app/config/:ro
+    networks:
+      - jem-test-net
+    restart: unless-stopped
+
+  # ========================================================================
+  # Collectors — PLC 데이터 수집 (10개)
+  # ========================================================================
+
+  # PLC-A: PS 접점 조립
+  collector-plc-a:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    container_name: jem-test-collector-plc-a
+    volumes:
+      - ./config/collector_plc1.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_04_PLC-A.csv:/app/config/tags_04_PLC-A.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - jem-test-net
+    restart: unless-stopped
+
+  # PLC-B: YOKE 조립
+  collector-plc-b:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    container_name: jem-test-collector-plc-b
+    volumes:
+      - ./config/collector_plc2.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_02_PLC-B.csv:/app/config/tags_02_PLC-B.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - jem-test-net
+    restart: unless-stopped
+
+  # PLC-C: TER 조립
+  collector-plc-c:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    container_name: jem-test-collector-plc-c
+    volumes:
+      - ./config/collector_plc3.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_05_PLC-C.csv:/app/config/tags_05_PLC-C.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - jem-test-net
+    restart: unless-stopped
+
+  # PLC-D: 중간 검사
+  collector-plc-d:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    container_name: jem-test-collector-plc-d
+    volumes:
+      - ./config/collector_plc4.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_10_PLC-D.csv:/app/config/tags_10_PLC-D.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - jem-test-net
+    restart: unless-stopped
+
+  # PLC-EFG: AIR 청소
+  collector-plc-efg:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    container_name: jem-test-collector-plc-efg
+    volumes:
+      - ./config/collector_plc5.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_01_PLC-EFG.csv:/app/config/tags_01_PLC-EFG.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - jem-test-net
+    restart: unless-stopped
+
+  # PLC-H: 1차 SEAL 도포 및 건조
+  collector-plc-h:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    container_name: jem-test-collector-plc-h
+    volumes:
+      - ./config/collector_plc6.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_06_PLC-H.csv:/app/config/tags_06_PLC-H.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - jem-test-net
+    restart: unless-stopped
+
+  # PLC-I: 예비납땜
+  collector-plc-i:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    container_name: jem-test-collector-plc-i
+    volumes:
+      - ./config/collector_plc7.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_07_PLC-I.csv:/app/config/tags_07_PLC-I.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - jem-test-net
+    restart: unless-stopped
+
+  # PLC-J: 최종검사
+  collector-plc-j:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    container_name: jem-test-collector-plc-j
+    volumes:
+      - ./config/collector_plc8.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_03_PLC-J.csv:/app/config/tags_03_PLC-J.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - jem-test-net
+    restart: unless-stopped
+
+  # PLC-K: LASER 날인
+  collector-plc-k:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    container_name: jem-test-collector-plc-k
+    volumes:
+      - ./config/collector_plc9.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_08_PLC-K.csv:/app/config/tags_08_PLC-K.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - jem-test-net
+    restart: unless-stopped
+
+  # PLC-L: 동작검사 및 CASE and TER 검사
+  collector-plc-l:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    container_name: jem-test-collector-plc-l
+    volumes:
+      - ./config/collector_plc10.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_09_PLC-L.csv:/app/config/tags_09_PLC-L.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - jem-test-net
+    restart: unless-stopped
+
+  # ========================================================================
+  # Publisher — DB 저장
+  # ========================================================================
+  # config/ 폴더 전체를 /app/config/에 마운트합니다.
+  # master_sync가 /app/config/collector_plc*.yaml 을 스캔하여
+  # plc_master + {group}_master 테이블을 자동 채웁니다.
+  # tags CSV도 같은 폴더에 있어야 master_sync가 읽을 수 있습니다.
+
+  publisher:
+    build:
+      context: ../../../collector-publisher
+      dockerfile: Dockerfile
+    container_name: jem-test-publisher
+    volumes:
+      - ./config/:/app/config/:ro
+    command: ["--config", "/app/config/publisher_test.yaml"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - jem-test-net
+    restart: unless-stopped

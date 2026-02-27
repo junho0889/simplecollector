@@ -1,0 +1,5 @@
+FROM python:3.11-slim
+WORKDIR /app
+COPY mc_simulator.py .
+EXPOSE 5001-5010
+CMD ["python", "-u", "mc_simulator.py", "--config-dir", "/app/config", "--data-file", "/app/test_data.csv"]

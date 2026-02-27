@@ -1,0 +1,64 @@
+# ============================================================================
+# Publisher Test — Docker 테스트 환경용 TimescaleDB (timescaledb:5432)
+# ============================================================================
+# 10개 PLC 데이터를 수신하여 DB에 저장
+# 큐: queue.db (COPY), queue.monitor (UPSERT), queue.mqtt (미사용)
+
+rabbitmq:
+  host: "${RABBITMQ_HOST:rabbitmq}"
+  port: 5672
+  virtual_host: "/"
+  username: "${RABBITMQ_USER:admin}"
+  password: "${RABBITMQ_PASSWORD:admin}"
+  exchange_name: "plc.data"
+  exchange_type: "topic"
+  queue_db: "queue.db"
+  queue_mqtt: "queue.mqtt"
+  queue_monitor: "queue.monitor"
+  routing_key_pattern: "plc.*.data"
+  prefetch_count: 50
+  monitor_prefetch: 10
+  monitor_message_ttl: 30000
+  monitor_max_length: 10000
+  heartbeat: 60
+  connection_timeout: 10
+  compression: "zlib"
+  encryption_enabled: false
+  encryption_key: ""
+
+database:
+  enabled: true
+  host: "timescaledb"
+  port: 5432
+  database: "neurosense"
+  user: "user"
+  password: "neuro0901"
+  pool_size: 5
+  pool_min_size: 2
+  schema_name: "jem_test"
+  insert_method: "copy"
+  auto_init_schema: true
+  master_sync_enabled: true
+  collection_groups:
+    - name: "plc_data"
+      mode: "all"
+      retention_period: ""
+      compression_after: "1 day"
+    - name: "alm"
+      mode: "latest"
+      retention_period: ""
+      compression_after: "1 day"
+  custom_sql_path: "custom_init.sql"
+  compression_after: "1 day"
+  compression_segmentby: "plc_id, tag_id"
+  compression_orderby: "timestamp DESC"
+  retention_period: ""
+
+mqtt:
+  enabled: false
+
+logging:
+  level: "INFO"
+  file_path: "logs/publisher-test.log"
+  max_size_mb: 10
+  backup_count: 5
