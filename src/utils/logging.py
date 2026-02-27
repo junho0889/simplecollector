@@ -114,9 +114,12 @@ class ECSJsonFormatter(logging.Formatter):
     def __init__(
         self,
         service_name: str = "simple-collector",
-        service_version: str = "0.2.0",
+        service_version: str = "",
         environment: str = "production",
     ):
+        if not service_version:
+            from ..version import APP_VERSION
+            service_version = APP_VERSION
         super().__init__()
         self.service_name = service_name
         self.service_version = service_version
@@ -716,7 +719,6 @@ def setup_logging(config: LoggingConfig) -> None:
         if config.ecs_enabled:
             json_handler.setFormatter(ECSJsonFormatter(
                 service_name="simple-collector",
-                service_version="0.2.0",
                 environment=os.environ.get("ENVIRONMENT", "production"),
             ))
         else:

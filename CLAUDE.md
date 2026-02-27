@@ -161,6 +161,43 @@ python build_deploy.py --publisher
 
 > 설정 파일(`deploy/jem/*.yaml`, `*.csv`, `*.sql`)만 변경한 경우에는 빌드 불필요. 커밋만 수행.
 
+## Version Management
+
+### 버전 규칙
+- **Single Source of Truth**: `src/version.py`의 `APP_VERSION`이 유일한 버전 소스
+- `src/__init__.py`, `pyproject.toml`, `deploy/metadata/collector.json`은 `version.py`를 참조하거나 동일한 값을 유지
+- collector-publisher도 동일: `src/version.py` → `metadata.json`
+
+### 코드 수정 시 버전 업데이트 절차
+**코드(`src/`)를 수정한 경우 반드시:**
+1. 해당 프로젝트의 `src/version.py`에서:
+   - `APP_VERSION` 범프 (patch: 버그 수정, minor: 기능 추가, major: 호환성 변경)
+   - `APP_BUILD_DATE` 오늘 날짜로 변경
+   - `CHANGELOG`에 변경 내용 추가 (최신이 맨 위)
+   - 변경된 모듈의 `MODULE_VERSIONS` 업데이트
+2. `deploy/metadata/*.json`의 `version`도 동일하게 변경
+3. 커밋 → 빌드 (`python build_deploy.py`)
+
+### 현재 버전
+| 프로젝트 | 버전 | 최종 빌드 |
+|----------|------|-----------|
+| simpleCollector | 0.3.0 | 2026-02-27 |
+| collector-publisher | 0.2.0 | 2026-02-27 |
+
+### simpleCollector Changelog
+| 버전 | 날짜 | 변경 내용 |
+|------|------|----------|
+| 0.3.0 | 2026-02-27 | MC/Modbus 부분 실패 허용, 지수 백오프, 재연결 캐시 초기화, Modbus coil/discrete/STRING |
+| 0.2.3-beta | 2026-02-09 | MC Protocol VERBOSE 로깅, NaN/Inf 검증 |
+| 0.2.0-beta | 2026-01-15 | 태그 설정 확장, 마스터 동기화, 성능 최적화 |
+| 0.1.0 | 2025-12-01 | 초기 릴리스 (MC Protocol + RabbitMQ) |
+
+### collector-publisher Changelog
+| 버전 | 날짜 | 변경 내용 |
+|------|------|----------|
+| 0.2.0 | 2026-02-27 | Extensions (history/snapshot), DB pool SELECT 1 헬스체크, master sync 트랜잭션 |
+| 0.1.0 | 2026-02-10 | 초기 릴리스 (3-Queue, COPY, 그룹별 동적 테이블, 마스터 동기화) |
+
 ## Protocol Development
 새 프로토콜 추가 시 `docs/PROTOCOL_DEVELOPMENT_GUIDE.md` 참고
 

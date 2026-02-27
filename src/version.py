@@ -2,7 +2,8 @@
 Simple Collector Version Information
 ====================================
 
-각 모듈의 버전 정보를 관리합니다.
+버전 정보의 단일 소스 (Single Source of Truth).
+모든 모듈, 로그, metadata.json은 이 파일의 APP_VERSION을 참조합니다.
 """
 
 import sys
@@ -13,17 +14,48 @@ from typing import Dict, List, Tuple
 # Application Version
 # =============================================================================
 APP_NAME = "Simple Collector"
-APP_VERSION = "0.2.3-beta"
-APP_BUILD_DATE = "2026-02-09"
+APP_VERSION = "0.3.0"
+APP_BUILD_DATE = "2026-02-27"
+
+# =============================================================================
+# Changelog
+# =============================================================================
+CHANGELOG: List[Dict[str, str]] = [
+    {
+        "version": "0.3.0",
+        "date": "2026-02-27",
+        "changes": (
+            "MC/Modbus collector 부분 실패 허용 (이미 읽은 데이터 유지), "
+            "재연결 지수 백오프 (1s~5s), "
+            "Processor 재연결 시 on_change 캐시 초기화, "
+            "Modbus coil/discrete 레지스터 + STRING 타입 파싱"
+        ),
+    },
+    {
+        "version": "0.2.3-beta",
+        "date": "2026-02-09",
+        "changes": "MC Protocol VERBOSE 로깅, apply_scaling NaN/Inf 검증",
+    },
+    {
+        "version": "0.2.0-beta",
+        "date": "2026-01-15",
+        "changes": "태그 설정 확장, 마스터 동기화, 성능 최적화",
+    },
+    {
+        "version": "0.1.0",
+        "date": "2025-12-01",
+        "changes": "초기 릴리스 (MC Protocol + RabbitMQ)",
+    },
+]
 
 # =============================================================================
 # Module Versions
 # =============================================================================
 MODULE_VERSIONS: Dict[str, str] = {
     "core": "0.2.0",           # 핵심 인터페이스, 설정
-    "collectors": "0.2.3",     # 데이터 수집기 (VERBOSE 로그 지원)
-    "processors": "0.2.0",     # 데이터 처리기
-    "publishers": "0.2.1",     # 데이터 발행기 (VERBOSE 로그 지원)
+    "collectors": "0.3.0",     # 데이터 수집기 (부분 실패 허용, 지수 백오프)
+    "processors": "0.3.0",     # 데이터 처리기 (재연결 캐시 초기화)
+    "publishers": "0.3.0",     # 데이터 발행기 (지수 백오프)
     "pipeline": "0.2.0",       # 파이프라인 관리
     "services": "0.2.0",       # 부가 서비스 (Status API 등)
     "utils": "0.2.1",          # 유틸리티 (VERBOSE 로그 레벨 추가)
@@ -33,8 +65,8 @@ MODULE_VERSIONS: Dict[str, str] = {
 # Protocol Support
 # =============================================================================
 SUPPORTED_PROTOCOLS: Dict[str, str] = {
-    "mc_protocol": "0.2.3",    # 미쓰비시 MC Protocol (Binary 3E/4E, VERBOSE 로그)
-    "modbus": "0.1.0",         # Modbus TCP/RTU
+    "mc_protocol": "0.3.0",    # 미쓰비시 MC Protocol (부분 실패 허용)
+    "modbus": "0.2.0",         # Modbus TCP/RTU (coil/discrete/STRING 추가)
 }
 
 # =============================================================================
