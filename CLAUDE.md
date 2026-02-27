@@ -64,6 +64,33 @@ if decimals > 0:
 - `alm`: 알람 (on_change, 값 변경 시에만 발행)
 - `log`: 설비 로그 (polling, 5초)
 
+### Extensions (collector-publisher YAML 설정)
+그룹별 부가 기능. publisher YAML의 `collection_groups[].extensions`에서 설정.
+
+```yaml
+collection_groups:
+  - name: "alm"
+    mode: "latest"
+    extensions:
+      history:                    # 값 변경 이력
+        trigger_on: "v_bool"      # v_bool, v_int, v_float, v_text, all
+      snapshot:                   # 신호 캡처 (rising edge)
+        triggers:
+          - watch_tag: 1
+            capture_tags: [1, 2, 3]
+```
+
+- **history**: `{group}_latest` UPDATE 시 trigger_on 컬럼 변경 감지 → `{group}_history`에 INSERT
+- **snapshot**: watch_tag의 v_bool rising edge(FALSE→TRUE) → capture_tags의 latest 값을 `{group}_snapshot`에 INSERT
+- 테이블은 hypertable로 자동 변환, 압축/보관 정책은 그룹 설정을 따름
+- DDL 자동 생성: `schema_init.py`의 `_build_history_ddl()`, `_build_snapshot_ddl()`
+
+### Master Sync (재시작 동작)
+publisher 재시작 시 `master_sync.py`가 실행:
+1. `{group}_master` + `{group}_latest` 테이블 TRUNCATE (stale 데이터 방지)
+2. collector YAML + tag CSV 스캔 → `plc_master` UPSERT + `{group}_master` INSERT
+- `_integrated`, `_history`, `_snapshot` 데이터는 보존됨
+
 ### MessageSerializer Format
 `JSON → zlib compress → Fernet encrypt (optional)`
 - collector-publisher와 동일한 포맷 공유
@@ -133,6 +160,9 @@ python build_deploy.py --publisher
 2. **빌드**: `python build_deploy.py` 를 실행하여 배포용 tar 파일을 갱신한다
 
 > 설정 파일(`deploy/jem/*.yaml`, `*.csv`, `*.sql`)만 변경한 경우에는 빌드 불필요. 커밋만 수행.
+
+## Protocol Development
+새 프로토콜 추가 시 `docs/PROTOCOL_DEVELOPMENT_GUIDE.md` 참고
 
 ## Git Workflow
 - 개발 단계: 큰 변경 시 자동 commit + push
