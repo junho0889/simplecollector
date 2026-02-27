@@ -25,6 +25,7 @@ Usage:
             pass
 """
 
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -217,6 +218,10 @@ class TagDefinition:
 
         # 스케일링: (raw * scale) + offset
         scaled = (raw_value * self.scale) + self.offset
+
+        # NaN/Inf 검증 (PLC 센서 오류 시 IEEE 754 특수값 반환 가능)
+        if isinstance(scaled, float) and not math.isfinite(scaled):
+            return None
 
         # decimals 적용
         # - 정수 타입: 고정소수점 변환 (PLC 관례: raw / 10^decimals)
