@@ -4,10 +4,10 @@
 -- 스키마 생성 후 자동 실행됩니다.
 -- 플레이스홀더:
 --   {schema}  → 설정된 스키마명 (예: jem_jh02)
---   {group}   → 수집 그룹명 (plc_data, alm)
+--   {group}   → 수집 그룹명 (plc_data, alm, log)
 --              {group} 포함 시 모든 그룹에 대해 반복 실행
 --
--- NOTE: alm_history는 extensions.history로 이전됨 (publisher YAML 설정)
+-- NOTE: alm_history → extensions.history, log_snapshot → extensions.snapshot으로 이전됨
 -- ============================================================================
 
 

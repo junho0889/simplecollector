@@ -48,6 +48,9 @@ database:
       mode: "latest"
       retention_period: ""
       compression_after: "1 day"
+      extensions:
+        history:
+          trigger_on: "v_bool"
   custom_sql_path: "custom_init.sql"
   compression_after: "1 day"
   compression_segmentby: "plc_id, tag_id"
