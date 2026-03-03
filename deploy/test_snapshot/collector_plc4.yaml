@@ -1,20 +1,19 @@
-﻿# ============================================================================
-# PLC-D: 중간 검사
 # ============================================================================
-# 192.168.0.4:5007 → RabbitMQ Exchange: PLC_D
+# PLC-D: snapshot 기능 테스트 (테스트 PLC 192.168.0.54:5007)
+# ============================================================================
 
 collector:
   plc_id: 4
   name: "PLC-D"
-  description: "중간 검사"
+  description: "중간 검사 (TEST)"
   site: "진영전기"
   area: "릴레이 생산"
   line: "JH-2HO"
-  tags_file: "config/tags_10_PLC-D.csv"
+  tags_file: "deploy/jem/tags_10_PLC-D.csv"
 
   protocol:
     type: "mc_protocol"
-    host: "192.168.0.4"
+    host: "192.168.0.54"
     port: 5007
     unit_id: 1
     timeout_ms: 5000
@@ -64,11 +63,11 @@ publisher:
 
   rabbitmq:
     enabled: true
-    host: "${RABBITMQ_HOST:rabbitmq}"
-    port: 5672
+    host: "localhost"
+    port: 25672
     virtual_host: "/"
-    username: "${RABBITMQ_USER:admin}"
-    password: "${RABBITMQ_PASSWORD:admin}"
+    username: "admin"
+    password: "admin"
     exchange_name: "plc.data"
     exchange_type: "topic"
     routing_key_prefix: "plc"
@@ -79,5 +78,5 @@ publisher:
     delivery_mode: 2
 
 logging:
-  level: "INFO"
+  level: "DEBUG"
   format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"

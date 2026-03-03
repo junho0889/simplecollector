@@ -1,0 +1,81 @@
+# ============================================================================
+# test_snapshot — Publisher (snapshot 기능 테스트)
+# ============================================================================
+# PLC-D만 대상, 로컬 실행, Docker RabbitMQ/TimescaleDB 연결
+
+rabbitmq:
+  host: "localhost"
+  port: 25672
+  virtual_host: "/"
+  username: "admin"
+  password: "admin"
+  exchange_name: "plc.data"
+  exchange_type: "topic"
+  queue_db: "queue.db"
+  queue_mqtt: "queue.mqtt"
+  queue_monitor: "queue.monitor"
+  routing_key_pattern: "plc.*.data"
+  prefetch_count: 50
+  monitor_prefetch: 10
+  monitor_message_ttl: 30000
+  monitor_max_length: 10000
+  heartbeat: 60
+  connection_timeout: 10
+  compression: "zlib"
+  encryption_enabled: false
+  encryption_key: ""
+
+database:
+  enabled: true
+  host: "localhost"
+  port: 25432
+  database: "testdb"
+  user: "postgres"
+  password: "postgres"
+  pool_size: 3
+  pool_min_size: 1
+  schema_name: "test_snapshot"
+  insert_method: "copy"
+  auto_init_schema: true
+  master_sync_enabled: true
+  master_sync_config_dir: "D:/4.source/simpleCollector/deploy/test_snapshot"
+  collection_groups:
+    - name: "plc_data"
+      mode: "all"
+      retention_period: "90 days"
+      compression_after: "1 day"
+    - name: "alm"
+      mode: "latest"
+      retention_period: "90 days"
+      compression_after: "1 day"
+      extensions:
+        history:
+          trigger_on: "v_bool"
+    - name: "log"
+      mode: "latest"
+      retention_period: "90 days"
+      compression_after: "1 day"
+      extensions:
+        snapshot:
+          triggers:
+            # M180 → Log1: D3100 (1 tag)
+            - watch_tag: 1021
+              plc_ids: [4]
+              capture_tags: [1020]
+            # M188 → Log3: D360-D368 (5 tags)
+            - watch_tag: 1022
+              plc_ids: [4]
+              capture_tags: [1015, 1016, 1017, 1018, 1019]
+  compression_after: "1 day"
+  compression_segmentby: "plc_id, tag_id"
+  compression_orderby: "timestamp DESC"
+  retention_period: "90 days"
+
+mqtt:
+  enabled: false
+
+logging:
+  level: "DEBUG"
+  file_path: "logs/publisher-test.log"
+  max_size_mb: 10
+  backup_count: 5

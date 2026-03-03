@@ -239,3 +239,80 @@
 238,D212,D,212,int16,plc_data,1,0,,2,,,실시간 효율_PCS
 239,D214,D,214,int16,plc_data,1,0,,2,,,분 효율_PCS
 240,D216,D,216,uint32,plc_data,0.1,0,,5,,,사이클 시간
+1000,Y401,Y,1025,bool,plc_data,1,0,,,,,자동 선택 표시 등
+1001,Y402,Y,1026,bool,plc_data,1,0,,,,,표시등을 수동으로 선택
+1002,Y403,Y,1027,bool,plc_data,1,0,,,,,자동 시작 표시등
+1003,Y404,Y,1028,bool,plc_data,1,0,,,,,자동 정지 표시등
+1004,Y405,Y,1029,bool,plc_data,1,0,,,,,재설정 표시등
+1005,Y406,Y,1030,bool,plc_data,1,0,,,,,알람 해제 표시등
+1006,Y407,Y,1031,bool,plc_data,1,0,,,,,사이클 시작 표시등
+1007,Y408,Y,1032,bool,plc_data,1,0,,,,,실린더 작동 표시 등
+1008,Y409,Y,1033,bool,plc_data,1,0,,,,,실린더 재설정 표시등
+1009,Y40A,Y,1034,bool,plc_data,1,0,,,,,잔여물 처리 표시등
+1010,Y40C,Y,1036,bool,plc_data,1,0,,,,,TL_RED
+1011,Y40D,Y,1037,bool,plc_data,1,0,,,,,TL_Green
+1012,Y40E,Y,1038,bool,plc_data,1,0,,,,,TL_Yellow
+1013,D360,D,360,uint32,log,1,0,0,,,,Number/h
+1014,D362,D,362,uint32,log,1,0,0,,,,OK_Number/h
+1015,D364,D,364,uint32,log,1,0,0,,,,NG_Number/h
+1016,D366,D,366,float32,log,1,0,2,,,,OK/%
+1017,D368,D,368,float32,log,1,0,2,,,,NG/%
+1018,D3900,D,3900,string,log,,,,4,,,Status
+1019,D3902,D,3902,string,log,,,,4,,,ST2_Status
+1020,D3904,D,3904,int32,log,1,0,0,,,,ST2_On_L
+1021,D3906,D,3906,int32,log,1,0,0,,,,ST2_OFF_L
+1022,D3908,D,3908,int32,log,1,0,0,,,,Test2_On_R
+1023,D3910,D,3910,int32,log,1,0,0,,,,Test2_OFF_R
+1024,D3912,D,3912,string,log,,,,4,,,Test3_Status
+1025,D3914,D,3914,float32,log,1,0,0,,,,Test3_Leave_L
+1026,D3916,D,3916,float32,log,1,0,0,,,,Test3_Leave_R
+1027,D3918,D,3918,float32,log,1,0,0,,,,Test3_Height_L
+1028,D3920,D,3920,float32,log,1,0,,,,,Test2_OFF_R
+1029,D3922,D,3922,int32,log,1,0,,,,,Test3_Status
+1030,D3924,D,3924,float32,log,1,0,,,,,Test3_Status_CCD
+1031,D3926,D,3926,float32,log,1,0,,,,,Test3_Leave_L
+1032,D3928,D,3928,int32,log,1,0,,,,,Test3_Status_Height
+1033,D3930,D,3930,float32,log,1,0,,,,,Test3_Height_L
+1034,D3932,D,3932,int32,log,1,0,,,,,Test3_Status_CCD
+1035,D3934,D,3934,float32,log,1,0,,,,,Test3_Appearance_CCD
+1036,D3936,D,3936,int32,log,1,0,,,,,Date
+1037,D3938,D,3938,float32,log,1,0,,,,,Test3_Height_R
+1038,D3940,D,3940,float32,log,1,0,,,,,Test5_Status
+1039,D3942,D,3942,float32,log,1,0,,,,,Test5_Pressure_L_
+1040,D3944,D,3944,int32,log,1,0,,,,,Test6_Status
+1041,D3946,D,3946,float32,log,1,0,,,,,Test6_Pressure_R
+1042,D3950,D,3950,string,log,,,,4,,,Test3_Status_Height
+1043,D3952,D,3952,int32,log,1,0,,,,,Test7_Status_Reset
+1044,D3954,D,3954,int32,log,1,0,,,,,Test7_Status_Time
+1045,D3956,D,3956,int32,log,1,0,,,,,Time
+1046,D4900,D,4900,string,log,,,,4,,,Status
+1047,D4902,D,4902,string,log,,,,4,,,ST2_Status
+1048,D4904,D,4904,int32,log,1,0,0,,,,ST2_On_L
+1049,D4906,D,4906,int32,log,1,0,0,,,,ST2_OFF_L
+1050,D4908,D,4908,int32,log,1,0,0,,,,Test2_On_R
+1051,D4910,D,4910,int32,log,1,0,0,,,,Test2_OFF_R
+1052,D4912,D,4912,string,log,,,,4,,,Test3_Status
+1053,D4914,D,4914,float32,log,1,0,0,,,,Test3_Leave_L
+1054,D4916,D,4916,float32,log,1,0,0,,,,Test3_Leave_R
+1055,D4918,D,4918,float32,log,1,0,0,,,,Test3_Height_L
+1056,D4920,D,4920,float32,log,1,0,,,,,Test3_Height_R_실제 거리 LAG_NGSave
+1057,D4922,D,4922,int32,log,1,0,,,,,Test3_Appearance_CCD_Ascll 상태 LAG_NGSave
+1058,D4924,D,4924,float32,log,1,0,,,,,Test3_Height_L_CCD_실제 거리 LAG_NGSave
+1059,D4926,D,4926,float32,log,1,0,,,,,Test3_Height_R_CCD_실제 거리 LAG_NGSave
+1060,D4928,D,4928,int32,log,1,0,,,,,Test5_Status_Ascll 상태 LAG_NGSave
+1061,D4930,D,4930,float32,log,1,0,,,,,Test5_Pressure_L_실제 압력 LAG_NGSave
+1062,D4932,D,4932,int32,log,1,0,,,,,Test6_Status_Ascll 상태 LAG_NGSave
+1063,D4934,D,4934,float32,log,1,0,,,,,Test6_Pressure_R_실제 압력 LAG_NGSave
+1064,D4936,D,4936,int32,log,1,0,,,,,Test7_Status_Ascll 상태 LAG_NGSave
+1065,D4938,D,4938,float32,log,1,0,,,,,Test7_OpenVoltage_실제 동작 전압 LAG_NGSave
+1066,D4940,D,4940,float32,log,1,0,,,,,Test7_ResetVoltage_실제 동작 전압 LAG_NGSave
+1067,D4942,D,4942,float32,log,1,0,,,,,Test7_Time_실제 동기화 시간 LAG_NGSave
+1068,D4944,D,4944,int32,log,1,0,,,,,Test8_Status_Ascll 상태 LAG_NGSave
+1069,D4946,D,4946,float32,log,1,0,,,,,Test8_NGVoltage_Real_NG 전압 LAG_NGSave
+1070,D4950,D,4950,string,log,,,,4,,,Test3_Status_Height
+1071,D4952,D,4952,int32,log,1,0,,,,,Test3_Status_CCD_Ascll 상태 LAG_NGSave
+1072,D4954,D,4954,int32,log,1,0,,,,,Test7_Status_Reset_Ascll 상태 LAG_NGSave
+1073,D4956,D,4956,int32,log,1,0,,,,,Test7_Status_Time_Ascll 상태 LAG_NGSave
+1074,M180,M,180,bool,log,1,0,,,,,Log1(D3900-D3956)
+1075,M184,M,184,bool,log,1,0,,,,,Log2(D4900-D4956)
+1076,M188,M,188,bool,log,1,0,,,,,Log3(D360-D368)

@@ -1,0 +1,36 @@
+# ============================================================================
+# test_snapshot — snapshot 기능 통합 테스트
+# ============================================================================
+# RabbitMQ + TimescaleDB 인프라만 (collector/publisher는 로컬 실행)
+
+networks:
+  ts-net:
+    driver: bridge
+
+services:
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ts-rabbitmq
+    ports:
+      - "25672:5672"
+      - "35672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    networks:
+      - ts-net
+    restart: unless-stopped
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: ts-timescaledb
+    ports:
+      - "25432:5432"
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    networks:
+      - ts-net
+    restart: unless-stopped

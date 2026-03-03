@@ -51,6 +51,83 @@ database:
       extensions:
         history:
           trigger_on: "v_bool"
+    - name: "log"
+      mode: "latest"
+      retention_period: "1 year"
+      compression_after: "1 day"
+      extensions:
+        snapshot:
+          triggers:
+            # ===== PLC-A/B/C (plc_id=1,2,3) =====
+            # M180 → Log1: D3900-D3956 (28 tags)
+            - watch_tag: 1074
+              plc_ids: [1, 2, 3]
+              capture_tags: [
+                1018, 1019, 1020, 1021, 1022, 1023, 1024, 1025, 1026, 1027,
+                1028, 1029, 1030, 1031, 1032, 1033, 1034, 1035, 1036, 1037,
+                1038, 1039, 1040, 1041, 1042, 1043, 1044, 1045
+              ]
+            # M184 → Log2: D4900-D4956 (28 tags)
+            - watch_tag: 1075
+              plc_ids: [1, 2, 3]
+              capture_tags: [
+                1046, 1047, 1048, 1049, 1050, 1051, 1052, 1053, 1054, 1055,
+                1056, 1057, 1058, 1059, 1060, 1061, 1062, 1063, 1064, 1065,
+                1066, 1067, 1068, 1069, 1070, 1071, 1072, 1073
+              ]
+            # M188 → Log3: D360-D368 (5 tags)
+            - watch_tag: 1076
+              plc_ids: [1, 2, 3]
+              capture_tags: [1013, 1014, 1015, 1016, 1017]
+            # ===== PLC-D (plc_id=4) =====
+            # M180 → Log1: D3100 (1 tag)
+            - watch_tag: 1021
+              plc_ids: [4]
+              capture_tags: [1020]
+            # M188 → Log3: D360-D368 (5 tags)
+            - watch_tag: 1022
+              plc_ids: [4]
+              capture_tags: [1015, 1016, 1017, 1018, 1019]
+            # ===== PLC-EFG (plc_id=5) =====
+            # M180 → Log1: D3900-D3956 (28 tags)
+            - watch_tag: 1084
+              plc_ids: [5]
+              capture_tags: [
+                1028, 1029, 1030, 1031, 1032, 1033, 1034, 1035, 1036, 1037,
+                1038, 1039, 1040, 1041, 1042, 1043, 1044, 1045, 1046, 1047,
+                1048, 1049, 1050, 1051, 1052, 1053, 1054, 1055
+              ]
+            # M184 → Log2: D4900-D4956 (28 tags)
+            - watch_tag: 1085
+              plc_ids: [5]
+              capture_tags: [
+                1056, 1057, 1058, 1059, 1060, 1061, 1062, 1063, 1064, 1065,
+                1066, 1067, 1068, 1069, 1070, 1071, 1072, 1073, 1074, 1075,
+                1076, 1077, 1078, 1079, 1080, 1081, 1082, 1083
+              ]
+            # M188 → Log3: D360-D368 (5 tags)
+            - watch_tag: 1086
+              plc_ids: [5]
+              capture_tags: [1023, 1024, 1025, 1026, 1027]
+            # ===== PLC-H/I/K (plc_id=6,7,9) =====
+            # M188 → Log3: D360-D368 (5 tags)
+            - watch_tag: 1018
+              plc_ids: [6, 7, 9]
+              capture_tags: [1013, 1014, 1015, 1016, 1017]
+            # ===== PLC-J (plc_id=8) =====
+            # M180 → Log1: D3500 (1 tag)
+            - watch_tag: 1019
+              plc_ids: [8]
+              capture_tags: [1018]
+            # M188 → Log3: D360-D368 (5 tags)
+            - watch_tag: 1020
+              plc_ids: [8]
+              capture_tags: [1013, 1014, 1015, 1016, 1017]
+            # ===== PLC-L (plc_id=10) =====
+            # M188 → Log3: D360-D368 (5 tags)
+            - watch_tag: 1017
+              plc_ids: [10]
+              capture_tags: [1012, 1013, 1014, 1015, 1016]
   custom_sql_path: "custom_init.sql"
   compression_after: "1 day"
   compression_segmentby: "plc_id, tag_id"
