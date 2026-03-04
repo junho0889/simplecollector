@@ -92,19 +92,19 @@
 91,D212,D,212,int16,plc_data,1,0,,2,,,실시간 효율_PCS
 92,D214,D,214,int16,plc_data,1,0,,2,,,분 효율_PCS
 93,D216,D,216,uint32,plc_data,0.1,0,,5,,,사이클 시간
-1000,Y401,Y,1025,bool,plc_data,1,0,,,,,자동 선택 표시 등
-1001,Y402,Y,1026,bool,plc_data,1,0,,,,,표시등을 수동으로 선택
-1002,Y403,Y,1027,bool,plc_data,1,0,,,,,자동 시작 표시등
-1003,Y404,Y,1028,bool,plc_data,1,0,,,,,자동 정지 표시등
-1004,Y405,Y,1029,bool,plc_data,1,0,,,,,재설정 표시등
-1005,Y406,Y,1030,bool,plc_data,1,0,,,,,알람 해제 표시등
-1006,Y407,Y,1031,bool,plc_data,1,0,,,,,사이클 시작 표시등
-1007,Y408,Y,1032,bool,plc_data,1,0,,,,,실린더 작동 표시 등
-1008,Y409,Y,1033,bool,plc_data,1,0,,,,,실린더 재설정 표시등
-1009,Y40A,Y,1034,bool,plc_data,1,0,,,,,잔여물 처리 표시등
-1010,Y40C,Y,1036,bool,plc_data,1,0,,,,,TL_RED
-1011,Y40D,Y,1037,bool,plc_data,1,0,,,,,TL_Green
-1012,Y40E,Y,1038,bool,plc_data,1,0,,,,,TL_Yellow
+1000,Y401,Y,401,bool,plc_data,1,0,,,,,자동 선택 표시 등
+1001,Y402,Y,402,bool,plc_data,1,0,,,,,표시등을 수동으로 선택
+1002,Y403,Y,403,bool,plc_data,1,0,,,,,자동 시작 표시등
+1003,Y404,Y,404,bool,plc_data,1,0,,,,,자동 정지 표시등
+1004,Y405,Y,405,bool,plc_data,1,0,,,,,재설정 표시등
+1005,Y406,Y,406,bool,plc_data,1,0,,,,,알람 해제 표시등
+1006,Y407,Y,407,bool,plc_data,1,0,,,,,사이클 시작 표시등
+1007,Y408,Y,408,bool,plc_data,1,0,,,,,실린더 작동 표시 등
+1008,Y409,Y,409,bool,plc_data,1,0,,,,,실린더 재설정 표시등
+1009,Y40A,Y,40A,bool,plc_data,1,0,,,,,잔여물 처리 표시등
+1010,Y40C,Y,40C,bool,plc_data,1,0,,,,,TL_RED
+1011,Y40D,Y,40D,bool,plc_data,1,0,,,,,TL_Green
+1012,Y40E,Y,40E,bool,plc_data,1,0,,,,,TL_Yellow
 1013,D360,D,360,uint32,log,1,0,0,,,,Number/h
 1014,D362,D,362,uint32,log,1,0,0,,,,OK_Number/h
 1015,D364,D,364,uint32,log,1,0,0,,,,NG_Number/h

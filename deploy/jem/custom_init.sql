@@ -61,3 +61,190 @@ GRANT CONNECT ON DATABASE neurosense TO api_reader;
 GRANT USAGE ON SCHEMA {schema} TO api_reader;
 GRANT SELECT ON ALL TABLES IN SCHEMA {schema} TO api_reader;
 ALTER DEFAULT PRIVILEGES IN SCHEMA {schema} GRANT SELECT ON TABLES TO api_reader;
+
+
+-- ============================================================================
+-- 4. 생산 리셋 기록 + 알람 통계
+-- ============================================================================
+-- 생산수량 또는 총생산수가 0이 되면 (리셋 감지):
+--   1. 리셋 직전 생산량을 production_reset_log에 기록
+--   2. 해당 시점의 PLC별 알람 통계를 alm_statistics에 기록
+--
+-- 대상 태그: plc_data_master의 description이 '생산수량' 또는 '총 생산수'인 태그
+-- 트리거: plc_data_latest BEFORE UPDATE (값이 non-zero → 0 전환 시)
+
+-- 4-1. production_reset_log 테이블
+CREATE TABLE IF NOT EXISTS {schema}.production_reset_log (
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    plc_id SMALLINT NOT NULL,
+    trigger_tag_id INTEGER NOT NULL,
+    trigger_type VARCHAR(20),
+    last_value BIGINT,
+    production_qty BIGINT,
+    ok_qty BIGINT,
+    ng_qty BIGINT,
+    total_production BIGINT
+);
+
+SELECT create_hypertable(
+    '{schema}.production_reset_log', 'timestamp',
+    chunk_time_interval => INTERVAL '30 days',
+    if_not_exists => TRUE
+);
+
+-- 4-2. alm_statistics 테이블
+CREATE TABLE IF NOT EXISTS {schema}.alm_statistics (
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    plc_id SMALLINT NOT NULL,
+    trigger_tag_id INTEGER,
+    total_alarms INTEGER,
+    active_alarms INTEGER,
+    alarm_rate DOUBLE PRECISION
+);
+
+SELECT create_hypertable(
+    '{schema}.alm_statistics', 'timestamp',
+    chunk_time_interval => INTERVAL '30 days',
+    if_not_exists => TRUE
+);
+
+-- 4-3. production_reset_snapshot 테이블
+-- PLC-D(4), PLC-J(8), PLC-L(10) 전용: 리셋 시점의 주요 생산 지표 캡처
+-- 직행율, 생산수량, 총생산수, NG수량_PCS, 사이클시간
+CREATE TABLE IF NOT EXISTS {schema}.production_reset_snapshot (
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    plc_id SMALLINT NOT NULL,
+    trigger_tag_id INTEGER NOT NULL,
+    trigger_type VARCHAR(20),
+    first_pass_yield DOUBLE PRECISION,
+    production_qty BIGINT,
+    total_production BIGINT,
+    ng_qty BIGINT,
+    cycle_time BIGINT
+);
+
+SELECT create_hypertable(
+    '{schema}.production_reset_snapshot', 'timestamp',
+    chunk_time_interval => INTERVAL '30 days',
+    if_not_exists => TRUE
+);
+
+-- 4-4. 커스텀 테이블 압축/보관 정책 (1일 압축, 3년 보관)
+ALTER TABLE {schema}.production_reset_log SET (timescaledb.compress, timescaledb.compress_segmentby = 'plc_id');
+SELECT add_compression_policy('{schema}.production_reset_log', INTERVAL '1 day', if_not_exists => TRUE);
+SELECT add_retention_policy('{schema}.production_reset_log', INTERVAL '3 years', if_not_exists => TRUE);
+
+ALTER TABLE {schema}.alm_statistics SET (timescaledb.compress, timescaledb.compress_segmentby = 'plc_id');
+SELECT add_compression_policy('{schema}.alm_statistics', INTERVAL '1 day', if_not_exists => TRUE);
+SELECT add_retention_policy('{schema}.alm_statistics', INTERVAL '3 years', if_not_exists => TRUE);
+
+ALTER TABLE {schema}.production_reset_snapshot SET (timescaledb.compress, timescaledb.compress_segmentby = 'plc_id');
+SELECT add_compression_policy('{schema}.production_reset_snapshot', INTERVAL '1 day', if_not_exists => TRUE);
+SELECT add_retention_policy('{schema}.production_reset_snapshot', INTERVAL '3 years', if_not_exists => TRUE);
+
+-- 4-6. 트리거 함수
+-- plc_data_latest UPDATE 시 생산수량/총생산수가 0이 되면:
+--   - production_reset_log에 리셋 직전 값 + 생산 태그 스냅샷
+--   - alm_statistics에 해당 PLC의 알람 통계
+--   - production_reset_snapshot에 PLC-D/J/L 주요 지표 캡처
+CREATE OR REPLACE FUNCTION {schema}.fn_production_reset_check()
+RETURNS TRIGGER AS $fn$
+DECLARE
+    v_old_val BIGINT;
+    v_new_val BIGINT;
+    v_monitor_type VARCHAR(20);
+    v_now TIMESTAMPTZ;
+BEGIN
+    -- 값 추출 (uint32 → v_int 또는 v_bigint)
+    v_new_val := COALESCE(NEW.v_int::bigint, NEW.v_bigint, -1);
+    v_old_val := COALESCE(OLD.v_int::bigint, OLD.v_bigint, -1);
+
+    -- Fast path: 새 값이 0이 아니면 스킵 (대부분의 경우)
+    IF v_new_val != 0 THEN
+        RETURN NEW;
+    END IF;
+
+    -- 이전 값이 이미 0 이하이면 스킵 (리셋이 아님)
+    IF v_old_val <= 0 THEN
+        RETURN NEW;
+    END IF;
+
+    -- 이 태그가 생산 모니터링 대상인지 확인
+    SELECT
+        CASE
+            WHEN m.description LIKE '%생산수량%' THEN '생산수량'
+            WHEN m.description LIKE '%총%생산수%' THEN '총생산수'
+            ELSE NULL
+        END INTO v_monitor_type
+    FROM {schema}.plc_data_master m
+    WHERE m.plc_id = NEW.plc_id AND m.tag_id = NEW.tag_id;
+
+    IF v_monitor_type IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    v_now := NOW();
+
+    -- 1. production_reset_log: 리셋 직전 값 + 생산 태그 스냅샷
+    INSERT INTO {schema}.production_reset_log (
+        timestamp, plc_id, trigger_tag_id, trigger_type, last_value,
+        production_qty, ok_qty, ng_qty, total_production
+    )
+    SELECT v_now, NEW.plc_id, NEW.tag_id, v_monitor_type, v_old_val,
+        MAX(CASE WHEN m.description LIKE '%생산수량%'
+            THEN COALESCE(l.v_int::bigint, l.v_bigint) END),
+        MAX(CASE WHEN m.description LIKE '%OK%수량%'
+            THEN COALESCE(l.v_int::bigint, l.v_bigint) END),
+        MAX(CASE WHEN m.description LIKE '%NG%수량%'
+            THEN COALESCE(l.v_int::bigint, l.v_bigint) END),
+        MAX(CASE WHEN m.description LIKE '%총%생산수%'
+            THEN COALESCE(l.v_int::bigint, l.v_bigint) END)
+    FROM {schema}.plc_data_master m
+    LEFT JOIN {schema}.plc_data_latest l
+        ON l.plc_id = m.plc_id AND l.tag_id = m.tag_id
+    WHERE m.plc_id = NEW.plc_id;
+
+    -- 2. alm_statistics: 해당 PLC의 알람 통계
+    INSERT INTO {schema}.alm_statistics (
+        timestamp, plc_id, trigger_tag_id,
+        total_alarms, active_alarms, alarm_rate
+    )
+    SELECT v_now, NEW.plc_id, NEW.tag_id,
+        count(*),
+        count(*) FILTER (WHERE v_bool = TRUE),
+        count(*) FILTER (WHERE v_bool = TRUE)::double precision / NULLIF(count(*), 0)
+    FROM {schema}.alm_latest
+    WHERE plc_id = NEW.plc_id;
+
+    -- 3. production_reset_snapshot: PLC-D(4)/J(8)/L(10) 주요 생산 지표 캡처
+    IF NEW.plc_id IN (4, 8, 10) THEN
+        INSERT INTO {schema}.production_reset_snapshot (
+            timestamp, plc_id, trigger_tag_id, trigger_type,
+            first_pass_yield, production_qty, total_production, ng_qty, cycle_time
+        )
+        SELECT v_now, NEW.plc_id, NEW.tag_id, v_monitor_type,
+            MAX(CASE WHEN m.description LIKE '%직행%'
+                THEN l.v_float END),
+            MAX(CASE WHEN m.description LIKE '%생산수량%'
+                THEN COALESCE(l.v_int::bigint, l.v_bigint) END),
+            MAX(CASE WHEN m.description LIKE '%총%생산수%'
+                THEN COALESCE(l.v_int::bigint, l.v_bigint) END),
+            MAX(CASE WHEN m.description LIKE '%NG%수량%'
+                THEN COALESCE(l.v_int::bigint, l.v_bigint) END),
+            MAX(CASE WHEN m.description LIKE '%사이클 시간%'
+                THEN COALESCE(l.v_int::bigint, l.v_bigint) END)
+        FROM {schema}.plc_data_master m
+        LEFT JOIN {schema}.plc_data_latest l
+            ON l.plc_id = m.plc_id AND l.tag_id = m.tag_id
+        WHERE m.plc_id = NEW.plc_id;
+    END IF;
+
+    RETURN NEW;
+END;
+$fn$ LANGUAGE plpgsql;
+
+-- 4-7. 트리거 (plc_data_latest UPDATE 시)
+CREATE TRIGGER trg_plc_data_production_reset
+    BEFORE UPDATE ON {schema}.plc_data_latest
+    FOR EACH ROW
+    EXECUTE FUNCTION {schema}.fn_production_reset_check();
