@@ -39,21 +39,22 @@ database:
   auto_init_schema: true
   master_sync_enabled: true
   master_sync_config_dir: "D:/4.source/simpleCollector/deploy/test_snapshot"
+  custom_sql_path: "D:/4.source/simpleCollector/deploy/test_snapshot/custom_init.sql"
   collection_groups:
     - name: "plc_data"
       mode: "all"
-      retention_period: "90 days"
+      retention_period: "3 years"
       compression_after: "1 day"
     - name: "alm"
       mode: "latest"
-      retention_period: "90 days"
+      retention_period: "3 years"
       compression_after: "1 day"
       extensions:
         history:
           trigger_on: "v_bool"
     - name: "log"
       mode: "latest"
-      retention_period: "90 days"
+      retention_period: "3 years"
       compression_after: "1 day"
       extensions:
         snapshot:
@@ -69,7 +70,7 @@ database:
   compression_after: "1 day"
   compression_segmentby: "plc_id, tag_id"
   compression_orderby: "timestamp DESC"
-  retention_period: "90 days"
+  retention_period: "3 years"
 
 mqtt:
   enabled: false
