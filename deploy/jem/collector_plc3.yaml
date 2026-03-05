@@ -45,7 +45,7 @@ collector:
       deadband: 0
 
     - name: "log"
-      interval_ms: 500
+      interval_ms: 100
       timeout_ms: 5000
       retry_count: 2
       retry_delay_ms: 500
