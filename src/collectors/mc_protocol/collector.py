@@ -835,8 +835,9 @@ class McProtocolCollector(BaseCollector):
                 word_based_bit = read_group.word_based_bit
 
                 if word_based_bit:
-                    # L 디바이스: 워드 주소로 읽기
-                    read_address = read_group.word_start_address
+                    # L 디바이스: 워드 단위(0x0000)로 읽되, 시작 주소는 비트 주소
+                    # MC Protocol 사양: 비트 디바이스의 시작 주소는 항상 비트 번호
+                    read_address = read_group.word_start_address * 16
                     read_count = read_group.point_count  # 워드 수
                     logger.verbose(
                         f"[{self._name}] Reading {read_group.device}[{read_address}:{read_count}] "

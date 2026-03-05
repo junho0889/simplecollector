@@ -14,13 +14,21 @@ from typing import Dict, List, Tuple
 # Application Version
 # =============================================================================
 APP_NAME = "Simple Collector"
-APP_VERSION = "0.3.0"
-APP_BUILD_DATE = "2026-02-27"
+APP_VERSION = "0.3.1"
+APP_BUILD_DATE = "2026-03-05"
 
 # =============================================================================
 # Changelog
 # =============================================================================
 CHANGELOG: List[Dict[str, str]] = [
+    {
+        "version": "0.3.1",
+        "date": "2026-03-05",
+        "changes": (
+            "fix: L 디바이스 워드 기반 비트 읽기 주소 버그 수정 "
+            "(워드 인덱스 대신 비트 주소를 PLC에 전송)"
+        ),
+    },
     {
         "version": "0.3.0",
         "date": "2026-02-27",
@@ -53,7 +61,7 @@ CHANGELOG: List[Dict[str, str]] = [
 # =============================================================================
 MODULE_VERSIONS: Dict[str, str] = {
     "core": "0.2.0",           # 핵심 인터페이스, 설정
-    "collectors": "0.3.0",     # 데이터 수집기 (부분 실패 허용, 지수 백오프)
+    "collectors": "0.3.1",     # 데이터 수집기 (L 디바이스 주소 버그 수정)
     "processors": "0.3.0",     # 데이터 처리기 (재연결 캐시 초기화)
     "publishers": "0.3.0",     # 데이터 발행기 (지수 백오프)
     "pipeline": "0.2.0",       # 파이프라인 관리
@@ -65,7 +73,7 @@ MODULE_VERSIONS: Dict[str, str] = {
 # Protocol Support
 # =============================================================================
 SUPPORTED_PROTOCOLS: Dict[str, str] = {
-    "mc_protocol": "0.3.0",    # 미쓰비시 MC Protocol (부분 실패 허용)
+    "mc_protocol": "0.3.1",    # 미쓰비시 MC Protocol (L 디바이스 주소 수정)
     "modbus": "0.2.0",         # Modbus TCP/RTU (coil/discrete/STRING 추가)
 }
 

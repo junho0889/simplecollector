@@ -2,7 +2,7 @@
   "name": "simple-collector",
   "display_name": "Simple Collector",
   "description": "Industrial PLC Data Collector - Modbus/MC Protocol",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "service_type": "collector",
   "icon": "radio-tower",
   "environment": [
