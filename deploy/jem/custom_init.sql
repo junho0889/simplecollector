@@ -333,3 +333,216 @@ BEGIN
     );
 END;
 $fn$ LANGUAGE plpgsql;
+
+
+-- ============================================================================
+-- 6. 통계/분석 테이블 (Analytics)
+-- ============================================================================
+-- 시간별 생산 통계, 알람 지속시간, 가동율 집계
+-- Continuous Aggregate: 자동 갱신 (production_hourly)
+-- Stored Procedure + pg_cron: alm_duration, operating_rate
+-- ============================================================================
+
+-- 6-1. production_hourly (Continuous Aggregate)
+-- plc_data_integrated에서 시간별 first/last 값 자동 집계
+-- 생산량 = (last - first) + reset_log 보정 (API 조회 시 JOIN)
+DO $do$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM timescaledb_information.continuous_aggregates
+        WHERE view_schema = '{schema}' AND view_name = 'production_hourly'
+    ) THEN
+        EXECUTE $ca$
+            CREATE MATERIALIZED VIEW {schema}.production_hourly
+            WITH (timescaledb.continuous) AS
+            SELECT
+                time_bucket('1 hour', timestamp) AS bucket,
+                plc_id, tag_id,
+                first(COALESCE(v_int::bigint, v_bigint, 0), timestamp) AS first_val,
+                last(COALESCE(v_int::bigint, v_bigint, 0), timestamp) AS last_val,
+                max(COALESCE(v_int::bigint, v_bigint, 0)) AS max_val,
+                count(*) AS sample_count
+            FROM {schema}.plc_data_integrated
+            GROUP BY bucket, plc_id, tag_id
+            WITH NO DATA
+        $ca$;
+    END IF;
+END $do$;
+
+SELECT add_continuous_aggregate_policy('{schema}.production_hourly',
+    start_offset => INTERVAL '2 hours',
+    end_offset   => INTERVAL '1 hour',
+    schedule_interval => INTERVAL '1 hour',
+    if_not_exists => TRUE);
+
+ALTER MATERIALIZED VIEW {schema}.production_hourly SET (
+    timescaledb.compress = true);
+SELECT add_compression_policy('{schema}.production_hourly',
+    compress_after => INTERVAL '1 day', if_not_exists => TRUE);
+SELECT add_retention_policy('{schema}.production_hourly',
+    drop_after => INTERVAL '3 years', if_not_exists => TRUE);
+
+
+-- 6-2. alm_duration_log (알람 지속시간 기록)
+-- alm_history의 ON→OFF 페어링으로 개별 알람 지속시간 저장
+CREATE TABLE IF NOT EXISTS {schema}.alm_duration_log (
+    alarm_on     TIMESTAMPTZ      NOT NULL,
+    alarm_off    TIMESTAMPTZ,
+    plc_id       SMALLINT         NOT NULL,
+    tag_id       INTEGER          NOT NULL,
+    duration_sec DOUBLE PRECISION
+);
+
+SELECT create_hypertable(
+    '{schema}.alm_duration_log', 'alarm_on',
+    chunk_time_interval => INTERVAL '30 days',
+    if_not_exists => TRUE
+);
+
+ALTER TABLE {schema}.alm_duration_log SET (timescaledb.compress, timescaledb.compress_segmentby = 'plc_id');
+SELECT add_compression_policy('{schema}.alm_duration_log', INTERVAL '1 day', if_not_exists => TRUE);
+SELECT add_retention_policy('{schema}.alm_duration_log', INTERVAL '3 years', if_not_exists => TRUE);
+
+
+-- 6-3. operating_rate_hourly (시간별 가동율)
+-- 생산수량 태그의 1분 단위 값 변화 유무로 가동/비가동 판정
+CREATE TABLE IF NOT EXISTS {schema}.operating_rate_hourly (
+    bucket          TIMESTAMPTZ      NOT NULL,
+    plc_id          SMALLINT         NOT NULL,
+    operating_minutes  DOUBLE PRECISION,
+    idle_minutes       DOUBLE PRECISION,
+    operating_rate     DOUBLE PRECISION,
+    production_qty     BIGINT,
+    PRIMARY KEY (bucket, plc_id)
+);
+
+SELECT create_hypertable(
+    '{schema}.operating_rate_hourly', 'bucket',
+    chunk_time_interval => INTERVAL '30 days',
+    if_not_exists => TRUE,
+    migrate_data => TRUE
+);
+
+ALTER TABLE {schema}.operating_rate_hourly SET (timescaledb.compress, timescaledb.compress_segmentby = 'plc_id');
+SELECT add_compression_policy('{schema}.operating_rate_hourly', INTERVAL '1 day', if_not_exists => TRUE);
+SELECT add_retention_policy('{schema}.operating_rate_hourly', INTERVAL '3 years', if_not_exists => TRUE);
+
+
+-- 6-4. 알람 지속시간 계산 프로시저
+-- alm_history에서 ON→OFF 페어링하여 alm_duration_log에 INSERT
+CREATE OR REPLACE PROCEDURE {schema}.sp_calc_alm_duration(
+    p_from TIMESTAMPTZ,
+    p_to   TIMESTAMPTZ
+)
+LANGUAGE plpgsql AS $proc$
+BEGIN
+    DELETE FROM {schema}.alm_duration_log
+    WHERE alarm_on >= p_from AND alarm_on < p_to;
+
+    INSERT INTO {schema}.alm_duration_log (alarm_on, alarm_off, plc_id, tag_id, duration_sec)
+    WITH paired AS (
+        SELECT
+            plc_id, tag_id, timestamp AS ts, v_bool,
+            LEAD(timestamp) OVER (
+                PARTITION BY plc_id, tag_id ORDER BY timestamp
+            ) AS next_ts
+        FROM {schema}.alm_history
+        WHERE timestamp >= p_from
+          AND timestamp < p_to + INTERVAL '1 hour'
+    )
+    SELECT
+        ts, next_ts, plc_id, tag_id,
+        EXTRACT(EPOCH FROM next_ts - ts)
+    FROM paired
+    WHERE v_bool = TRUE
+      AND ts >= p_from AND ts < p_to
+      AND next_ts IS NOT NULL;
+END;
+$proc$;
+
+
+-- 6-5. 가동율 계산 프로시저
+-- 1분 단위 생산수량 변화 감지 → 시간별 가동율 산출
+CREATE OR REPLACE PROCEDURE {schema}.sp_calc_operating_rate(
+    p_from TIMESTAMPTZ,
+    p_to   TIMESTAMPTZ
+)
+LANGUAGE plpgsql AS $proc$
+BEGIN
+    INSERT INTO {schema}.operating_rate_hourly
+        (bucket, plc_id, operating_minutes, idle_minutes, operating_rate, production_qty)
+    WITH production_tags AS (
+        SELECT plc_id, tag_id
+        FROM {schema}.plc_data_master
+        WHERE description LIKE '%생산수량%'
+    ),
+    minute_check AS (
+        SELECT
+            time_bucket('1 minute', i.timestamp) AS minute_bucket,
+            i.plc_id,
+            CASE WHEN max(COALESCE(i.v_int::bigint, i.v_bigint, 0))
+                      > min(COALESCE(i.v_int::bigint, i.v_bigint, 0))
+                 THEN 1 ELSE 0 END AS is_active
+        FROM {schema}.plc_data_integrated i
+        JOIN production_tags pt USING (plc_id, tag_id)
+        WHERE i.timestamp >= p_from AND i.timestamp < p_to
+        GROUP BY minute_bucket, i.plc_id
+    ),
+    hourly_agg AS (
+        SELECT
+            time_bucket('1 hour', minute_bucket) AS bucket,
+            plc_id,
+            sum(is_active)::double precision AS op_min,
+            (60 - sum(is_active))::double precision AS idle_min
+        FROM minute_check
+        GROUP BY bucket, plc_id
+    ),
+    hourly_production AS (
+        SELECT
+            time_bucket('1 hour', i.timestamp) AS bucket,
+            i.plc_id,
+            (last(COALESCE(i.v_int::bigint, i.v_bigint, 0), i.timestamp)
+             - first(COALESCE(i.v_int::bigint, i.v_bigint, 0), i.timestamp))
+            + COALESCE(r.reset_sum, 0) AS qty
+        FROM {schema}.plc_data_integrated i
+        JOIN production_tags pt USING (plc_id, tag_id)
+        LEFT JOIN (
+            SELECT time_bucket('1 hour', timestamp) AS bucket, plc_id,
+                   sum(last_value) AS reset_sum
+            FROM {schema}.plc_data_reset_log
+            WHERE timestamp >= p_from AND timestamp < p_to
+            GROUP BY 1, 2
+        ) r ON r.bucket = time_bucket('1 hour', i.timestamp)
+           AND r.plc_id = i.plc_id
+        WHERE i.timestamp >= p_from AND i.timestamp < p_to
+        GROUP BY time_bucket('1 hour', i.timestamp), i.plc_id, r.reset_sum
+    )
+    SELECT
+        h.bucket, h.plc_id, h.op_min, h.idle_min,
+        round(h.op_min / 60.0 * 100, 2),
+        p.qty
+    FROM hourly_agg h
+    LEFT JOIN hourly_production p USING (bucket, plc_id)
+    ON CONFLICT (bucket, plc_id) DO UPDATE SET
+        operating_minutes = EXCLUDED.operating_minutes,
+        idle_minutes      = EXCLUDED.idle_minutes,
+        operating_rate    = EXCLUDED.operating_rate,
+        production_qty    = EXCLUDED.production_qty;
+END;
+$proc$;
+
+
+-- 6-6. pg_cron 스케줄 (수동 설정 필요)
+-- 아래 SQL을 DB에서 직접 실행하여 스케줄 등록:
+--
+-- SELECT cron.schedule('calc-alm-duration', '10 * * * *',
+--     $$CALL {schema}.sp_calc_alm_duration(
+--         date_trunc('hour', now() - interval '1 hour'),
+--         date_trunc('hour', now())
+--     )$$);
+--
+-- SELECT cron.schedule('calc-operating-rate', '15 * * * *',
+--     $$CALL {schema}.sp_calc_operating_rate(
+--         date_trunc('hour', now() - interval '1 hour'),
+--         date_trunc('hour', now())
+--     )$$);

@@ -52,6 +52,14 @@ collector:
       mode: "on_change"
       deadband: 0
 
+    - name: "action"
+      interval_ms: 500
+      timeout_ms: 5000
+      retry_count: 2
+      retry_delay_ms: 500
+      mode: "on_change"
+      deadband: 0
+
 buffer:
   max_size: 10000
   flush_threshold: 1000
