@@ -181,12 +181,14 @@ python build_deploy.py --publisher
 ### 현재 버전
 | 프로젝트 | 버전 | 최종 빌드 |
 |----------|------|-----------|
-| simpleCollector | 0.3.0 | 2026-02-27 |
+| simpleCollector | 0.3.2 | 2026-03-05 |
 | collector-publisher | 0.2.0 | 2026-02-27 |
 
 ### simpleCollector Changelog
 | 버전 | 날짜 | 변경 내용 |
 |------|------|----------|
+| 0.3.2 | 2026-03-05 | 비트 디바이스(M/X/Y) 워드 기반 읽기 전환 — 비트 읽기(0x0001) PLC 호환성 문제 해결 |
+| 0.3.1 | 2026-03-05 | L 디바이스 워드 기반 비트 읽기 주소 버그 수정 |
 | 0.3.0 | 2026-02-27 | MC/Modbus 부분 실패 허용, 지수 백오프, 재연결 캐시 초기화, Modbus coil/discrete/STRING |
 | 0.2.3-beta | 2026-02-09 | MC Protocol VERBOSE 로깅, NaN/Inf 검증 |
 | 0.2.0-beta | 2026-01-15 | 태그 설정 확장, 마스터 동기화, 성능 최적화 |

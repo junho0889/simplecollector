@@ -14,13 +14,21 @@ from typing import Dict, List, Tuple
 # Application Version
 # =============================================================================
 APP_NAME = "Simple Collector"
-APP_VERSION = "0.3.1"
+APP_VERSION = "0.3.2"
 APP_BUILD_DATE = "2026-03-05"
 
 # =============================================================================
 # Changelog
 # =============================================================================
 CHANGELOG: List[Dict[str, str]] = [
+    {
+        "version": "0.3.2",
+        "date": "2026-03-05",
+        "changes": (
+            "fix: 모든 비트 디바이스(M/X/Y) 워드 기반 읽기로 전환 — "
+            "비트 읽기(0x0001)가 일부 PLC에서 항상 0 반환하는 문제 해결"
+        ),
+    },
     {
         "version": "0.3.1",
         "date": "2026-03-05",
@@ -61,7 +69,7 @@ CHANGELOG: List[Dict[str, str]] = [
 # =============================================================================
 MODULE_VERSIONS: Dict[str, str] = {
     "core": "0.2.0",           # 핵심 인터페이스, 설정
-    "collectors": "0.3.1",     # 데이터 수집기 (L 디바이스 주소 버그 수정)
+    "collectors": "0.3.2",     # 데이터 수집기 (비트 디바이스 워드 기반 읽기 통일)
     "processors": "0.3.0",     # 데이터 처리기 (재연결 캐시 초기화)
     "publishers": "0.3.0",     # 데이터 발행기 (지수 백오프)
     "pipeline": "0.2.0",       # 파이프라인 관리
@@ -73,7 +81,7 @@ MODULE_VERSIONS: Dict[str, str] = {
 # Protocol Support
 # =============================================================================
 SUPPORTED_PROTOCOLS: Dict[str, str] = {
-    "mc_protocol": "0.3.1",    # 미쓰비시 MC Protocol (L 디바이스 주소 수정)
+    "mc_protocol": "0.3.2",    # 미쓰비시 MC Protocol (비트 디바이스 워드 기반 읽기)
     "modbus": "0.2.0",         # Modbus TCP/RTU (coil/discrete/STRING 추가)
 }
 

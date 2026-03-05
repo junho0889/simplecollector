@@ -231,10 +231,11 @@ class DeviceCode:
     def needs_word_based_read(cls, device_name: str) -> bool:
         """
         워드 단위로 읽어서 비트 파싱해야 하는 디바이스 여부.
-        L 디바이스는 iQ-R 시리즈에서 비트 단위 읽기(0x0001)가 동작하지 않아
-        워드 단위(0x0000)로 읽고 비트를 추출해야 함.
+        비트 단위 읽기(subcommand 0x0001)는 일부 PLC에서 항상 0을 반환하는
+        문제가 확인되어, 모든 비트 디바이스(M, X, Y, L 등)를 워드 단위(0x0000)로
+        읽고 비트를 추출하는 방식으로 통일.
         """
-        return device_name.upper() == 'L'
+        return cls.is_bit_device(device_name)
 
     @classmethod
     def get_address_base(cls, device_name: str) -> int:
