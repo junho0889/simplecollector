@@ -35,6 +35,9 @@ class ProtocolRegistry:
         's7': ('src.collectors.s7_protocol', ['snap7']),    # alias
         'opcua': ('src.collectors.opcua', ['asyncua']),
         'fenet': ('src.collectors.fenet', []),              # 순수 Python
+        'ble': ('src.collectors.ble', ['bleak']),             # BLE advertisement
+        'lora_rak5146': ('src.collectors.lora_rak5146', []),   # LoRa RAK5146 (SX1303 HAL)
+        'lora': ('src.collectors.lora_rak5146', []),           # alias
     }
 
     _cache: Dict[str, Any] = {}

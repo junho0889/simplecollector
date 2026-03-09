@@ -519,7 +519,7 @@ BEGIN
     )
     SELECT
         h.bucket, h.plc_id, h.op_min, h.idle_min,
-        round(h.op_min / 60.0 * 100, 2),
+        round((h.op_min / 60.0 * 100)::numeric, 2)::double precision,
         p.qty
     FROM hourly_agg h
     LEFT JOIN hourly_production p USING (bucket, plc_id)
@@ -546,3 +546,244 @@ $proc$;
 --         date_trunc('hour', now() - interval '1 hour'),
 --         date_trunc('hour', now())
 --     )$$);
+
+
+-- ============================================================================
+-- 7. 설비 가동 상태 감지 (Equipment Status Detection)
+-- ============================================================================
+-- D200(생산수량) 증감으로 설비 가동/비가동 판단
+-- 판단 단위: 1분 버킷 (1초 샘플 비교 시 진동 방지)
+-- - running: 1분간 D200의 MAX > MIN (생산수 증가한 적 있음)
+-- - idle: 1분간 D200 변화 없음
+-- - offline: 데이터 미수신 (2분 초과)
+--
+-- 구성:
+--   equipment_status_log      : 상태 전환 이력 (hypertable)
+--   equipment_status_realtime : 현재 상태 실시간 뷰
+--   detect_equipment_status() : 1분 주기 프로시저 (TimescaleDB job)
+--   equipment_daily_summary   : 일별 가동/비가동 시간 집계 뷰
+-- ============================================================================
+
+-- 7-1. 상태 전환 이력 테이블
+CREATE TABLE IF NOT EXISTS {schema}.equipment_status_log (
+    plc_id       SMALLINT    NOT NULL,
+    status       TEXT        NOT NULL,   -- 'running' | 'idle' | 'offline'
+    started_at   TIMESTAMPTZ NOT NULL,
+    ended_at     TIMESTAMPTZ,
+    duration_sec INT,
+    PRIMARY KEY (plc_id, started_at)
+);
+
+SELECT create_hypertable(
+    '{schema}.equipment_status_log', 'started_at',
+    chunk_time_interval => INTERVAL '30 days',
+    if_not_exists => TRUE
+);
+
+ALTER TABLE {schema}.equipment_status_log SET (
+    timescaledb.compress,
+    timescaledb.compress_segmentby = 'plc_id',
+    timescaledb.compress_orderby = 'started_at DESC');
+SELECT add_compression_policy('{schema}.equipment_status_log', INTERVAL '1 day', if_not_exists => TRUE);
+SELECT add_retention_policy('{schema}.equipment_status_log', INTERVAL '3 years', if_not_exists => TRUE);
+
+
+-- 7-2. 실시간 가동 상태 뷰 (최근 2분 윈도우 MAX/MIN 비교)
+CREATE OR REPLACE VIEW {schema}.equipment_status_realtime AS
+WITH d200_tags AS (
+    SELECT plc_id, tag_id
+    FROM {schema}.plc_data_master
+    WHERE tag_name = 'D200'
+),
+recent AS (
+    SELECT
+        i.plc_id,
+        MAX(i.timestamp) AS last_seen,
+        MAX(COALESCE(i.v_float, i.v_int, i.v_bigint)) AS max_val,
+        MIN(COALESCE(i.v_float, i.v_int, i.v_bigint)) AS min_val,
+        MAX(COALESCE(i.v_float, i.v_int, i.v_bigint)) AS current_count
+    FROM {schema}.plc_data_integrated i
+    JOIN d200_tags t ON i.plc_id = t.plc_id AND i.tag_id = t.tag_id
+    WHERE i.timestamp >= NOW() - INTERVAL '2 minutes'
+    GROUP BY i.plc_id
+)
+SELECT
+    r.plc_id,
+    pm.plc_name,
+    CASE
+        WHEN r.last_seen < NOW() - INTERVAL '2 minutes' THEN 'offline'
+        WHEN r.last_seen IS NULL                         THEN 'offline'
+        WHEN r.max_val > r.min_val                       THEN 'running'
+        ELSE 'idle'
+    END AS status,
+    r.current_count,
+    r.last_seen,
+    EXTRACT(EPOCH FROM (NOW() - r.last_seen))::INT AS seconds_ago
+FROM recent r
+JOIN {schema}.plc_master pm ON r.plc_id = pm.plc_id
+ORDER BY r.plc_id;
+
+
+-- 7-3. 상태 변화 감지 프로시저 (1분 주기 실행)
+-- 최근 2분 윈도우에서 D200의 MAX > MIN → running
+CREATE OR REPLACE PROCEDURE {schema}.detect_equipment_status()
+LANGUAGE plpgsql AS $proc$
+DECLARE
+    r RECORD;
+    prev_status TEXT;
+BEGIN
+    FOR r IN
+        WITH d200_tags AS (
+            SELECT plc_id, tag_id
+            FROM {schema}.plc_data_master
+            WHERE tag_name = 'D200'
+        ),
+        recent AS (
+            SELECT
+                i.plc_id,
+                MAX(i.timestamp) AS last_ts,
+                MAX(COALESCE(i.v_float, i.v_int, i.v_bigint)) AS max_val,
+                MIN(COALESCE(i.v_float, i.v_int, i.v_bigint)) AS min_val
+            FROM {schema}.plc_data_integrated i
+            JOIN d200_tags t ON i.plc_id = t.plc_id AND i.tag_id = t.tag_id
+            WHERE i.timestamp >= NOW() - INTERVAL '2 minutes'
+            GROUP BY i.plc_id
+        )
+        SELECT
+            plc_id,
+            last_ts,
+            CASE
+                WHEN last_ts < NOW() - INTERVAL '2 minutes' THEN 'offline'
+                WHEN max_val > min_val                       THEN 'running'
+                ELSE 'idle'
+            END AS current_status
+        FROM recent
+    LOOP
+        -- 현재 열린 상태 레코드 조회
+        SELECT status INTO prev_status
+        FROM {schema}.equipment_status_log
+        WHERE plc_id = r.plc_id AND ended_at IS NULL
+        ORDER BY started_at DESC
+        LIMIT 1;
+
+        -- 상태 변화 시: 이전 레코드 닫고 새 레코드 삽입
+        IF prev_status IS DISTINCT FROM r.current_status THEN
+            UPDATE {schema}.equipment_status_log
+            SET ended_at = r.last_ts,
+                duration_sec = EXTRACT(EPOCH FROM (r.last_ts - started_at))::INT
+            WHERE plc_id = r.plc_id AND ended_at IS NULL;
+
+            INSERT INTO {schema}.equipment_status_log (plc_id, status, started_at)
+            VALUES (r.plc_id, r.current_status, r.last_ts);
+        END IF;
+    END LOOP;
+END;
+$proc$;
+
+-- 7-4. TimescaleDB Job 등록 (중복 방지)
+-- 기존 job 제거 후 재등록
+DO $do$
+DECLARE
+    v_job_id INTEGER;
+BEGIN
+    FOR v_job_id IN
+        SELECT job_id FROM timescaledb_information.jobs
+        WHERE proc_name = 'detect_equipment_status'
+          AND proc_schema = '{schema}'
+    LOOP
+        PERFORM delete_job(v_job_id);
+    END LOOP;
+END $do$;
+
+SELECT add_job('{schema}.detect_equipment_status', '1 minute');
+
+
+-- 7-5. 일별 가동률 요약 뷰
+CREATE OR REPLACE VIEW {schema}.equipment_daily_summary AS
+SELECT
+    plc_id,
+    date_trunc('day', started_at AT TIME ZONE 'Asia/Seoul') AS work_date,
+    status,
+    COUNT(*) AS event_count,
+    SUM(duration_sec) AS total_sec,
+    ROUND(SUM(duration_sec) / 60.0, 1) AS total_min
+FROM {schema}.equipment_status_log
+WHERE ended_at IS NOT NULL
+GROUP BY plc_id, date_trunc('day', started_at AT TIME ZONE 'Asia/Seoul'), status
+ORDER BY plc_id, work_date, status;
+
+
+-- 7-6. 과거 데이터 백필 프로시저 (1분 버킷 기반, 세트 연산)
+-- plc_data_integrated의 D200 이력을 1분 단위로 집계하여 상태 판정
+-- 사용법: CALL {schema}.backfill_equipment_status('2026-01-01', '2026-03-09');
+CREATE OR REPLACE PROCEDURE {schema}.backfill_equipment_status(
+    p_from DATE,
+    p_to   DATE
+)
+LANGUAGE plpgsql AS $proc$
+BEGIN
+    -- 백필 범위의 기존 데이터 삭제 (재실행 가능)
+    DELETE FROM {schema}.equipment_status_log
+    WHERE started_at >= p_from::timestamptz
+      AND started_at < (p_to + 1)::timestamptz;
+
+    -- 1분 버킷으로 집계 → 상태 판정 → 전환점만 INSERT
+    INSERT INTO {schema}.equipment_status_log (plc_id, status, started_at, ended_at, duration_sec)
+    WITH d200_tags AS (
+        SELECT plc_id, tag_id
+        FROM {schema}.plc_data_master
+        WHERE tag_name = 'D200'
+    ),
+    -- 1분 버킷별 MAX/MIN 집계
+    minute_agg AS (
+        SELECT
+            i.plc_id,
+            time_bucket('1 minute', i.timestamp) AS bucket,
+            MAX(COALESCE(i.v_float, i.v_int, i.v_bigint)) AS max_val,
+            MIN(COALESCE(i.v_float, i.v_int, i.v_bigint)) AS min_val
+        FROM {schema}.plc_data_integrated i
+        JOIN d200_tags t ON i.plc_id = t.plc_id AND i.tag_id = t.tag_id
+        WHERE i.timestamp >= p_from::timestamptz
+          AND i.timestamp < (p_to + 1)::timestamptz
+        GROUP BY i.plc_id, time_bucket('1 minute', i.timestamp)
+    ),
+    -- 상태 판정: MAX > MIN → running, 그 외 idle
+    with_status AS (
+        SELECT
+            plc_id, bucket,
+            CASE
+                WHEN max_val > min_val THEN 'running'
+                ELSE 'idle'
+            END AS status
+        FROM minute_agg
+    ),
+    -- 이전 상태와 비교 → 변화 시점만 추출
+    transitions AS (
+        SELECT
+            plc_id, bucket, status,
+            LAG(status) OVER (PARTITION BY plc_id ORDER BY bucket) AS prev_status
+        FROM with_status
+    ),
+    changes AS (
+        SELECT plc_id, bucket, status
+        FROM transitions
+        WHERE prev_status IS DISTINCT FROM status
+    ),
+    -- ended_at = 다음 전환 시점, 마지막은 백필 범위 끝
+    with_end AS (
+        SELECT
+            plc_id, status,
+            bucket AS started_at,
+            COALESCE(
+                LEAD(bucket) OVER (PARTITION BY plc_id ORDER BY bucket),
+                (p_to + 1)::timestamptz
+            ) AS ended_at
+        FROM changes
+    )
+    SELECT
+        plc_id, status, started_at, ended_at,
+        EXTRACT(EPOCH FROM (ended_at - started_at))::INT AS duration_sec
+    FROM with_end
+    ON CONFLICT (plc_id, started_at) DO NOTHING;
+END;
+$proc$;

@@ -110,6 +110,19 @@ database:
   compression_orderby: "timestamp DESC"
   retention_period: "3 years"
 
+scheduler:
+  enabled: true
+  jobs:
+    - name: calc_operating_rate
+      sql: "CALL {schema}.sp_calc_operating_rate(date_trunc('hour', now() - interval '1 hour'), date_trunc('hour', now()))"
+      cron: "15 * * * *"
+    - name: daily_alm_check
+      sql: "SELECT {schema}.fn_daily_alm_check()"
+      cron: "0 9 * * *"
+    - name: calc_alm_duration
+      sql: "CALL {schema}.sp_calc_alm_duration(date_trunc('hour', now() - interval '1 hour'), date_trunc('hour', now()))"
+      cron: "20 * * * *"
+
 mqtt:
   enabled: false
 

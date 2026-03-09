@@ -1,0 +1,83 @@
+# Simple Collector - LoRa RAK5146 Configuration
+# ===============================================
+# End Device → LoRa → RAK5146 (SPI) → HAL → RabbitMQ
+#
+# 사전 요구사항:
+#   - RAK5146 모듈 (mPCIe 슬롯 장착)
+#   - SPI 활성화: sudo raspi-config → Interface → SPI
+#   - libloragw.so 빌드 및 배치 (/app/lib/libloragw.so)
+#
+# Docker 실행 시:
+#   --privileged (SPI 접근)
+#   --device /dev/spidev0.0 (또는 전체 /dev 마운트)
+
+collector:
+  plc_id: 21
+  name: "LORA_POSIOT_01"
+  tags_file: "config/tags_lora.csv"
+
+  protocol:
+    type: "lora_rak5146"
+    host: ""                          # LoRa는 미사용
+    port: 0                           # LoRa는 미사용
+    unit_id: 1
+    timeout_ms: 10000
+    reconnect_interval_ms: 5000
+
+    extra:
+      device_id: 1                             # 대상 end device ID (1~255)
+      device_profile: "posiot_lora"            # 디바이스 프로파일
+      lib_path: "/app/lib/libloragw.so"        # HAL 라이브러리 경로
+      spi_path: "/dev/spidev0.0"               # SPI 디바이스 경로
+      freq_hz: 923300000                       # 중심 주파수 (Hz) — KR920 대역
+      cache_ttl: 30.0                          # 패킷 캐시 만료 (초)
+      poll_interval: 0.01                      # 수신 폴링 간격 (초, 10ms)
+
+  collection_groups:
+    # 센서 데이터: 5초 주기
+    - name: "plc_data"
+      interval_ms: 5000
+      timeout_ms: 10000
+      retry_count: 1
+      retry_delay_ms: 2000
+
+    # 알람 그룹: 배터리 부족 등 (on_change)
+    - name: "alm"
+      interval_ms: 5000
+      timeout_ms: 10000
+      retry_count: 1
+      retry_delay_ms: 2000
+      mode: "on_change"
+      deadband: 0
+
+buffer:
+  max_size: 5000
+  flush_threshold: 100
+  flush_interval_ms: 5000
+
+publisher:
+  batch_size: 100
+  retry_count: 3
+  retry_delay_ms: 1000
+
+  rabbitmq:
+    enabled: true
+    host: "${RABBITMQ_HOST:localhost}"
+    port: ${RABBITMQ_PORT:5672}
+    virtual_host: "/"
+    username: "${RABBITMQ_USER:admin}"
+    password: "${RABBITMQ_PASS:admin}"
+    exchange_name: "plc.data"
+    exchange_type: "topic"
+    routing_key_prefix: "plc"
+    compression: "zlib"
+    encryption_enabled: false
+    heartbeat: 60
+    connection_timeout: 10
+    delivery_mode: 2
+
+logging:
+  level: "INFO"
+  collection_level: "INFO"
+  publish_level: "INFO"
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"

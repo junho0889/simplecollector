@@ -1,0 +1,67 @@
+# ============================================================================
+# LoRa Gateway — 로컬 개발용 (Windows/amd64)
+# ============================================================================
+# End device 개발 시 MQTT 확인용 인프라만 실행
+#
+# 구성:
+#   - RabbitMQ (메시지 브로커)
+#   - Mosquitto (MQTT broker — end device 데이터 확인용)
+#   - collector-publisher (RabbitMQ → MQTT 포워딩)
+#
+# collector는 실제 게이트웨이(CM4+RAK5146)에서 별도 실행하거나,
+# 테스트 시에는 RabbitMQ에 직접 메시지를 넣어 확인할 수 있습니다.
+#
+# 사용법:
+#   docker-compose -f docker-compose.local.yml up -d
+#
+# MQTT 확인:
+#   mosquitto_sub -h localhost -t "plc/data/#" -v
+# ============================================================================
+
+networks:
+  collector-net:
+    driver: bridge
+
+volumes:
+  rabbitmq_data:
+
+services:
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: lora-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - collector-net
+    restart: unless-stopped
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: lora-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    networks:
+      - collector-net
+    restart: unless-stopped
+
+  publisher:
+    image: neuro_publisher:latest
+    container_name: lora-publisher
+    volumes:
+      - ./:/app/config:ro
+    command: ["--config", "/app/config/publisher.yaml"]
+    networks:
+      - collector-net
+    restart: unless-stopped
+    depends_on:
+      - rabbitmq
+      - mosquitto

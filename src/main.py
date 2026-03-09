@@ -192,6 +192,22 @@ class ComponentFactory:
                 config=config.collector,
                 event_bus=event_bus,
             )
+        elif protocol_type == "ble":
+            from src.collectors.ble import BleCollector
+            return BleCollector(
+                plc_id=config.collector.plc_id,
+                name=config.collector.name,
+                config=config.collector,
+                event_bus=event_bus,
+            )
+        elif protocol_type in ("lora", "lora_rak5146"):
+            from src.collectors.lora_rak5146 import LoRaRak5146Collector
+            return LoRaRak5146Collector(
+                plc_id=config.collector.plc_id,
+                name=config.collector.name,
+                config=config.collector,
+                event_bus=event_bus,
+            )
         else:
             # 데모/미지원 프로토콜
             return ComponentFactory._create_demo_collector(config, event_bus)
@@ -224,6 +240,20 @@ class ComponentFactory:
             return McProtocolProcessor(
                 name=f"{config.collector.name}_processor",
                 word_order=extra.get('word_order', 'little'),  # 미쓰비시 기본값
+            )
+        elif protocol_type == "ble":
+            from src.collectors.ble import BleProcessor
+            extra = config.collector.protocol.extra if config.collector.protocol else {}
+            return BleProcessor(
+                name=f"{config.collector.name}_processor",
+                default_profile=extra.get('device_profile', 'posiot'),
+            )
+        elif protocol_type in ("lora", "lora_rak5146"):
+            from src.collectors.lora_rak5146 import LoRaRak5146Processor
+            extra = config.collector.protocol.extra if config.collector.protocol else {}
+            return LoRaRak5146Processor(
+                name=f"{config.collector.name}_processor",
+                default_profile=extra.get('device_profile', 'posiot_lora'),
             )
         else:
             from src.processors.base import GenericProcessor

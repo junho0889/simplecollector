@@ -1,0 +1,96 @@
+# ============================================================================
+# LoRa Gateway — docker-compose.yml
+# ============================================================================
+# 구성:
+#   - RabbitMQ (인프라)
+#   - Mosquitto (MQTT broker)
+#   - simpleCollector — LoRa RAK5146 (SPI)
+#   - collector-publisher (MQTT only, DB 저장 안 함)
+#
+# CM4/CM5 + RAK5146 배포용 (linux/arm64)
+#
+# MQTT 확인:
+#   mosquitto_sub -h <게이트웨이IP> -t "plc/data/#" -v
+#   또는 MQTT Explorer에서 <게이트웨이IP>:1883 접속
+# ============================================================================
+
+networks:
+  collector-net:
+    driver: bridge
+
+volumes:
+  rabbitmq_data:
+
+services:
+
+  # ========================================================================
+  # 인프라
+  # ========================================================================
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: lora-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - collector-net
+    restart: unless-stopped
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: lora-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    networks:
+      - collector-net
+    restart: unless-stopped
+
+  # ========================================================================
+  # Collector — LoRa RAK5146
+  # ========================================================================
+
+  collector-lora:
+    image: neuro_collector_lora:latest
+    container_name: lora-collector
+    privileged: true                    # SPI 접근 필요
+    volumes:
+      - ./collector_lora.yaml:/app/config/collector.yaml:ro
+      - ./tags_lora.csv:/app/config/tags_lora.csv:ro
+      - ./lib/libloragw.so:/app/lib/libloragw.so:ro
+    devices:
+      - /dev/spidev0.0:/dev/spidev0.0  # SPI 디바이스
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: admin
+      RABBITMQ_PASS: admin
+    networks:
+      - collector-net
+    restart: unless-stopped
+    depends_on:
+      - rabbitmq
+
+  # ========================================================================
+  # Publisher — MQTT only (DB 없이 MQTT 포워딩만)
+  # ========================================================================
+
+  publisher:
+    image: neuro_publisher:latest
+    container_name: lora-publisher
+    volumes:
+      - ./:/app/config:ro
+    command: ["--config", "/app/config/publisher.yaml"]
+    networks:
+      - collector-net
+    restart: unless-stopped
+    depends_on:
+      - rabbitmq
+      - mosquitto

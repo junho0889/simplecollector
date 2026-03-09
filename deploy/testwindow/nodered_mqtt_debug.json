@@ -1,0 +1,108 @@
+[
+    {
+        "id": "flow_plc_mqtt_debug",
+        "type": "tab",
+        "label": "PLC-D MQTT Debug",
+        "disabled": false,
+        "info": "PLC-D 데이터를 MQTT로 수신하여 디버그 출력 (tag_name 포함)"
+    },
+    {
+        "id": "mqtt_broker_tw",
+        "type": "mqtt-broker",
+        "name": "tw-mosquitto",
+        "broker": "localhost",
+        "port": "1883",
+        "clientid": "nodered-debug",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "closeTopic": "",
+        "willTopic": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "mqtt_in_plc_data",
+        "type": "mqtt in",
+        "z": "flow_plc_mqtt_debug",
+        "name": "MQTT plc/data",
+        "topic": "plc/data",
+        "qos": "1",
+        "datatype": "json",
+        "broker": "mqtt_broker_tw",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 130,
+        "y": 160,
+        "wires": [
+            ["debug_raw", "parse_with_tagname"]
+        ]
+    },
+    {
+        "id": "debug_raw",
+        "type": "debug",
+        "z": "flow_plc_mqtt_debug",
+        "name": "Raw Message",
+        "active": false,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 380,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "parse_with_tagname",
+        "type": "function",
+        "z": "flow_plc_mqtt_debug",
+        "name": "Parse with Tag Names",
+        "func": "// TAG_MAP: tag_id → tag_name (tags_10_PLC-D.csv 기준)\nvar TAG_MAP = {\n    1: \"자동모드\",\n    2: \"수동모드\",\n    3: \"상부 매거진 서보 ON\",\n    4: \"공급 서보 ON\",\n    5: \"피딩 서보 ON\",\n    6: \"공급 서보 ON\",\n    7: \"리벳팅 서보 ON\",\n    8: \"공급 서보 ON\",\n    9: \"서보 활성화 ON\"\n};\n\nvar p = msg.payload;\nvar result = {\n    plc_id: p.plc_id,\n    timestamp: p.timestamp,\n    count: p.count,\n    tags: []\n};\n\nif (p.data && p.data.length > 0) {\n    for (var i = 0; i < p.data.length; i++) {\n        var d = p.data[i];\n        var val = (d.v_bool !== undefined && d.v_bool !== null) ? d.v_bool :\n                  (d.v_float !== undefined && d.v_float !== null) ? d.v_float :\n                  (d.v_int !== undefined && d.v_int !== null) ? d.v_int :\n                  (d.v_bigint !== undefined && d.v_bigint !== null) ? d.v_bigint :\n                  (d.v_text !== undefined && d.v_text !== null) ? d.v_text : null;\n        result.tags.push({\n            tag_id: d.tag_id,\n            tag_name: TAG_MAP[d.tag_id] || (\"tag_\" + d.tag_id),\n            value: val,\n            data_type: d.data_type || \"\"\n        });\n    }\n}\n\nmsg.payload = result;\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 400,
+        "y": 160,
+        "wires": [
+            ["debug_tags"]
+        ]
+    },
+    {
+        "id": "debug_tags",
+        "type": "debug",
+        "z": "flow_plc_mqtt_debug",
+        "name": "Tags with Names",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "payload.plc_id & \" | tags: \" & payload.count",
+        "statusType": "jsonata",
+        "x": 620,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "comment_1",
+        "type": "comment",
+        "z": "flow_plc_mqtt_debug",
+        "name": "PLC-D MQTT Debug Flow",
+        "info": "Mosquitto: localhost:1883\nTopic: plc/data\n\n- Raw Message: 전체 JSON (기본 비활성)\n- Tags with Names: tag_id + tag_name + value 어레이 출력\n\nTAG_MAP은 tags_10_PLC-D.csv 기준.\n태그 추가/변경 시 Parse with Tag Names 함수 내 TAG_MAP도 수정 필요.",
+        "x": 160,
+        "y": 40,
+        "wires": []
+    }
+]

@@ -1,0 +1,77 @@
+# ============================================================================
+# BLE Collector — POSIOT 센서 #1
+# ============================================================================
+# MAC 주소를 실제 센서 값으로 변경 필요
+
+collector:
+  plc_id: 51                            # BLE 센서는 50번대 plc_id 사용
+  name: "BLE_POSIOT_01"
+  tags_file: "deploy/ble/tags_ble_posiot.csv"
+
+  protocol:
+    type: "ble"
+    host: ""                             # BLE는 미사용
+    port: 0                              # BLE는 미사용
+    unit_id: 1
+    timeout_ms: 10000
+    reconnect_interval_ms: 5000
+
+    extra:
+      mac_address: "D4:BB:36:61:27:AC"
+      device_name_filter: "POSIOT"
+      device_profile: "posiot"
+      cache_ttl: 30.0                    # advertisement 캐시 만료 (초)
+      duplicate_filter_s: 4.0            # 중복 필터 (초)
+
+  collection_groups:
+    - name: "ble_env"                    # 환경 데이터 (온도/습도/기압)
+      interval_ms: 5000
+      timeout_ms: 10000
+      retry_count: 1
+      retry_delay_ms: 2000
+
+    - name: "ble_vib"                    # 진동 데이터
+      interval_ms: 5000
+      timeout_ms: 10000
+      retry_count: 1
+      retry_delay_ms: 2000
+
+    - name: "ble_alm"                    # 알람 (배터리 부족 등)
+      interval_ms: 5000
+      timeout_ms: 10000
+      retry_count: 1
+      retry_delay_ms: 2000
+      mode: "on_change"
+      deadband: 0
+
+buffer:
+  max_size: 5000
+  flush_threshold: 100
+  flush_interval_ms: 5000
+
+publisher:
+  batch_size: 100
+  retry_count: 3
+  retry_delay_ms: 1000
+
+  rabbitmq:
+    enabled: true
+    host: "${RABBITMQ_HOST:localhost}"
+    port: ${RABBITMQ_PORT:5672}
+    virtual_host: "/"
+    username: "admin"
+    password: "admin"
+    exchange_name: "plc.data"
+    exchange_type: "topic"
+    routing_key_prefix: "plc"
+    compression: "zlib"
+    encryption_enabled: false
+    heartbeat: 60
+    connection_timeout: 10
+    delivery_mode: 2
+
+logging:
+  level: "DEBUG"
+  collection_level: "DEBUG"
+  publish_level: "DEBUG"
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"

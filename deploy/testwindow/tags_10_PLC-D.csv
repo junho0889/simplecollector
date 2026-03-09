@@ -1,0 +1,26 @@
+﻿tag_id,tag_name,memory,address,data_type,collection_group,scale,offset,decimals,word_length,format,unit,description
+1,자동모드,Y,401,bool,plc_data,1,0,,,,,자동모드
+2,수동모드,Y,402,bool,plc_data,1,0,,,,,수동모드
+3,상부 매거진 서보 ON,Y,442,bool,plc_data,1,0,,,,,1# 상부 매거진 서보 ON
+4,공급 서보 ON,Y,443,bool,plc_data,1,0,,,,,1# 공급 서보 ON
+5,피딩 서보 ON,Y,444,bool,plc_data,1,0,,,,,4# 피딩 서보 ON
+6,공급 서보 ON,Y,445,bool,plc_data,1,0,,,,,6# 공급 서보 ON
+7,리벳팅 서보 ON,Y,446,bool,plc_data,1,0,,,,,8# 리벳팅 서보 ON
+8,공급 서보 ON,Y,447,bool,plc_data,1,0,,,,,10# 공급 서보 ON
+9,서보 활성화 ON,Y,1115,bool,plc_data,1,0,,,,,3# 서보 활성화 ON
+10,타워램프_적색,Y,40C,bool,plc_data,1,0,,,,,타워램프 빨간색 (알람/비상정지)
+11,타워램프_녹색,Y,40D,bool,plc_data,1,0,,,,,타워램프 초록색 (정상 가동 중)
+12,타워램프_황색,Y,40E,bool,plc_data,1,0,,,,,타워램프 노란색 (정지/대기)
+13,알람_부저,Y,40F,bool,plc_data,1,0,,,,,설비 알람 부저
+14,자동기동_지시등,Y,403,bool,plc_data,1,0,,,,,판넬 자동 기동 램프
+15,자동정지_지시등,Y,404,bool,plc_data,1,0,,,,,판넬 자동 정지 램프
+16,리셋_지시등,Y,405,bool,plc_data,1,0,,,,,원점 복귀(리셋) 동작 지시등
+17,알람해제_지시등,Y,406,bool,plc_data,1,0,,,,,알람 해제(Reset) 버튼 지시등
+18,사이클기동_지시등,Y,407,bool,plc_data,1,0,,,,,주기(Cycle) 기동 지시등
+19,현재모델번호,D,100,word,plc_data,1,0,,1,,,현재 생산 중인 모델 번호
+20,모델선택순서,D,3996,word,plc_data,1,0,,1,,,모델 선택 순서 번호
+21,비상정지_상태,X,100,bool,plc_data,1,0,,,,,비상정지 버튼 1번 입력 상태
+22,DC12V_전원상태,Y,44E,bool,plc_data,1,0,,,,,DC12V 전원 계전기 출력 상태
+23,DC24V_전원상태,Y,44F,bool,plc_data,1,0,,,,,DC24V 전원 계전기 출력 상태
+24,서보_10번_NG배출,Y,46C,bool,plc_data,1,0,,,,,10# NG 하료 서보 활성화
+25,서보_3번_상하1,Y,460,bool,plc_data,1,0,,,,,3# 상하 서보 1 활성화

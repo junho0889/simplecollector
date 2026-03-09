@@ -1,0 +1,21 @@
+tag_id,tag_name,memory,address,data_type,collection_group,scale,offset,decimals,unit,string_length,word_length,format,description
+1,temperature,ADV,temperature,float32,plc_data,1,0,2,℃,,,,온도
+2,humidity,ADV,humidity,float32,plc_data,1,0,2,%,,,,습도
+3,pressure,ADV,pressure,float32,plc_data,1,0,2,hPa,,,,기압
+4,battery,ADV,battery,uint16,plc_data,1,0,,%,,,,배터리
+5,version,ADV,version,uint16,plc_data,1,0,,,,,, 펌웨어버전
+6,mode,ADV,mode,uint16,plc_data,1,0,,,,,,동작모드
+7,accel_rms_x,ADV,accel_rms_x,float32,plc_data,1,0,3,g,,,,가속도RMS X
+8,accel_rms_y,ADV,accel_rms_y,float32,plc_data,1,0,3,g,,,,가속도RMS Y
+9,accel_rms_z,ADV,accel_rms_z,float32,plc_data,1,0,3,g,,,,가속도RMS Z
+10,velocity_rms,ADV,velocity_rms_under_1k,float32,plc_data,1,0,3,mm/s,,,,속도RMS <1kHz
+11,accel_rms_1k5k,ADV,accel_rms_1k_5k,float32,plc_data,1,0,3,g,,,,가속도RMS 1-5kHz
+12,vibration_peak,ADV,vibration_peak,uint16,plc_data,1,0,,,,,, 진동피크
+13,harmony_cnt_low,ADV,harmony_cnt_under_1k,uint16,plc_data,1,0,,,,,,고조파수 <1kHz
+14,harmony_cnt_high,ADV,harmony_cnt_1k_5k,uint16,plc_data,1,0,,,,,,고조파수 1-5kHz
+15,gravity_mag,ADV,gravity_mag_xyz,uint16,plc_data,1,0,,,,,,중력크기
+16,sound_db,ADV,sound_db,uint16,plc_data,1,0,,dB,,,,소음
+17,sound_peak,ADV,sound_peak,uint16,plc_data,1,0,,,,,,소음피크
+18,prob_temp,ADV,prob_temp,float32,plc_data,1,0,2,℃,,,,프로브온도
+19,rssi,META,rssi,int16,plc_data,1,0,,dBm,,,,신호강도
+20,battery_low,ADV,battery,bool,alm,1,0,,,,,,배터리부족알람

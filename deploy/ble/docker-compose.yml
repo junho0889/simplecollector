@@ -1,0 +1,73 @@
+# ============================================================================
+# BLE 테스트 — docker-compose.yml (Windows)
+# ============================================================================
+# 구성:
+#   [Docker]  RabbitMQ + Mosquitto (인프라)
+#   [로컬]    BLE collector (python -m src.main) — Windows Bluetooth 사용
+#
+# Windows Docker에서는 BLE 어댑터 접근 불가 (WSL2/Hyper-V VM)
+# → collector는 반드시 네이티브로 실행
+#
+# 사용법:
+#   1. docker compose up -d           (인프라 시작)
+#   2. python -m src.main -c deploy/ble/collector_ble1.yaml   (BLE 수집 시작)
+#   3. docker exec -it ble-mosquitto mosquitto_sub -t '#' -v  (MQTT 수신 확인)
+# ============================================================================
+
+services:
+
+  # RabbitMQ — 메시지 브로커
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ble-rabbitmq
+    ports:
+      - "5672:5672"       # AMQP
+      - "15672:15672"     # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Mosquitto — MQTT 브로커 (BLE 데이터 최종 수신)
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: ble-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  # Node-RED — MQTT 디버깅 대시보드
+  nodered:
+    image: nodered/node-red:latest
+    container_name: ble-nodered
+    ports:
+      - "1881:1880"
+    volumes:
+      - nodered_data:/data
+      - ./nodered_ble_debug.json:/data/flows/nodered_ble_debug.json:ro
+    environment:
+      TZ: Asia/Seoul
+    depends_on:
+      - mosquitto
+
+  # collector-publisher — RabbitMQ → MQTT forward
+  # publisher-ble:
+  #   image: neuro_publisher:latest
+  #   container_name: ble-publisher
+  #   volumes:
+  #     - ./:/app/config:ro
+  #   command: ["--config", "/app/config/publisher_ble.yaml"]
+  #   environment:
+  #     RABBITMQ_HOST: rabbitmq
+  #     MQTT_HOST: mosquitto
+  #   depends_on:
+  #     rabbitmq:
+  #       condition: service_healthy
+
+volumes:
+  nodered_data:

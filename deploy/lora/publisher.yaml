@@ -1,0 +1,47 @@
+# ============================================================================
+# Publisher — LoRa (MQTT only)
+# ============================================================================
+# LoRa end device 데이터만 수신하여 MQTT로 포워딩 (DB 저장 안 함)
+# 큐: queue.mqtt
+
+rabbitmq:
+  host: "${RABBITMQ_HOST:rabbitmq}"
+  port: 5672
+  virtual_host: "/"
+  username: "${RABBITMQ_USER:admin}"
+  password: "${RABBITMQ_PASSWORD:admin}"
+  exchange_name: "plc.data"
+  exchange_type: "topic"
+  queue_db: "queue.db"
+  queue_mqtt: "queue.mqtt"
+  queue_monitor: "queue.monitor"
+  routing_key_pattern: "plc.*.data"
+  prefetch_count: 50
+  monitor_prefetch: 10
+  monitor_message_ttl: 30000
+  monitor_max_length: 10000
+  heartbeat: 60
+  connection_timeout: 10
+  compression: "zlib"
+  encryption_enabled: false
+  encryption_key: ""
+
+database:
+  enabled: false
+
+mqtt:
+  enabled: true
+  host: "mosquitto"
+  port: 1883
+  client_id: "lora-publisher"
+  username: ""
+  password: ""
+  topic: "plc/data"
+  qos: 1
+  use_tls: false
+
+logging:
+  level: "INFO"
+  file_path: "logs/publisher.log"
+  max_size_mb: 10
+  backup_count: 5
