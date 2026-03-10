@@ -1,0 +1,45 @@
+# ============================================================================
+# JEM-like Test Infrastructure (RabbitMQ + TimescaleDB only)
+# ============================================================================
+# Publisher는 호스트에서 직접 실행, 목업 데이터는 Python 스크립트로 주입
+#
+# 사용법:
+#   docker compose -f tests/jem_test/infra/docker-compose.yml up -d
+#   python -m src.main -c D:/4.source/simpleCollector/tests/jem_test/infra/publisher_local.yaml
+#   python tests/jem_test/mock_producer.py
+# ============================================================================
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: jem-local-rmq
+    ports:
+      - "36672:5672"
+      - "36673:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      start_period: 15s
+      retries: 10
+    restart: unless-stopped
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: jem-local-db
+    ports:
+      - "55432:5432"
+    environment:
+      POSTGRES_DB: neurosense
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: neuro0901
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d neurosense"]
+      interval: 5s
+      timeout: 5s
+      start_period: 15s
+      retries: 10
+    restart: unless-stopped

@@ -1,0 +1,117 @@
+# ============================================================================
+# Publisher — JEM-like 로컬 테스트 환경
+# ============================================================================
+# RabbitMQ: localhost:45672
+# TimescaleDB: localhost:45432 (neurosense / jem_test)
+# Publisher를 호스트에서 직접 실행:
+#   cd d:\4.source\collector-publisher
+#   python -m src.main -c D:/4.source/simpleCollector/tests/jem_test/infra/publisher_local.yaml
+# ============================================================================
+
+rabbitmq:
+  host: "localhost"
+  port: 36672
+  virtual_host: "/"
+  username: "admin"
+  password: "admin"
+  exchange_name: "plc.data"
+  exchange_type: "topic"
+  queue_db: "queue.db"
+  queue_mqtt: "queue.mqtt"
+  queue_monitor: "queue.monitor"
+  routing_key_pattern: "plc.*.data"
+  prefetch_count: 50
+  monitor_prefetch: 10
+  monitor_message_ttl: 30000
+  monitor_max_length: 10000
+  heartbeat: 60
+  connection_timeout: 10
+  compression: "zlib"
+  encryption_enabled: false
+  encryption_key: ""
+
+database:
+  enabled: true
+  host: "localhost"
+  port: 55432
+  database: "neurosense"
+  user: "user"
+  password: "neuro0901"
+  pool_size: 5
+  pool_min_size: 2
+  schema_name: "jem_test"
+  insert_method: "copy"
+  auto_init_schema: true
+  master_sync_enabled: true
+  collection_groups:
+    - name: "plc_data"
+      mode: "all"
+      retention_period: ""
+      compression_after: "1 day"
+    - name: "alm"
+      mode: "latest"
+      retention_period: ""
+      compression_after: "1 day"
+      extensions:
+        history:
+          trigger_on: "v_bool"
+    - name: "log"
+      mode: "latest"
+      retention_period: ""
+      compression_after: "1 day"
+      extensions:
+        snapshot:
+          triggers:
+            - watch_tag: 3000
+              plc_ids: [1, 2, 3, 5, 6, 7, 9, 10]
+              capture_tags: [3001, 3002, 3003, 3004, 3005]
+            - watch_tag: 3005
+              plc_ids: [4]
+              capture_tags: [
+                3008, 3009, 3010, 3011, 3012, 3013, 3014, 3015, 3016, 3017,
+                3018, 3019, 3020, 3021, 3022, 3023, 3024, 3025, 3026, 3027,
+                3028, 3029, 3030, 3031, 3032, 3033, 3034, 3035, 3036, 3037,
+                3038, 3039, 3040, 3041, 3042, 3043, 3044, 3045, 3046, 3047,
+                3048, 3049, 3050, 3051, 3052, 3053, 3054, 3055
+              ]
+            - watch_tag: 3006
+              plc_ids: [4]
+              capture_tags: [3000, 3001, 3002, 3003, 3004]
+            - watch_tag: 3007
+              plc_ids: [4]
+              capture_tags: [
+                3056, 3057, 3058, 3059, 3060, 3061, 3062, 3063, 3064, 3065,
+                3066, 3067, 3068, 3069, 3070, 3071, 3072, 3073, 3074, 3075
+              ]
+            - watch_tag: 3000
+              plc_ids: [8]
+              capture_tags: [
+                3001, 3002, 3003, 3004, 3005, 3006, 3007, 3008, 3009, 3010,
+                3011, 3012, 3013, 3014, 3015, 3016, 3017, 3018, 3019, 3020,
+                3021, 3022, 3023, 3024, 3025, 3026, 3027, 3028, 3029, 3030,
+                3031, 3032, 3033, 3034, 3035, 3036
+              ]
+            - watch_tag: 3037
+              plc_ids: [8]
+              capture_tags: [3038, 3039, 3040, 3041, 3042]
+    - name: "action"
+      mode: "latest"
+      retention_period: ""
+      compression_after: "1 day"
+  custom_sql_path: "D:/4.source/simpleCollector/tests/jem_test/infra/custom_init.sql"
+  compression_after: "1 day"
+  compression_segmentby: "plc_id, tag_id"
+  compression_orderby: "timestamp DESC"
+  retention_period: ""
+
+scheduler:
+  enabled: false
+
+mqtt:
+  enabled: false
+
+logging:
+  level: "INFO"
+  file_path: ""
+  max_size_mb: 10
+  backup_count: 5
