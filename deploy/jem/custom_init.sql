@@ -90,3 +90,31 @@ CREATE TABLE IF NOT EXISTS {schema}.production_target (
     updated_at    TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (line_id, target_type)
 );
+
+-- 4-2. 목표수량 변경 이력
+CREATE TABLE IF NOT EXISTS {schema}.production_target_history (
+    id            SERIAL PRIMARY KEY,
+    line_id       INTEGER NOT NULL,
+    target_type   VARCHAR(10) NOT NULL,
+    target_qty    INTEGER NOT NULL,
+    changed_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_target_history_lookup
+    ON {schema}.production_target_history (line_id, target_type, changed_at DESC);
+
+-- 4-3. 트리거: production_target INSERT/UPDATE 시 이력 자동 기록
+CREATE OR REPLACE FUNCTION {schema}.fn_production_target_history()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO {schema}.production_target_history (line_id, target_type, target_qty)
+    VALUES (NEW.line_id, NEW.target_type, NEW.target_qty);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_production_target_history ON {schema}.production_target;
+CREATE TRIGGER trg_production_target_history
+    AFTER INSERT OR UPDATE ON {schema}.production_target
+    FOR EACH ROW
+    EXECUTE FUNCTION {schema}.fn_production_target_history();
