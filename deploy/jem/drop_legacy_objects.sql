@@ -5,7 +5,7 @@
 -- 실행: publisher 중지 상태에서 DB에 직접 실행
 --   psql -h <host> -U <user> -d neurosense -f drop_legacy_objects.sql
 --
--- 주의: {schema}를 실제 스키마명으로 치환하고 실행할 것 (예: jem_jh02)
+-- 주의: jem_jh02를 실제 스키마명으로 치환하고 실행할 것 (예: jem_jh02)
 -- ============================================================================
 
 
@@ -18,26 +18,26 @@
 DO $$
 BEGIN
     -- CA 정책 먼저 제거
-    PERFORM remove_continuous_aggregate_policy('{schema}.production_hourly', if_not_exists => TRUE);
+    PERFORM remove_continuous_aggregate_policy('jem_jh02.production_hourly', if_not_exists => TRUE);
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'production_hourly CA policy 제거 스킵: %', SQLERRM;
 END $$;
 
 DO $$
 BEGIN
-    PERFORM remove_compression_policy('{schema}.production_hourly', if_not_exists => TRUE);
+    PERFORM remove_compression_policy('jem_jh02.production_hourly', if_not_exists => TRUE);
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'production_hourly compression policy 제거 스킵: %', SQLERRM;
 END $$;
 
 DO $$
 BEGIN
-    PERFORM remove_retention_policy('{schema}.production_hourly', if_not_exists => TRUE);
+    PERFORM remove_retention_policy('jem_jh02.production_hourly', if_not_exists => TRUE);
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'production_hourly retention policy 제거 스킵: %', SQLERRM;
 END $$;
 
-DROP MATERIALIZED VIEW IF EXISTS {schema}.production_hourly CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS jem_jh02.production_hourly CASCADE;
 
 
 -- ============================================================================
@@ -45,17 +45,17 @@ DROP MATERIALIZED VIEW IF EXISTS {schema}.production_hourly CASCADE;
 -- ============================================================================
 
 -- 알람 교대별 통계 → v_alarm_ranking_daily/weekly/monthly로 대체
-DROP TABLE IF EXISTS {schema}.alm_shift_summary CASCADE;
-DROP FUNCTION IF EXISTS {schema}.fn_compute_alm_shift_summary(TIMESTAMPTZ, TIMESTAMPTZ, VARCHAR, DATE);
-DROP FUNCTION IF EXISTS {schema}.fn_daily_alm_check();
+DROP TABLE IF EXISTS jem_jh02.alm_shift_summary CASCADE;
+DROP FUNCTION IF EXISTS jem_jh02.fn_compute_alm_shift_summary(TIMESTAMPTZ, TIMESTAMPTZ, VARCHAR, DATE);
+DROP FUNCTION IF EXISTS jem_jh02.fn_daily_alm_check();
 
 -- 알람 지속시간 기록 → v_alarm_downtime 뷰로 대체
-DROP TABLE IF EXISTS {schema}.alm_duration_log CASCADE;
-DROP PROCEDURE IF EXISTS {schema}.sp_calc_alm_duration(TIMESTAMPTZ, TIMESTAMPTZ);
+DROP TABLE IF EXISTS jem_jh02.alm_duration_log CASCADE;
+DROP PROCEDURE IF EXISTS jem_jh02.sp_calc_alm_duration(TIMESTAMPTZ, TIMESTAMPTZ);
 
 -- 시간별 가동율 → production_shift_current.operating_rate (트리거 실시간)로 대체
-DROP TABLE IF EXISTS {schema}.operating_rate_hourly CASCADE;
-DROP PROCEDURE IF EXISTS {schema}.sp_calc_operating_rate(TIMESTAMPTZ, TIMESTAMPTZ);
+DROP TABLE IF EXISTS jem_jh02.operating_rate_hourly CASCADE;
+DROP PROCEDURE IF EXISTS jem_jh02.sp_calc_operating_rate(TIMESTAMPTZ, TIMESTAMPTZ);
 
 
 -- ============================================================================
@@ -75,11 +75,18 @@ END $$;
 
 
 -- ============================================================================
--- 4. 유지 항목 (참고용, DROP 하지 않음)
+-- 4. PLC 리셋 감지 (새 설계에서 불필요, 제거)
 -- ============================================================================
--- plc_data_reset_log          — PLC 카운터 리셋 감지 (교대 전환과 다른 개념, 유지)
--- plc_data_reset_snapshot     — 리셋 시점 주요 지표 캡처 (유지)
--- fn_production_reset_check() — 리셋 감지 트리거 (유지)
+-- 새 fn_production_shift_tracker()가 교대별 누적값을 관리하므로 별도 리셋 감지 불필요
+DROP TRIGGER IF EXISTS trg_plc_data_production_reset ON jem_jh02.plc_data_latest;
+DROP FUNCTION IF EXISTS jem_jh02.fn_production_reset_check();
+DROP TABLE IF EXISTS jem_jh02.plc_data_reset_log CASCADE;
+DROP TABLE IF EXISTS jem_jh02.plc_data_reset_snapshot CASCADE;
+
+
+-- ============================================================================
+-- 5. 유지 항목 (참고용, DROP 하지 않음)
+-- ============================================================================
 -- {group}_latest_view         — 새 SQL에 포함됨 (OR REPLACE로 갱신)
 -- {group}_master_updated_at   — 새 SQL에 포함됨 (OR REPLACE로 갱신)
 

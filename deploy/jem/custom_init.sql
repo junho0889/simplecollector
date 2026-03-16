@@ -1505,14 +1505,14 @@ BEGIN
         timescaledb.compress_segmentby = 'plc_id',
         timescaledb.compress_orderby = 'created_at DESC'
     );
-    SELECT add_compression_policy(
+    PERFORM add_compression_policy(
         '{schema}.production_shift_history',
         INTERVAL '1 day',
         if_not_exists => TRUE
     );
 
     -- 보관 정책 (3년)
-    SELECT add_retention_policy(
+    PERFORM add_retention_policy(
         '{schema}.production_shift_history',
         INTERVAL '3 years',
         if_not_exists => TRUE
@@ -1546,13 +1546,13 @@ BEGIN
         timescaledb.compress_segmentby = 'plc_id',
         timescaledb.compress_orderby = 'snapshot_at DESC'
     );
-    SELECT add_compression_policy(
+    PERFORM add_compression_policy(
         '{schema}.production_hourly',
         INTERVAL '1 day',
         if_not_exists => TRUE
     );
 
-    SELECT add_retention_policy(
+    PERFORM add_retention_policy(
         '{schema}.production_hourly',
         INTERVAL '3 years',
         if_not_exists => TRUE
@@ -1586,13 +1586,13 @@ BEGIN
         timescaledb.compress_segmentby = 'plc_id',
         timescaledb.compress_orderby = 'prod_date DESC'
     );
-    SELECT add_compression_policy(
+    PERFORM add_compression_policy(
         '{schema}.production_daily',
         INTERVAL '1 day',
         if_not_exists => TRUE
     );
 
-    SELECT add_retention_policy(
+    PERFORM add_retention_policy(
         '{schema}.production_daily',
         INTERVAL '3 years',
         if_not_exists => TRUE
