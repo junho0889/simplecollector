@@ -172,12 +172,12 @@ SELECT
     b.max_shift_order,
     b.tag_type,
     -- 첫 값 (교대 시작 시점의 누적값)
-    (SELECT COALESCE(v_float, v_int::numeric, 0)
+    (SELECT COALESCE(v_float, v_bigint::numeric, v_int::numeric, 0)
      FROM jem_jh02.plc_data_integrated
      WHERE plc_id = b.plc_id AND tag_id = b.tag_id AND timestamp = b.first_ts
      LIMIT 1) AS first_val,
     -- 마지막 값 (교대 종료 시점의 누적값)
-    (SELECT COALESCE(v_float, v_int::numeric, 0)
+    (SELECT COALESCE(v_float, v_bigint::numeric, v_int::numeric, 0)
      FROM jem_jh02.plc_data_integrated
      WHERE plc_id = b.plc_id AND tag_id = b.tag_id AND timestamp = b.last_ts
      LIMIT 1) AS last_val
@@ -406,7 +406,7 @@ BEGIN
         SELECT
             t.plc_id,
             date_trunc('hour', i.timestamp) AS snapshot_at,
-            MAX(COALESCE(i.v_float, i.v_int::numeric, 0)) AS accumulated
+            MAX(COALESCE(i.v_float, i.v_bigint::numeric, i.v_int::numeric, 0)) AS accumulated
         FROM tmp_tags t
         JOIN jem_jh02.plc_data_integrated i
             ON i.plc_id = t.plc_id AND i.tag_id = t.tag_id
@@ -418,7 +418,7 @@ BEGIN
         SELECT
             t.plc_id,
             date_trunc('hour', i.timestamp) AS snapshot_at,
-            MAX(COALESCE(i.v_float, i.v_int::numeric, 0)) AS accumulated
+            MAX(COALESCE(i.v_float, i.v_bigint::numeric, i.v_int::numeric, 0)) AS accumulated
         FROM tmp_tags t
         JOIN jem_jh02.plc_data_integrated i
             ON i.plc_id = t.plc_id AND i.tag_id = t.tag_id

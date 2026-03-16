@@ -534,8 +534,8 @@ BEGIN
     -- 현재 교대 정보 조회
     SELECT * INTO v_shift FROM {schema}.fn_get_current_shift();
 
-    -- 수신값 (v_int 또는 v_float 사용)
-    v_new_val := COALESCE(NEW.v_float, NEW.v_int::NUMERIC, 0);
+    -- 수신값 (v_float, v_bigint, v_int 순으로 사용 — uint32는 v_bigint에 저장됨)
+    v_new_val := COALESCE(NEW.v_float, NEW.v_bigint::NUMERIC, NEW.v_int::NUMERIC, 0);
 
     -- current 행 조회 (없으면 INSERT)
     SELECT * INTO v_cur
