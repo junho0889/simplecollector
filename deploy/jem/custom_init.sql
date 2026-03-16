@@ -6,6 +6,8 @@
 --
 -- 플레이스홀더:
 --   {schema}  → publisher YAML의 schema_name (예: jem_jh02)
+--   {group}   → 수집 그룹명 (plc_data, alm, log)
+--              {group} 포함 시 모든 그룹에 대해 반복 실행
 --
 -- 실행 순서:
 --   1. publisher가 글로벌/그룹 테이블 자동 생성 (schema_init.py)
@@ -40,8 +42,48 @@
 --   [hypertable] production_hourly       — 1일 압축, 3년 보관
 --   [hypertable] production_daily        — 1일 압축, 3년 보관
 --   [백필] fn_backfill_daily_statistics() — 누락된 일별 통계 자동 복구
+--   [뷰] {group}_latest_view              — latest + master 조인 뷰 (그룹별)
+--   [트리거] {group}_master_updated_at    — master 수정 시 updated_at 자동 갱신
 --   [권한] api_reader                      — API 조회용 읽기 전용 계정
 -- ============================================================================
+
+
+-- ============================================================================
+-- 그룹별 공통 객체 ({group} 플레이스홀더 — 모든 그룹에 대해 반복 실행)
+-- ============================================================================
+
+-- {group}_latest + {group}_master 조인 뷰
+-- 용도: 최신값 조회 시 태그 메타정보(이름, 단위, 설명)를 함께 표시
+CREATE OR REPLACE VIEW {schema}.{group}_latest_view AS
+SELECT
+    l.plc_id,
+    l.tag_id,
+    m.tag_name,
+    m.data_type,
+    m.unit,
+    m.description,
+    l.timestamp,
+    l.v_bool, l.v_int, l.v_bigint, l.v_float, l.v_text,
+    l.quality_code,
+    l.updated_at
+FROM {schema}.{group}_latest l
+LEFT JOIN {schema}.{group}_master m
+    ON l.plc_id = m.plc_id AND l.tag_id = m.tag_id;
+
+-- {group}_master 수정 시 updated_at 자동 갱신 트리거
+CREATE OR REPLACE FUNCTION {schema}.{group}_master_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_{group}_master_updated_at ON {schema}.{group}_master;
+CREATE TRIGGER trg_{group}_master_updated_at
+    BEFORE UPDATE ON {schema}.{group}_master
+    FOR EACH ROW
+    EXECUTE FUNCTION {schema}.{group}_master_updated_at();
 
 
 -- ============================================================================
