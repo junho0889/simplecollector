@@ -204,41 +204,39 @@ DECLARE
 BEGIN
     CREATE TEMP TABLE tmp_alm_downtime AS
     WITH
-    -- 4-0. publisher 초기화 일괄 OFF 제외
-    -- 같은 plc_id에서 1초 이내에 10개 이상 태그가 동시에 OFF → 초기화로 간주
-    bulk_off_events AS (
+    -- 4-0. publisher 초기화 일괄 OFF 시점 감지
+    -- 같은 plc_id에서 1초 이내에 10개 이상 태그가 동시에 OFF → 초기화 시점
+    bulk_off_times AS (
         SELECT plc_id, date_trunc('second', timestamp) AS bulk_sec
         FROM jem_jh02.alm_history
         WHERE v_bool = FALSE
         GROUP BY plc_id, date_trunc('second', timestamp)
         HAVING COUNT(DISTINCT tag_id) >= 10
     ),
-    -- 초기화 이벤트를 제외한 알람 이력
-    filtered_alm AS (
-        SELECT a.*
-        FROM jem_jh02.alm_history a
-        LEFT JOIN bulk_off_events b
-            ON a.plc_id = b.plc_id
-            AND date_trunc('second', a.timestamp) = b.bulk_sec
-            AND a.v_bool = FALSE
-        WHERE b.plc_id IS NULL
-    ),
-    -- 4-1. 알람 ON/OFF 페어링 (LEAD로 다음 이벤트 매칭)
+    -- 4-1. 알람 ON/OFF 페어링 (원본 데이터 전체 사용)
     alarm_events AS (
         SELECT
             plc_id, tag_id, timestamp, v_bool,
             LEAD(timestamp) OVER (PARTITION BY plc_id, tag_id ORDER BY timestamp) AS next_ts,
             LEAD(v_bool) OVER (PARTITION BY plc_id, tag_id ORDER BY timestamp) AS next_bool
-        FROM filtered_alm
+        FROM jem_jh02.alm_history
     ),
-    -- TRUE → FALSE 페어만 추출
+    -- TRUE → FALSE 페어 추출 후, bulk OFF 시점의 OFF는 해당 시점으로 잘라줌
+    -- OFF가 없는 알람(next_bool != FALSE)은 다음 bulk OFF 시점을 alarm_off로 사용
     alarm_periods AS (
         SELECT
-            plc_id,
-            timestamp AS alarm_on,
-            CASE WHEN next_bool = FALSE THEN next_ts ELSE NULL END AS alarm_off
-        FROM alarm_events
-        WHERE v_bool = TRUE
+            ae.plc_id,
+            ae.timestamp AS alarm_on,
+            CASE
+                -- 정상 OFF가 있으면 그대로 사용
+                WHEN ae.next_bool = FALSE THEN ae.next_ts
+                -- OFF 없으면 해당 알람 이후 가장 가까운 bulk OFF 시점을 종료로 사용
+                ELSE (SELECT MIN(b.bulk_sec)
+                      FROM bulk_off_times b
+                      WHERE b.plc_id = ae.plc_id AND b.bulk_sec > ae.timestamp)
+            END AS alarm_off
+        FROM alarm_events ae
+        WHERE ae.v_bool = TRUE
     ),
     -- 4-2. 교대 구간에 클리핑 (교대 경계로 자르기)
     alarm_in_shifts AS (
