@@ -31,7 +31,9 @@ class ProfileRegistry:
 
 # Built-in 프로파일 자동 등록
 from .posiot import PosiotProfile
+from .posiot_v2 import PosiotV2Profile
 
 ProfileRegistry.register(PosiotProfile())
+ProfileRegistry.register(PosiotV2Profile())
 
 __all__ = ['DeviceProfile', 'ProfileRegistry']

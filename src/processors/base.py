@@ -135,8 +135,9 @@ class BaseProcessor(IProcessor):
         # 최적화: 태그별 출력 타입 캐시 (tag_id → output_type)
         self._output_type_cache: Dict[int, str] = {}
 
-        # on_change 모드용 값 캐시 (tag_id → 이전 값)
-        self._value_cache: Dict[int, Any] = {}
+        # on_change 모드용 값 캐시 ((plc_id, tag_id) → 이전 값)
+        # 멀티디바이스 모드에서 디바이스별 독립 변경 감지를 위해 복합 키 사용
+        self._value_cache: Dict[tuple, Any] = {}
 
         # 통계
         self._total_processed = 0
@@ -437,7 +438,8 @@ class BaseProcessor(IProcessor):
         tag_id: int,
         new_value: Any,
         deadband: float = 0.0,
-        deadband_type: str = "absolute"
+        deadband_type: str = "absolute",
+        plc_id: int = 0,
     ) -> bool:
         """
         값 변경 여부 판단 (on_change 모드용).
@@ -447,22 +449,25 @@ class BaseProcessor(IProcessor):
             new_value: 새로운 값
             deadband: 변화 감지 임계값
             deadband_type: "absolute" (절대값) 또는 "percent" (백분율)
+            plc_id: PLC/BLE 디바이스 ID (멀티디바이스 구분용)
 
         Returns:
             값이 변경되었으면 True
         """
+        cache_key = (plc_id, tag_id)
+
         # 캐시에 이전 값이 없으면 첫 수집 → 변경으로 간주
-        if tag_id not in self._value_cache:
-            self._value_cache[tag_id] = new_value
+        if cache_key not in self._value_cache:
+            self._value_cache[cache_key] = new_value
             return True
 
-        old_value = self._value_cache[tag_id]
+        old_value = self._value_cache[cache_key]
 
         # None 처리
         if old_value is None and new_value is None:
             return False
         if old_value is None or new_value is None:
-            self._value_cache[tag_id] = new_value
+            self._value_cache[cache_key] = new_value
             return True
 
         # 타입별 비교
@@ -471,14 +476,14 @@ class BaseProcessor(IProcessor):
             if isinstance(new_value, bool) or isinstance(old_value, bool):
                 changed = bool(old_value) != bool(new_value)
                 if changed:
-                    self._value_cache[tag_id] = new_value
+                    self._value_cache[cache_key] = new_value
                 return changed
 
             # 문자열 타입
             if isinstance(new_value, str) or isinstance(old_value, str):
                 changed = str(old_value) != str(new_value)
                 if changed:
-                    self._value_cache[tag_id] = new_value
+                    self._value_cache[cache_key] = new_value
                 return changed
 
             # 숫자 타입 (deadband 적용)
@@ -500,7 +505,7 @@ class BaseProcessor(IProcessor):
                 changed = abs(new_num - old_num) > deadband
 
             if changed:
-                self._value_cache[tag_id] = new_value
+                self._value_cache[cache_key] = new_value
 
             return changed
 
@@ -508,7 +513,7 @@ class BaseProcessor(IProcessor):
             # 비교 불가 → 문자열 비교
             changed = str(old_value) != str(new_value)
             if changed:
-                self._value_cache[tag_id] = new_value
+                self._value_cache[cache_key] = new_value
             return changed
 
     def _filter_changed_data(
@@ -534,7 +539,9 @@ class BaseProcessor(IProcessor):
             # 대표값 추출
             value = data.value
 
-            if self._is_value_changed(data.tag_id, value, deadband, deadband_type):
+            if self._is_value_changed(
+                data.tag_id, value, deadband, deadband_type, plc_id=data.plc_id
+            ):
                 changed_list.append(data)
 
         return changed_list

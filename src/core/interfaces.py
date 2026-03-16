@@ -151,6 +151,10 @@ class TagDefinition:
     bool_true_value: Optional[int] = None
     bool_false_value: Optional[int] = None
     bool_invert: bool = False
+    # BLE 확장 필드
+    mac_address: str = ""              # BLE MAC 주소 (멀티디바이스 식별용)
+    device_name_filter: str = ""       # BLE LocalName 필터 (선택)
+    byte_offset: Optional[int] = None  # BLE payload 바이트 오프셋 (flexible 모드용)
 
     @property
     def output_type(self) -> DataType:

@@ -187,6 +187,25 @@ class ProtocolConfig:
 
 
 @dataclass
+class BleDeviceEntry:
+    """
+    BLE 디바이스 엔트리 (devices CSV 한 행).
+
+    Attributes:
+        ble_id: BLE 센서 고유 ID (내부적으로 plc_id에 매핑)
+        mac_address: BLE MAC 주소
+        device_profile: 프로파일 이름 (posiot, posiot_v2 등)
+        device_name_filter: BLE LocalName 필터 (선택)
+        description: 설명
+    """
+    ble_id: int
+    mac_address: str
+    device_profile: str = "posiot"
+    device_name_filter: str = ""
+    description: str = ""
+
+
+@dataclass
 class CollectorConfig:
     """
     수집기 설정.
@@ -198,13 +217,17 @@ class CollectorConfig:
         protocol: 프로토콜 설정
         collection_groups: 수집 그룹 리스트
         tags_file: 태그 정의 CSV 파일 경로
+        devices_file: BLE 디바이스 목록 CSV 경로 (멀티디바이스 모드, 레거시)
+        mode: BLE 수집 모드 ("hardcoded": 프로파일 기반, "flexible": CSV byte_offset 기반)
     """
-    plc_id: int
-    name: str
+    plc_id: int = 0
+    name: str = "collector"
     enabled: bool = True
     protocol: Optional[ProtocolConfig] = None
     collection_groups: List[CollectionGroup] = field(default_factory=list)
     tags_file: str = "config/tags.csv"
+    devices_file: Optional[str] = None
+    mode: str = ""  # "hardcoded" | "flexible" | "" (기본: hardcoded)
 
 
 @dataclass
@@ -386,6 +409,49 @@ class ConfigLoader:
         return tags
 
     @classmethod
+    def load_devices(cls, devices_path: Union[str, Path]) -> List['BleDeviceEntry']:
+        """
+        BLE 디바이스 목록 CSV 로드.
+
+        CSV 컬럼:
+            ble_id, mac_address, device_profile, device_name_filter, description
+
+        Args:
+            devices_path: 디바이스 CSV 경로
+
+        Returns:
+            BleDeviceEntry 리스트
+        """
+        devices_path = Path(devices_path)
+        if not devices_path.exists():
+            raise FileNotFoundError(f"Devices file not found: {devices_path}")
+
+        logger.info(f"Loading BLE devices from: {devices_path}")
+
+        devices: List[BleDeviceEntry] = []
+
+        with open(devices_path, 'r', encoding='utf-8-sig') as f:
+            lines = [line for line in f if not line.strip().startswith('#')]
+            reader = csv.DictReader(lines)
+
+            for row_num, row in enumerate(reader, start=2):
+                try:
+                    device = BleDeviceEntry(
+                        ble_id=int(row['ble_id']),
+                        mac_address=row['mac_address'].strip().upper(),
+                        device_profile=row.get('device_profile', 'posiot').strip(),
+                        device_name_filter=row.get('device_name_filter', '').strip(),
+                        description=row.get('description', '').strip(),
+                    )
+                    devices.append(device)
+                except Exception as e:
+                    logger.warning(f"Failed to parse device at row {row_num}: {e}")
+                    continue
+
+        logger.info(f"Loaded {len(devices)} BLE devices")
+        return devices
+
+    @classmethod
     def _substitute_env_vars(cls, config: Any) -> Any:
         """
         설정 값에서 환경변수 치환.
@@ -478,12 +544,14 @@ class ConfigLoader:
         ]
 
         collector = CollectorConfig(
-            plc_id=int(collector_dict.get('plc_id', 1)),
+            plc_id=int(collector_dict.get('plc_id', 0)),
             name=collector_dict.get('name', 'collector'),
             enabled=collector_dict.get('enabled', True),
             protocol=protocol,
             collection_groups=collection_groups,
             tags_file=collector_dict.get('tags_file', 'config/tags.csv'),
+            devices_file=collector_dict.get('devices_file'),
+            mode=collector_dict.get('mode', ''),
         )
 
         # Publisher 설정
@@ -653,6 +721,10 @@ class ConfigLoader:
             bool_true_value=parse_optional_int(row.get('bool_true_value', '')),
             bool_false_value=parse_optional_int(row.get('bool_false_value', '')),
             bool_invert=parse_optional_bool(row.get('bool_invert', '')),
+            # BLE 확장 필드
+            mac_address=row.get('mac_address', '').strip().upper(),
+            device_name_filter=row.get('device_name', '').strip(),
+            byte_offset=parse_optional_int(row.get('byte_offset', '')),
         )
 
     @classmethod
@@ -752,8 +824,12 @@ class ConfigLoader:
         errors: List[str] = []
 
         # Collector 검사
-        if config.collector.plc_id < 1 or config.collector.plc_id > 100:
-            errors.append("PLC ID must be between 1 and 100")
+        # BLE 멀티디바이스 또는 devices_file 설정 시 plc_id 검사 스킵
+        is_ble = (config.collector.protocol and
+                  config.collector.protocol.type.lower() == 'ble')
+        if not config.collector.devices_file and not is_ble:
+            if config.collector.plc_id < 1 or config.collector.plc_id > 100:
+                errors.append("PLC ID must be between 1 and 100")
 
         if not config.collector.collection_groups:
             errors.append("At least one collection group is required")

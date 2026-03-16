@@ -1,0 +1,66 @@
+# BLE 멀티디바이스 수집기 설정
+# 1 컨테이너에서 tags CSV의 모든 BLE 센서를 수집
+# mac_address 컬럼이 있는 태그는 자동으로 멀티디바이스 모드로 동작
+collector:
+  name: "BLE_SITE_A"
+  tags_file: "deploy/ble/tags_ble_multi.csv"
+
+  # BLE 수집 모드
+  # - hardcoded: DeviceProfile 기반 패킷 파싱 (기본값, CSV byte_offset 무시)
+  # - flexible: CSV byte_offset 기반 유동적 파싱 (추후 지원)
+  mode: "hardcoded"
+
+  protocol:
+    type: "ble"
+    host: ""
+    port: 0
+    extra:
+      # 프로파일 (hardcoded 모드에서 사용)
+      device_profile: "posiot"
+      # advertisement 캐시 만료 시간 (초) — 이 시간 내에 새 패킷이 없으면 데이터 없음 처리
+      cache_ttl: 30.0
+      # 같은 MAC의 중복 advertisement 무시 시간 (초) — 너무 짧으면 CPU 낭비, 너무 길면 갱신 느림
+      duplicate_filter_s: 4.0
+
+  collection_groups:
+    - name: "ble_env"
+      interval_ms: 5000
+      timeout_ms: 10000
+      retry_count: 1
+      retry_delay_ms: 2000
+    - name: "ble_vib"
+      interval_ms: 5000
+      timeout_ms: 10000
+      retry_count: 1
+      retry_delay_ms: 2000
+    - name: "ble_alm"
+      interval_ms: 5000
+      timeout_ms: 10000
+      retry_count: 1
+      retry_delay_ms: 2000
+      mode: "on_change"
+      deadband: 0
+
+publisher:
+  rabbitmq:
+    enabled: true
+    host: "${RMQ_HOST:rabbitmq}"
+    port: ${RMQ_PORT:5672}
+    virtual_host: "/"
+    username: "${RMQ_USER:guest}"
+    password: "${RMQ_PASS:guest}"
+    exchange_name: "plc.data"
+    routing_key_prefix: "plc"
+    compression: "zlib"
+    encryption_enabled: false
+  publish_interval_ms: 1000
+
+buffer:
+  max_size: 5000
+  batch_size: 200
+  threshold_ratio: 0.8
+
+logging:
+  level: "INFO"
+  collection_level: "INFO"
+  publish_level: "INFO"

@@ -193,6 +193,8 @@ class ComponentFactory:
                 event_bus=event_bus,
             )
         elif protocol_type == "ble":
+            # BLE 프로토콜: 태그에 mac_address가 있으면 멀티디바이스 모드
+            # (create_pipeline에서 tags를 전달하여 결정)
             from src.collectors.ble import BleCollector
             return BleCollector(
                 plc_id=config.collector.plc_id,
@@ -389,6 +391,12 @@ async def create_pipeline(
     """
     logger = LoggerFactory.get_system_logger()
 
+    # BLE 멀티디바이스 판별
+    protocol_type = (config.collector.protocol.type.lower()
+                     if config.collector.protocol else "")
+    has_ble_mac = (protocol_type == "ble" and
+                   any(t.mac_address for t in tags))
+
     # 데모 모드
     if demo_mode:
         logger.info("Running in DEMO mode")
@@ -398,7 +406,16 @@ async def create_pipeline(
         publisher = ComponentFactory._create_demo_publisher(config)
     else:
         # 실제 모드
-        collector = ComponentFactory.create_collector(config, event_bus)
+        if has_ble_mac:
+            from src.collectors.ble import BleMultiCollector
+            collector = BleMultiCollector(
+                name=config.collector.name,
+                config=config.collector,
+                tags=tags,
+                event_bus=event_bus,
+            )
+        else:
+            collector = ComponentFactory.create_collector(config, event_bus)
         processor = ComponentFactory.create_processor(config)
         publishers = ComponentFactory.create_publishers(config)
 
@@ -423,8 +440,14 @@ async def create_pipeline(
         logger.info(f"Created Publisher: {publisher.__class__.__name__}")
 
     # 파이프라인 생성
+    is_multi = config.collector.devices_file or has_ble_mac
+    pipeline_name = (
+        f"Pipeline_{config.collector.name}"
+        if is_multi
+        else f"Pipeline_PLC{config.collector.plc_id}"
+    )
     pipeline = Pipeline(
-        name=f"Pipeline_PLC{config.collector.plc_id}",
+        name=pipeline_name,
         collector=collector,
         processor=processor,
         publisher=publisher,

@@ -1,0 +1,56 @@
+tag_id,tag_name,memory,address,data_type,collection_group,scale,offset,decimals,unit,mac_address,device_name,byte_offset,description
+# === 1호기 (posiot v1) D4:BB:36:61:27:AC ===
+1,temperature,,temperature,float32,ble_env,1,0,2,℃,D4:BB:36:61:27:AC,POSIOT,,1호기 온도
+2,humidity,,humidity,float32,ble_env,1,0,2,%,D4:BB:36:61:27:AC,POSIOT,,1호기 습도
+3,pressure,,pressure,float32,ble_env,1,0,2,hPa,D4:BB:36:61:27:AC,POSIOT,,1호기 기압
+4,battery,,battery,uint16,ble_env,1,0,,,D4:BB:36:61:27:AC,POSIOT,,1호기 배터리
+5,prob_temp,,prob_temp,float32,ble_env,1,0,2,℃,D4:BB:36:61:27:AC,POSIOT,,1호기 프로브온도
+6,accel_rms_x,,accel_rms_x,float32,ble_vib,1,0,3,g,D4:BB:36:61:27:AC,POSIOT,,1호기 가속도X
+7,accel_rms_y,,accel_rms_y,float32,ble_vib,1,0,3,g,D4:BB:36:61:27:AC,POSIOT,,1호기 가속도Y
+8,accel_rms_z,,accel_rms_z,float32,ble_vib,1,0,3,g,D4:BB:36:61:27:AC,POSIOT,,1호기 가속도Z
+9,velocity_rms,,velocity_rms_under_1k,float32,ble_vib,1,0,3,mm/s,D4:BB:36:61:27:AC,POSIOT,,1호기 속도RMS
+10,accel_rms_1k5k,,accel_rms_1k_5k,float32,ble_vib,1,0,3,g,D4:BB:36:61:27:AC,POSIOT,,1호기 가속도1-5k
+11,vibration_peak,,vibration_peak,uint16,ble_vib,1,0,,,D4:BB:36:61:27:AC,POSIOT,,1호기 진동피크
+12,harmony_cnt_low,,harmony_cnt_under_1k,uint16,ble_vib,1,0,,,D4:BB:36:61:27:AC,POSIOT,,1호기 고조파수<1k
+13,harmony_cnt_high,,harmony_cnt_1k_5k,uint16,ble_vib,1,0,,,D4:BB:36:61:27:AC,POSIOT,,1호기 고조파수1-5k
+14,gravity_mag,,gravity_mag_xyz,uint16,ble_vib,1,0,,,D4:BB:36:61:27:AC,POSIOT,,1호기 중력크기
+15,sound_db,,sound_db,uint16,ble_vib,1,0,,dB,D4:BB:36:61:27:AC,POSIOT,,1호기 소음
+16,sound_peak,,sound_peak,uint16,ble_vib,1,0,,,D4:BB:36:61:27:AC,POSIOT,,1호기 소음피크
+17,rssi,,rssi,int16,ble_env,1,0,,dBm,D4:BB:36:61:27:AC,POSIOT,,1호기 신호강도
+18,version,,version,uint16,ble_env,1,0,,,D4:BB:36:61:27:AC,POSIOT,,1호기 펌웨어버전
+19,mode,,mode,uint16,ble_env,1,0,,,D4:BB:36:61:27:AC,POSIOT,,1호기 동작모드
+20,battery_low,,battery,bool,ble_alm,1,0,,,D4:BB:36:61:27:AC,POSIOT,,1호기 배터리부족알람
+# === 2호기 (posiot v1) F6:5A:83:C7:DB:C7 ===
+21,temperature,,temperature,float32,ble_env,1,0,2,℃,F6:5A:83:C7:DB:C7,POSIOT,,2호기 온도
+22,humidity,,humidity,float32,ble_env,1,0,2,%,F6:5A:83:C7:DB:C7,POSIOT,,2호기 습도
+23,pressure,,pressure,float32,ble_env,1,0,2,hPa,F6:5A:83:C7:DB:C7,POSIOT,,2호기 기압
+24,battery,,battery,uint16,ble_env,1,0,,,F6:5A:83:C7:DB:C7,POSIOT,,2호기 배터리
+25,prob_temp,,prob_temp,float32,ble_env,1,0,2,℃,F6:5A:83:C7:DB:C7,POSIOT,,2호기 프로브온도
+26,accel_rms_x,,accel_rms_x,float32,ble_vib,1,0,3,g,F6:5A:83:C7:DB:C7,POSIOT,,2호기 가속도X
+27,accel_rms_y,,accel_rms_y,float32,ble_vib,1,0,3,g,F6:5A:83:C7:DB:C7,POSIOT,,2호기 가속도Y
+28,accel_rms_z,,accel_rms_z,float32,ble_vib,1,0,3,g,F6:5A:83:C7:DB:C7,POSIOT,,2호기 가속도Z
+29,velocity_rms,,velocity_rms_under_1k,float32,ble_vib,1,0,3,mm/s,F6:5A:83:C7:DB:C7,POSIOT,,2호기 속도RMS
+30,accel_rms_1k5k,,accel_rms_1k_5k,float32,ble_vib,1,0,3,g,F6:5A:83:C7:DB:C7,POSIOT,,2호기 가속도1-5k
+31,vibration_peak,,vibration_peak,uint16,ble_vib,1,0,,,F6:5A:83:C7:DB:C7,POSIOT,,2호기 진동피크
+32,sound_db,,sound_db,uint16,ble_vib,1,0,,dB,F6:5A:83:C7:DB:C7,POSIOT,,2호기 소음
+33,rssi,,rssi,int16,ble_env,1,0,,dBm,F6:5A:83:C7:DB:C7,POSIOT,,2호기 신호강도
+# === 3호기 (posiot v2) E5:79:FD:DB:0A:38 ===
+34,temperature,,temperature,float32,ble_env,1,0,2,℃,E5:79:FD:DB:0A:38,POSIOT,,3호기 온도
+35,humidity,,humidity,float32,ble_env,1,0,2,%,E5:79:FD:DB:0A:38,POSIOT,,3호기 습도
+36,accel_x,,accel_x,int16,ble_vib,1,0,,,E5:79:FD:DB:0A:38,POSIOT,,3호기 가속도X
+37,accel_y,,accel_y,int16,ble_vib,1,0,,,E5:79:FD:DB:0A:38,POSIOT,,3호기 가속도Y
+38,accel_z,,accel_z,int16,ble_vib,1,0,,,E5:79:FD:DB:0A:38,POSIOT,,3호기 가속도Z
+39,velocity_rms,,velocity_rms,uint16,ble_vib,1,0,,,E5:79:FD:DB:0A:38,POSIOT,,3호기 속도RMS
+40,sound_db,,sound_db,uint16,ble_vib,1,0,,dB,E5:79:FD:DB:0A:38,POSIOT,,3호기 소음
+41,battery,,battery,uint8,ble_env,1,0,,,E5:79:FD:DB:0A:38,POSIOT,,3호기 배터리
+42,rssi,,rssi,int16,ble_env,1,0,,dBm,E5:79:FD:DB:0A:38,POSIOT,,3호기 신호강도
+# === 4호기 (posiot v2) F5:12:5E:BE:EE:12 ===
+43,temperature,,temperature,float32,ble_env,1,0,2,℃,F5:12:5E:BE:EE:12,POSIOT,,4호기 온도
+44,humidity,,humidity,float32,ble_env,1,0,2,%,F5:12:5E:BE:EE:12,POSIOT,,4호기 습도
+45,accel_x,,accel_x,int16,ble_vib,1,0,,,F5:12:5E:BE:EE:12,POSIOT,,4호기 가속도X
+46,accel_y,,accel_y,int16,ble_vib,1,0,,,F5:12:5E:BE:EE:12,POSIOT,,4호기 가속도Y
+47,accel_z,,accel_z,int16,ble_vib,1,0,,,F5:12:5E:BE:EE:12,POSIOT,,4호기 가속도Z
+48,velocity_rms,,velocity_rms,uint16,ble_vib,1,0,,,F5:12:5E:BE:EE:12,POSIOT,,4호기 속도RMS
+49,sound_db,,sound_db,uint16,ble_vib,1,0,,dB,F5:12:5E:BE:EE:12,POSIOT,,4호기 소음
+50,battery,,battery,uint8,ble_env,1,0,,,F5:12:5E:BE:EE:12,POSIOT,,4호기 배터리
+51,rssi,,rssi,int16,ble_env,1,0,,dBm,F5:12:5E:BE:EE:12,POSIOT,,4호기 신호강도

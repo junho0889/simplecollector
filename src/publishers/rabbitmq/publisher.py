@@ -190,8 +190,8 @@ class RabbitMQPublisher(BasePublisher):
         """
         데이터 배치 발행.
 
-        배치 전체를 하나의 메시지로 직렬화(JSON→압축→암호화)하여
-        Topic Exchange에 발행합니다.
+        배치 내에 여러 plc_id가 섞여 있으면 plc_id별로 분리하여 발행합니다.
+        (멀티디바이스 모드 지원)
 
         Args:
             data: 발행할 ProcessedData 리스트
@@ -207,65 +207,81 @@ class RabbitMQPublisher(BasePublisher):
             return False
 
         try:
-            plc_id = data[0].plc_id
-            routing_key = f"{self._rmq_config.routing_key_prefix}.{plc_id}.data"
+            # plc_id별로 그룹핑
+            groups: dict = {}
+            for item in data:
+                groups.setdefault(item.plc_id, []).append(item)
 
-            # 직렬화: List[ProcessedData] → compressed bytes
-            dict_list = [item.to_dict() for item in data]
+            # 그룹별 발행
+            all_success = True
+            for plc_id, group_data in groups.items():
+                success = await self._publish_group(plc_id, group_data)
+                if not success:
+                    all_success = False
 
-            # VERBOSE: 압축/암호화 이전 원본 값 로깅
-            if logger.isEnabledFor(VERBOSE):
-                for item in data:
-                    logger.log(
-                        VERBOSE,
-                        f"[{self._name}] tag={item.tag_id} "
-                        f"type={item.data_type.value} "
-                        f"v_int={item.v_int} v_bigint={item.v_bigint} "
-                        f"v_float={item.v_float} v_bool={item.v_bool} "
-                        f"value={item.value}"
-                    )
-
-            body = self._serializer.serialize(dict_list)
-
-            # Delivery mode
-            delivery_mode = (
-                DeliveryMode.PERSISTENT
-                if self._rmq_config.delivery_mode == 2
-                else DeliveryMode.NOT_PERSISTENT
-            )
-
-            # AMQP 메시지 생성
-            message = Message(
-                body=body,
-                delivery_mode=delivery_mode,
-                content_type="application/json",
-                headers={
-                    "compression": self._rmq_config.compression,
-                    "encrypted": str(self._rmq_config.encryption_enabled).lower(),
-                    "plc_id": plc_id,
-                    "batch_count": len(data),
-                },
-                timestamp=datetime.now(),
-            )
-
-            # 발행
-            await self._exchange.publish(
-                message,
-                routing_key=routing_key,
-            )
-
-            logger.log(
-                VERBOSE,
-                f"[{self._name}] Published {len(data)} records "
-                f"to {routing_key} ({len(body)} bytes)"
-            )
-            return True
+            return all_success
 
         except Exception as e:
             logger.error(f"[{self._name}] RabbitMQ publish error: {e}")
-            # 연결 문제일 수 있으므로 연결 상태 갱신
             self._is_connected = False
             return False
+
+    async def _publish_group(
+        self, plc_id: int, data: List[ProcessedData]
+    ) -> bool:
+        """plc_id 단위로 메시지 발행."""
+        routing_key = f"{self._rmq_config.routing_key_prefix}.{plc_id}.data"
+
+        # 직렬화: List[ProcessedData] → compressed bytes
+        dict_list = [item.to_dict() for item in data]
+
+        # VERBOSE: 압축/암호화 이전 원본 값 로깅
+        if logger.isEnabledFor(VERBOSE):
+            for item in data:
+                logger.log(
+                    VERBOSE,
+                    f"[{self._name}] tag={item.tag_id} "
+                    f"type={item.data_type.value} "
+                    f"v_int={item.v_int} v_bigint={item.v_bigint} "
+                    f"v_float={item.v_float} v_bool={item.v_bool} "
+                    f"value={item.value}"
+                )
+
+        body = self._serializer.serialize(dict_list)
+
+        # Delivery mode
+        delivery_mode = (
+            DeliveryMode.PERSISTENT
+            if self._rmq_config.delivery_mode == 2
+            else DeliveryMode.NOT_PERSISTENT
+        )
+
+        # AMQP 메시지 생성
+        message = Message(
+            body=body,
+            delivery_mode=delivery_mode,
+            content_type="application/json",
+            headers={
+                "compression": self._rmq_config.compression,
+                "encrypted": str(self._rmq_config.encryption_enabled).lower(),
+                "plc_id": plc_id,
+                "batch_count": len(data),
+            },
+            timestamp=datetime.now(),
+        )
+
+        # 발행
+        await self._exchange.publish(
+            message,
+            routing_key=routing_key,
+        )
+
+        logger.log(
+            VERBOSE,
+            f"[{self._name}] Published {len(data)} records "
+            f"to {routing_key} ({len(body)} bytes)"
+        )
+        return True
 
     # =========================================================================
     # Statistics
