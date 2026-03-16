@@ -1,28 +1,31 @@
 # ============================================================================
-# BLE 테스트 — docker-compose.yml (Windows)
+# BLE 멀티디바이스 — docker-compose.yml (Raspberry Pi)
 # ============================================================================
 # 구성:
-#   [Docker]  RabbitMQ + Mosquitto (인프라)
-#   [로컬]    BLE collector (python -m src.main) — Windows Bluetooth 사용
-#
-# Windows Docker에서는 BLE 어댑터 접근 불가 (WSL2/Hyper-V VM)
-# → collector는 반드시 네이티브로 실행
+#   - RabbitMQ (포트 5682/15682) — 기존 서비스와 충돌 방지
+#   - Mosquitto (포트 1893)
+#   - Node-RED (포트 1882)
+#   - Publisher (RabbitMQ → MQTT)
+#   - BLE Collector ×1 (N개 센서를 하나의 컨테이너에서 수집)
 #
 # 사용법:
-#   1. docker compose up -d           (인프라 시작)
-#   2. python -m src.main -c deploy/ble/collector_ble1.yaml   (BLE 수집 시작)
-#   3. docker exec -it ble-mosquitto mosquitto_sub -t '#' -v  (MQTT 수신 확인)
+#   docker compose up -d
+#   Node-RED: http://<PI_IP>:1882
+#   RabbitMQ: http://<PI_IP>:15682 (admin/admin)
 # ============================================================================
 
 services:
 
-  # RabbitMQ — 메시지 브로커
+  # --------------------------------------------------------------------------
+  # 인프라
+  # --------------------------------------------------------------------------
+
   rabbitmq:
     image: rabbitmq:3-management
     container_name: ble-rabbitmq
     ports:
-      - "5672:5672"       # AMQP
-      - "15672:15672"     # Management UI
+      - "5682:5672"
+      - "15682:15672"
     environment:
       RABBITMQ_DEFAULT_USER: admin
       RABBITMQ_DEFAULT_PASS: admin
@@ -31,43 +34,68 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
 
-  # Mosquitto — MQTT 브로커 (BLE 데이터 최종 수신)
   mosquitto:
     image: eclipse-mosquitto:2
     container_name: ble-mosquitto
     ports:
-      - "1883:1883"
+      - "1893:1883"
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    restart: unless-stopped
 
-  # Node-RED — MQTT 디버깅 대시보드
   nodered:
     image: nodered/node-red:latest
     container_name: ble-nodered
     ports:
-      - "1881:1880"
+      - "1882:1880"
     volumes:
       - nodered_data:/data
-      - ./nodered_ble_debug.json:/data/flows/nodered_ble_debug.json:ro
     environment:
       TZ: Asia/Seoul
     depends_on:
       - mosquitto
+    restart: unless-stopped
 
-  # collector-publisher — RabbitMQ → MQTT forward
-  # publisher-ble:
-  #   image: neuro_publisher:latest
-  #   container_name: ble-publisher
-  #   volumes:
-  #     - ./:/app/config:ro
-  #   command: ["--config", "/app/config/publisher_ble.yaml"]
-  #   environment:
-  #     RABBITMQ_HOST: rabbitmq
-  #     MQTT_HOST: mosquitto
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
+  # --------------------------------------------------------------------------
+  # Publisher — RabbitMQ → MQTT forward
+  # --------------------------------------------------------------------------
+
+  publisher:
+    image: neuro_publisher:latest
+    container_name: ble-publisher
+    volumes:
+      - ./publisher_ble.yaml:/app/config/publisher.yaml:ro
+    command: ["--config", "/app/config/publisher.yaml"]
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      MQTT_HOST: mosquitto
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # BLE Collector — 멀티디바이스 (1 컨테이너에서 N개 센서 수집)
+  # --------------------------------------------------------------------------
+
+  collector-ble:
+    image: neuro_collector_ble:latest
+    container_name: ble-collector
+    network_mode: host
+    privileged: true
+    volumes:
+      - /var/run/dbus:/var/run/dbus:ro
+      - ./collector_ble_multi.yaml:/app/config/collector.yaml:ro
+      - ./tags_ble_multi.csv:/app/deploy/ble/tags_ble_multi.csv:ro
+    environment:
+      RMQ_HOST: 127.0.0.1
+      RMQ_PORT: 5682
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   nodered_data:

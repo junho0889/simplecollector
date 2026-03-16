@@ -1,0 +1,80 @@
+# ============================================================================
+# BLE Collector - Dockerfile
+# ============================================================================
+# bleak + D-Bus/BlueZ 의존성 포함 (라즈베리파이용)
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Stage 1: Builder
+# ----------------------------------------------------------------------------
+FROM python:3.11-slim as builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libdbus-1-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir --upgrade pip wheel
+
+COPY requirements.txt .
+
+# base deps + bleak
+RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt \
+    && pip wheel --no-cache-dir --wheel-dir /app/wheels bleak
+
+# ----------------------------------------------------------------------------
+# Stage 2: Runtime
+# ----------------------------------------------------------------------------
+FROM python:3.11-slim as runtime
+
+ARG BUILD_METADATA="{}"
+LABEL maintainer="NEUROSENSE Inc."
+LABEL com.neurosense.metadata=${BUILD_METADATA}
+
+RUN groupadd -r collector && useradd -r -g collector collector
+
+WORKDIR /app
+
+# BLE 런타임: D-Bus + BlueZ
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libdbus-1-3 \
+    bluez \
+    gosu \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+COPY --from=builder /app/wheels /wheels
+RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
+
+# 애플리케이션 코드 복사 (BLE 프로토콜)
+COPY --chown=collector:collector src/core/ ./src/core/
+COPY --chown=collector:collector src/collectors/__init__.py ./src/collectors/
+COPY --chown=collector:collector src/collectors/base.py ./src/collectors/
+COPY --chown=collector:collector src/collectors/ble/ ./src/collectors/ble/
+COPY --chown=collector:collector src/processors/ ./src/processors/
+COPY --chown=collector:collector src/publishers/ ./src/publishers/
+COPY --chown=collector:collector src/pipeline/ ./src/pipeline/
+COPY --chown=collector:collector src/services/ ./src/services/
+COPY --chown=collector:collector src/utils/ ./src/utils/
+COPY --chown=collector:collector src/main.py ./src/
+COPY --chown=collector:collector src/version.py ./src/
+
+RUN mkdir -p /app/data /app/logs /app/config && \
+    chown -R collector:collector /app/data /app/logs /app/config
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    CONFIG_PATH=/app/config/collector.yaml \
+    LOG_LEVEL=INFO
+
+VOLUME ["/app/config", "/app/data", "/app/logs"]
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
+
+# BLE는 D-Bus 접근을 위해 root로 실행 (privileged 컨테이너)
+ENTRYPOINT ["python", "-m", "src.main"]
+CMD ["--config", "/app/config/collector.yaml"]

@@ -1,13 +1,12 @@
 # ============================================================================
 # Publisher BLE — MQTT 전용
 # ============================================================================
-# BLE 센서 데이터를 MQTT로만 forward (DB 저장 안 함)
+# BLE 센서 데이터를 MQTT로 forward (DB 저장 안 함)
 #
 # 라우팅 구조:
 #   BLE collector → RabbitMQ (plc.data) → queue.ble.mqtt → MQTT broker
 #
-# MC Protocol 데이터와 분리하기 위해 별도 큐 이름 사용
-# (기존 queue.db/queue.monitor/queue.mqtt와 충돌 방지)
+# 토픽 형식: sensor/ble/{plc_id}/{collection_group}
 
 rabbitmq:
   host: "${RABBITMQ_HOST:rabbitmq}"
@@ -17,8 +16,6 @@ rabbitmq:
   password: "${RABBITMQ_PASSWORD:admin}"
   exchange_name: "plc.data"
   exchange_type: "topic"
-  # BLE plc_id 범위에 맞는 라우팅 키 (101~199)
-  # 모든 plc 데이터를 받되, collection_groups의 mode로 DB 저장 제어
   queue_db: "queue.ble.db"
   queue_mqtt: "queue.ble.mqtt"
   queue_monitor: "queue.ble.monitor"
@@ -33,21 +30,9 @@ rabbitmq:
   encryption_enabled: false
   encryption_key: ""
 
-# DB: 비활성화 (MQTT 전용이므로)
-# DB 저장이 필요하면 enabled: true + 아래 설정 활성화
+# DB: 비활성화 (MQTT 전용)
 database:
   enabled: false
-  # host: "192.168.0.236"
-  # port: 15432
-  # database: "neurosense"
-  # user: "user"
-  # password: "neuro0901"
-  # pool_size: 2
-  # pool_min_size: 1
-  # schema_name: "ble_sensor"
-  # insert_method: "copy"
-  # auto_init_schema: true
-  # master_sync_enabled: true
   collection_groups:
     - name: "ble_env"
       mode: "none"
@@ -59,12 +44,11 @@ database:
 # MQTT: 활성화 — BLE 데이터를 MQTT broker로 forward
 mqtt:
   enabled: true
-  host: "${MQTT_HOST:mqtt-broker}"
-  port: ${MQTT_PORT:1883}
+  host: "${MQTT_HOST:mosquitto}"
+  port: 1883
   username: ""
   password: ""
   topic_prefix: "sensor/ble"
-  # 메시지 토픽 형식: sensor/ble/{plc_id}/{collection_group}
   qos: 1
   retain: false
 
