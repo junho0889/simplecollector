@@ -204,13 +204,32 @@ DECLARE
 BEGIN
     CREATE TEMP TABLE tmp_alm_downtime AS
     WITH
+    -- 4-0. publisher 초기화 일괄 OFF 제외
+    -- 같은 plc_id에서 1초 이내에 10개 이상 태그가 동시에 OFF → 초기화로 간주
+    bulk_off_events AS (
+        SELECT plc_id, date_trunc('second', timestamp) AS bulk_sec
+        FROM jem_jh02.alm_history
+        WHERE v_bool = FALSE
+        GROUP BY plc_id, date_trunc('second', timestamp)
+        HAVING COUNT(DISTINCT tag_id) >= 10
+    ),
+    -- 초기화 이벤트를 제외한 알람 이력
+    filtered_alm AS (
+        SELECT a.*
+        FROM jem_jh02.alm_history a
+        LEFT JOIN bulk_off_events b
+            ON a.plc_id = b.plc_id
+            AND date_trunc('second', a.timestamp) = b.bulk_sec
+            AND a.v_bool = FALSE
+        WHERE b.plc_id IS NULL
+    ),
     -- 4-1. 알람 ON/OFF 페어링 (LEAD로 다음 이벤트 매칭)
     alarm_events AS (
         SELECT
             plc_id, tag_id, timestamp, v_bool,
             LEAD(timestamp) OVER (PARTITION BY plc_id, tag_id ORDER BY timestamp) AS next_ts,
             LEAD(v_bool) OVER (PARTITION BY plc_id, tag_id ORDER BY timestamp) AS next_bool
-        FROM jem_jh02.alm_history
+        FROM filtered_alm
     ),
     -- TRUE → FALSE 페어만 추출
     alarm_periods AS (
@@ -361,9 +380,9 @@ BEGIN
         CASE WHEN target_qty > 0
             THEN ROUND((shift_production / target_qty * 100)::numeric, 2)
             ELSE 0 END,
-        -- 직행률
-        CASE WHEN shift_production > 0
-            THEN ROUND(((shift_production - shift_ng_qty) / shift_production * 100)::numeric, 2)
+        -- 직행률: 생산 / (생산 + NG) × 100
+        CASE WHEN (shift_production + shift_ng_qty) > 0
+            THEN ROUND((shift_production / (shift_production + shift_ng_qty) * 100)::numeric, 2)
             ELSE 0 END,
         -- 알람 가동률
         CASE WHEN target_time_min > 0
@@ -502,9 +521,9 @@ BEGIN
         CASE WHEN target_qty > 0
             THEN ROUND((cumul_production / target_qty * 100)::numeric, 2)
             ELSE 0 END,
-        -- 직행률
-        CASE WHEN cumul_production > 0
-            THEN ROUND(((cumul_production - cumul_ng_qty) / cumul_production * 100)::numeric, 2)
+        -- 직행률: 생산 / (생산 + NG) × 100
+        CASE WHEN (cumul_production + cumul_ng_qty) > 0
+            THEN ROUND((cumul_production / (cumul_production + cumul_ng_qty) * 100)::numeric, 2)
             ELSE 0 END,
         -- 가동률 (정지시간 없으므로 0)
         0 AS operating_rate

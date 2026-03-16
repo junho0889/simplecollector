@@ -174,6 +174,22 @@ CREATE TABLE IF NOT EXISTS {schema}.line (
 ALTER TABLE {schema}.plc_master
     ADD COLUMN IF NOT EXISTS line_id INTEGER REFERENCES {schema}.line(line_id);
 
+-- 2-5. 초기 데이터: 회사 → 공장 → 라인 (이미 존재하면 스킵)
+INSERT INTO {schema}.company (company_id, company_name)
+VALUES (1, '진영전기')
+ON CONFLICT (company_id) DO NOTHING;
+
+INSERT INTO {schema}.factory (factory_id, company_id, factory_name)
+VALUES (1, 1, '마산자유무역지역')
+ON CONFLICT (factory_id) DO NOTHING;
+
+INSERT INTO {schema}.line (line_id, factory_id, line_name)
+VALUES (1, 1, 'JH02')
+ON CONFLICT (line_id) DO NOTHING;
+
+-- 2-6. PLC 10대를 JH02 라인에 매핑
+UPDATE {schema}.plc_master SET line_id = 1 WHERE line_id IS NULL;
+
 
 -- ============================================================================
 -- 3. 교대 설정
@@ -303,6 +319,12 @@ CREATE TRIGGER trg_production_target_history
     FOR EACH ROW
     EXECUTE FUNCTION {schema}.fn_production_target_history();
 
+-- 4-4. 초기 데이터: JH02 라인 목표수량 (이미 존재하면 스킵)
+INSERT INTO {schema}.production_target (line_id, target_type, target_qty) VALUES
+    (1, 'day',   20000),
+    (1, 'night', 0)
+ON CONFLICT (line_id, target_type) DO NOTHING;
+
 
 -- ============================================================================
 -- 5. 교대별 생산 실적 (실시간 + 이력)
@@ -376,7 +398,7 @@ CREATE TABLE IF NOT EXISTS {schema}.production_shift_current (
 
     -- 계산값 (트리거에서 자동 갱신)
     achievement_rate    NUMERIC(6,2) DEFAULT 0,     -- 달성률(%) = shift_production / target_qty * 100
-    first_pass_yield    NUMERIC(6,2) DEFAULT 0,     -- 직행률(%) = (shift_production - shift_ng_qty) / shift_production * 100
+    first_pass_yield    NUMERIC(6,2) DEFAULT 0,     -- 직행률(%) = shift_production / (shift_production + shift_ng_qty) * 100
     alm_operating_rate  NUMERIC(6,2) DEFAULT 0,     -- 알람 가동률(%) = (target_time - alm_downtime) / target_time * 100
     action_operating_rate NUMERIC(6,2) DEFAULT 0,   -- 액션 가동률(%)
     operating_rate      NUMERIC(6,2) DEFAULT 0,     -- 전체 가동률(%) = (target_time - total_downtime) / target_time * 100
@@ -675,11 +697,11 @@ BEGIN
             achievement_rate = CASE
                 WHEN target_qty > 0 THEN ROUND((v_new_val - prod_run_start)::NUMERIC / target_qty * 100, 2)
                 ELSE 0 END,
-            -- 직행률 갱신 (생산수량 변경 시 재계산)
+            -- 직행률 갱신 (생산수량 변경 시 재계산): 생산 / (생산 + NG) × 100
             first_pass_yield = CASE
-                WHEN (v_new_val - prod_run_start) > 0
-                THEN ROUND(((v_new_val - prod_run_start) - shift_ng_qty)::NUMERIC
-                           / (v_new_val - prod_run_start) * 100, 2)
+                WHEN ((v_new_val - prod_run_start) + shift_ng_qty) > 0
+                THEN ROUND((v_new_val - prod_run_start)::NUMERIC
+                           / ((v_new_val - prod_run_start) + shift_ng_qty) * 100, 2)
                 ELSE 0 END,
             updated_at = NOW()
         WHERE plc_id = NEW.plc_id;
@@ -687,11 +709,11 @@ BEGIN
         UPDATE {schema}.production_shift_current SET
             ng_accumulated = v_new_val,
             shift_ng_qty   = v_new_val - ng_run_start,
-            -- 직행률 갱신 (NG 변경 시 재계산)
+            -- 직행률 갱신 (NG 변경 시 재계산): 생산 / (생산 + NG) × 100
             first_pass_yield = CASE
-                WHEN shift_production > 0
-                THEN ROUND((shift_production - (v_new_val - ng_run_start))::NUMERIC
-                           / shift_production * 100, 2)
+                WHEN (shift_production + (v_new_val - ng_run_start)) > 0
+                THEN ROUND(shift_production::NUMERIC
+                           / (shift_production + (v_new_val - ng_run_start)) * 100, 2)
                 ELSE 0 END,
             updated_at = NOW()
         WHERE plc_id = NEW.plc_id;
@@ -960,8 +982,8 @@ SELECT
     CASE WHEN SUM(daily_target_qty) > 0
         THEN ROUND(SUM(daily_production) / SUM(daily_target_qty) * 100, 2)
         ELSE 0 END                       AS achievement_rate,
-    CASE WHEN SUM(daily_production) > 0
-        THEN ROUND((SUM(daily_production) - SUM(daily_ng_qty)) / SUM(daily_production) * 100, 2)
+    CASE WHEN (SUM(daily_production) + SUM(daily_ng_qty)) > 0
+        THEN ROUND(SUM(daily_production) / (SUM(daily_production) + SUM(daily_ng_qty)) * 100, 2)
         ELSE 0 END                       AS first_pass_yield,
     CASE WHEN SUM(daily_target_time_min) > 0
         THEN ROUND((SUM(daily_target_time_min) - SUM(daily_alm_downtime_min)) / SUM(daily_target_time_min) * 100, 2)
@@ -995,8 +1017,8 @@ SELECT
     CASE WHEN SUM(daily_target_qty) > 0
         THEN ROUND(SUM(daily_production) / SUM(daily_target_qty) * 100, 2)
         ELSE 0 END                       AS achievement_rate,
-    CASE WHEN SUM(daily_production) > 0
-        THEN ROUND((SUM(daily_production) - SUM(daily_ng_qty)) / SUM(daily_production) * 100, 2)
+    CASE WHEN (SUM(daily_production) + SUM(daily_ng_qty)) > 0
+        THEN ROUND(SUM(daily_production) / (SUM(daily_production) + SUM(daily_ng_qty)) * 100, 2)
         ELSE 0 END                       AS first_pass_yield,
     CASE WHEN SUM(daily_target_time_min) > 0
         THEN ROUND((SUM(daily_target_time_min) - SUM(daily_alm_downtime_min)) / SUM(daily_target_time_min) * 100, 2)
@@ -1030,8 +1052,8 @@ SELECT
     CASE WHEN SUM(daily_target_qty) > 0
         THEN ROUND(SUM(daily_production) / SUM(daily_target_qty) * 100, 2)
         ELSE 0 END                       AS achievement_rate,
-    CASE WHEN SUM(daily_production) > 0
-        THEN ROUND((SUM(daily_production) - SUM(daily_ng_qty)) / SUM(daily_production) * 100, 2)
+    CASE WHEN (SUM(daily_production) + SUM(daily_ng_qty)) > 0
+        THEN ROUND(SUM(daily_production) / (SUM(daily_production) + SUM(daily_ng_qty)) * 100, 2)
         ELSE 0 END                       AS first_pass_yield,
     CASE WHEN SUM(daily_target_time_min) > 0
         THEN ROUND((SUM(daily_target_time_min) - SUM(daily_alm_downtime_min)) / SUM(daily_target_time_min) * 100, 2)
@@ -1417,9 +1439,9 @@ BEGIN
         CASE WHEN v_daily_target > 0
             THEN ROUND(v_agg.production / v_daily_target * 100, 2)
             ELSE 0 END,
-        -- 직행률
-        CASE WHEN v_agg.production > 0
-            THEN ROUND((v_agg.production - v_agg.ng_qty) / v_agg.production * 100, 2)
+        -- 직행률: 생산 / (생산 + NG) × 100
+        CASE WHEN (v_agg.production + v_agg.ng_qty) > 0
+            THEN ROUND(v_agg.production / (v_agg.production + v_agg.ng_qty) * 100, 2)
             ELSE 0 END,
         -- 알람 가동률
         CASE WHEN v_agg.target_time > 0
@@ -1679,9 +1701,9 @@ BEGIN
         CASE WHEN COALESCE(pt.target_qty, d.target_qty) > 0
             THEN ROUND(d.production / COALESCE(pt.target_qty, d.target_qty) * 100, 2)
             ELSE 0 END,
-        -- 직행률
-        CASE WHEN d.production > 0
-            THEN ROUND((d.production - d.ng_qty) / d.production * 100, 2)
+        -- 직행률: 생산 / (생산 + NG) × 100
+        CASE WHEN (d.production + d.ng_qty) > 0
+            THEN ROUND(d.production / (d.production + d.ng_qty) * 100, 2)
             ELSE 0 END,
         -- 알람 가동률
         CASE WHEN d.target_time > 0
