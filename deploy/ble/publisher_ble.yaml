@@ -1,10 +1,12 @@
 # ============================================================================
-# Publisher BLE — MQTT 전용
+# Publisher BLE — DB + MQTT
 # ============================================================================
-# BLE 센서 데이터를 MQTT로 forward (DB 저장 안 함)
+# BLE 센서 데이터를 DB 저장 + MQTT forward
 #
 # 라우팅 구조:
-#   BLE collector → RabbitMQ (plc.data) → queue.ble.mqtt → MQTT broker
+#   BLE collector → RabbitMQ (plc.data) → queue.ble.db → TimescaleDB
+#                                       → queue.ble.mqtt → MQTT broker
+#                                       → OPC UA Server (port 4840)
 #
 # 토픽 형식: sensor/ble/{plc_id}/{collection_group}
 
@@ -19,6 +21,7 @@ rabbitmq:
   queue_db: "queue.ble.db"
   queue_mqtt: "queue.ble.mqtt"
   queue_monitor: "queue.ble.monitor"
+  queue_opcua: "queue.ble.opcua"
   routing_key_pattern: "plc.*.data"
   prefetch_count: 10
   monitor_prefetch: 5
@@ -30,16 +33,28 @@ rabbitmq:
   encryption_enabled: false
   encryption_key: ""
 
-# DB: 비활성화 (MQTT 전용)
+# DB: TimescaleDB 저장
 database:
-  enabled: false
+  enabled: true
+  host: "192.168.0.12"
+  port: 25432
+  database: "neurosense"
+  user: "user"
+  password: "neuro0901"
+  pool_size: 5
+  pool_min_size: 2
+  schema_name: "ble"
+  device_type: "ble"
+  insert_method: "copy"
+  auto_init_schema: true
+  master_sync_enabled: true
   collection_groups:
-    - name: "ble_env"
-      mode: "none"
-    - name: "ble_vib"
-      mode: "none"
-    - name: "ble_alm"
-      mode: "none"
+    - name: "ble_data"
+      mode: "all"
+  compression_after: "7 days"
+  compression_segmentby: "plc_id, tag_id"
+  compression_orderby: "source_time DESC"
+  retention_period: ""
 
 # MQTT: 활성화 — BLE 데이터를 MQTT broker로 forward
 mqtt:
@@ -51,6 +66,23 @@ mqtt:
   topic_prefix: "sensor/ble"
   qos: 1
   retain: false
+
+# OPC UA Server — BLE 데이터를 OPC UA 노드로 노출
+opcua:
+  enabled: true
+  port: 4840
+  endpoint: "opc.tcp://0.0.0.0:4840/collector"
+  server_name: "Neurosense BLE OPC UA Server"
+  namespace: "urn:neurosense:ble:collector"
+  cert_dir: "certs"
+  pre_init_config_dir: ""
+  security:
+    mode: "none"
+    policy: "none"
+    certificate_path: ""
+    private_key_path: ""
+    allow_anonymous: true
+    users: []
 
 logging:
   level: "INFO"
