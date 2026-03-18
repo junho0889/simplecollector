@@ -154,7 +154,8 @@ class TagDefinition:
     # BLE 확장 필드
     mac_address: str = ""              # BLE MAC 주소 (멀티디바이스 식별용)
     device_name_filter: str = ""       # BLE LocalName 필터 (선택)
-    byte_offset: Optional[int] = None  # BLE payload 바이트 오프셋 (flexible 모드용)
+    ble_mode: str = ""                 # BLE 파싱 모드 ("hardcoded" | "manual")
+    byte_offset: Optional[str] = None  # BLE payload 바이트 슬라이스 (manual 모드, "0:2" 형식)
 
     @property
     def output_type(self) -> DataType:
@@ -367,6 +368,7 @@ class ProcessedData:
 
     # 메타데이터 (DB 직접 컬럼 아님, 라우팅용)
     collection_group: str = "default"      # 수집 그룹 (fast, alm, log 등)
+    device_id_key: str = "plc_id"          # 디바이스 ID 키 ("plc_id" 또는 "ble_id")
 
     @property
     def value(self) -> Any:
@@ -387,7 +389,7 @@ class ProcessedData:
         """딕셔너리로 변환 (JSON/MQTT 직렬화용)."""
         result = {
             "source_time": self.source_time.isoformat(timespec='milliseconds'),
-            "plc_id": self.plc_id,
+            self.device_id_key: self.plc_id,  # "plc_id" 또는 "ble_id"
             "tag_id": self.tag_id,
             "quality": self.quality_code,
         }

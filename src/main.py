@@ -194,10 +194,10 @@ class ComponentFactory:
             )
         elif protocol_type == "ble":
             # BLE 프로토콜: 태그에 mac_address가 있으면 멀티디바이스 모드
-            # (create_pipeline에서 tags를 전달하여 결정)
+            # ble_id가 있으면 사용, 없으면 plc_id 사용
             from src.collectors.ble import BleCollector
             return BleCollector(
-                plc_id=config.collector.plc_id,
+                plc_id=config.collector.device_id,
                 name=config.collector.name,
                 config=config.collector,
                 event_bus=event_bus,
@@ -248,7 +248,7 @@ class ComponentFactory:
             extra = config.collector.protocol.extra if config.collector.protocol else {}
             return BleProcessor(
                 name=f"{config.collector.name}_processor",
-                default_profile=extra.get('device_profile', 'posiot'),
+                default_profile=extra.get('device_profile', 'pts-2305bp'),
             )
         elif protocol_type in ("lora", "lora_rak5146"):
             from src.collectors.lora_rak5146 import LoRaRak5146Processor
@@ -280,11 +280,15 @@ class ComponentFactory:
         if config.publisher.rabbitmq.enabled:
             try:
                 from src.publishers.rabbitmq import RabbitMQPublisher
-                publishers.append(RabbitMQPublisher(
+                rmq_pub = RabbitMQPublisher(
                     name=f"{config.collector.name}_rmq_publisher",
                     rabbitmq_config=config.publisher.rabbitmq,
                     publisher_config=config.publisher,
-                ))
+                )
+                # BLE 디바이스 메타데이터 설정
+                rmq_pub._device_id_key = config.collector.device_id_key
+                rmq_pub._collector_name = config.collector.name
+                publishers.append(rmq_pub)
             except ImportError as e:
                 LoggerFactory.get_system_logger().warning(
                     f"RabbitMQ publisher not available: {e}"

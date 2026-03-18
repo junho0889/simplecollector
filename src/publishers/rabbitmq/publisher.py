@@ -95,6 +95,10 @@ class RabbitMQPublisher(BasePublisher):
         self._channel: Optional[Any] = None
         self._exchange: Optional[Any] = None
 
+        # 디바이스 메타데이터 (Pipeline에서 설정)
+        self._device_id_key: str = "plc_id"     # "plc_id" 또는 "ble_id"
+        self._collector_name: str = ""           # OPC UA 폴더명용
+
         # 메시지 직렬화 (압축 + 암호화)
         self._serializer = MessageSerializer(
             compression=rabbitmq_config.compression,
@@ -207,9 +211,10 @@ class RabbitMQPublisher(BasePublisher):
             return False
 
         try:
-            # plc_id별로 그룹핑
+            # device_id별로 그룹핑 (plc_id 또는 ble_id)
             groups: dict = {}
             for item in data:
+                item.device_id_key = self._device_id_key
                 groups.setdefault(item.plc_id, []).append(item)
 
             # 그룹별 발행
@@ -264,8 +269,10 @@ class RabbitMQPublisher(BasePublisher):
             headers={
                 "compression": self._rmq_config.compression,
                 "encrypted": str(self._rmq_config.encryption_enabled).lower(),
-                "plc_id": plc_id,
+                self._device_id_key: plc_id,
                 "batch_count": len(data),
+                **({"collector_name": self._collector_name}
+                   if self._collector_name else {}),
             },
             timestamp=datetime.now(),
         )

@@ -221,13 +221,32 @@ class CollectorConfig:
         mode: BLE 수집 모드 ("hardcoded": 프로파일 기반, "flexible": CSV byte_offset 기반)
     """
     plc_id: int = 0
+    ble_id: Optional[int] = None  # BLE 전용 디바이스 ID (설정 시 plc_id 대신 사용)
     name: str = "collector"
+    description: str = ""
+    site: str = ""
+    area: str = ""
+    line: str = ""
     enabled: bool = True
     protocol: Optional[ProtocolConfig] = None
     collection_groups: List[CollectionGroup] = field(default_factory=list)
     tags_file: str = "config/tags.csv"
     devices_file: Optional[str] = None
-    mode: str = ""  # "hardcoded" | "flexible" | "" (기본: hardcoded)
+
+    @property
+    def device_id(self) -> int:
+        """디바이스 식별자 (ble_id 우선, 없으면 plc_id)."""
+        return self.ble_id if self.ble_id is not None else self.plc_id
+
+    @property
+    def device_type(self) -> str:
+        """디바이스 타입 (ble_id 설정 시 'ble', 아니면 'plc')."""
+        return "ble" if self.ble_id is not None else "plc"
+
+    @property
+    def device_id_key(self) -> str:
+        """메시지 키 이름 ('ble_id' 또는 'plc_id')."""
+        return "ble_id" if self.ble_id is not None else "plc_id"
 
 
 @dataclass
@@ -543,15 +562,23 @@ class ConfigLoader:
             for g in groups_list
         ]
 
+        # ble_id가 있으면 BLE 모드, 없으면 plc_id 사용
+        ble_id_raw = collector_dict.get('ble_id')
+        ble_id = int(ble_id_raw) if ble_id_raw is not None else None
+
         collector = CollectorConfig(
             plc_id=int(collector_dict.get('plc_id', 0)),
+            ble_id=ble_id,
             name=collector_dict.get('name', 'collector'),
+            description=collector_dict.get('description', ''),
+            site=collector_dict.get('site', ''),
+            area=collector_dict.get('area', ''),
+            line=collector_dict.get('line', ''),
             enabled=collector_dict.get('enabled', True),
             protocol=protocol,
             collection_groups=collection_groups,
             tags_file=collector_dict.get('tags_file', 'config/tags.csv'),
             devices_file=collector_dict.get('devices_file'),
-            mode=collector_dict.get('mode', ''),
         )
 
         # Publisher 설정
@@ -724,7 +751,8 @@ class ConfigLoader:
             # BLE 확장 필드
             mac_address=row.get('mac_address', '').strip().upper(),
             device_name_filter=row.get('device_name', '').strip(),
-            byte_offset=parse_optional_int(row.get('byte_offset', '')),
+            ble_mode=row.get('mode', '').strip().lower(),
+            byte_offset=row.get('byte_offset', '').strip() or None,
         )
 
     @classmethod
@@ -830,6 +858,10 @@ class ConfigLoader:
         if not config.collector.devices_file and not is_ble:
             if config.collector.plc_id < 1 or config.collector.plc_id > 100:
                 errors.append("PLC ID must be between 1 and 100")
+        # BLE에서 ble_id 검증
+        if is_ble and config.collector.ble_id is not None:
+            if config.collector.ble_id < 0 or config.collector.ble_id > 100:
+                errors.append("BLE ID must be between 0 and 100")
 
         if not config.collector.collection_groups:
             errors.append("At least one collection group is required")
