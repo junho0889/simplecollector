@@ -56,8 +56,9 @@ class BleMultiCollector(BaseCollector):
         tags: List[TagDefinition],
         event_bus: Optional[EventBus] = None,
     ):
-        plc_id = config.plc_id if config.plc_id > 0 else 0
-        super().__init__(plc_id=plc_id, name=name, config=config, event_bus=event_bus)
+        # ble_id 우선, 없으면 plc_id (0도 허용)
+        device_id = config.device_id
+        super().__init__(plc_id=device_id, name=name, config=config, event_bus=event_bus)
 
         # MAC별 디바이스 정보 추출
         self._devices: Dict[str, BleDeviceInfo] = {}
