@@ -65,8 +65,13 @@ services:
   publisher:
     image: neuro_publisher:latest
     container_name: ble-publisher
+    ports:
+      - "4840:4840"
     volumes:
       - ./publisher_ble.yaml:/app/config/publisher.yaml:ro
+      - ./collector_ble_multi.yaml:/app/config/collector_ble_multi.yaml:ro
+      - ./tags_ble_multi.csv:/app/config/tags_ble_multi.csv:ro
+      - opcua_certs:/app/certs
     command: ["--config", "/app/config/publisher.yaml"]
     environment:
       RABBITMQ_HOST: rabbitmq
@@ -99,3 +104,4 @@ services:
 
 volumes:
   nodered_data:
+  opcua_certs:
