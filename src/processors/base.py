@@ -316,7 +316,7 @@ class BaseProcessor(IProcessor):
             elif output_type == 'text':
                 v_text = str(scaled_value)
             elif output_type == 'byte':
-                v_byte = int(scaled_value) & 0xFF
+                v_int = int(scaled_value) & 0xFF
             else:
                 v_float = float(scaled_value)
 
@@ -333,6 +333,7 @@ class BaseProcessor(IProcessor):
             v_text=v_text,
             quality_code=quality_code,
             collection_group=tag.collection_group,
+            tag_name=tag.tag_name,
         )
 
     def _create_processed_data(

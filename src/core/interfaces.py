@@ -369,6 +369,7 @@ class ProcessedData:
     # 메타데이터 (DB 직접 컬럼 아님, 라우팅용)
     collection_group: str = "default"      # 수집 그룹 (fast, alm, log 등)
     device_id_key: str = "plc_id"          # 디바이스 ID 키 ("plc_id" 또는 "ble_id")
+    tag_name: str = ""                     # 태그 이름 (OPC UA display name 등)
 
     @property
     def value(self) -> Any:
@@ -409,6 +410,10 @@ class ProcessedData:
         # 수집 그룹 (publisher에서 테이블 라우팅용)
         if self.collection_group != "default":
             result["collection_group"] = self.collection_group
+
+        # 태그 이름 (OPC UA display name 등)
+        if self.tag_name:
+            result["tag_name"] = self.tag_name
 
         return result
 
