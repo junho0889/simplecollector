@@ -676,6 +676,18 @@ def setup_logging(config: LoggingConfig) -> None:
     console_handler.setFormatter(console_formatter)
     root_logger.addHandler(console_handler)
 
+    # 3rd-party 라이브러리 로거 레벨 제어 (DEBUG 시 내부 로그 폭주 방지)
+    noisy_loggers = [
+        "aio_pika", "aiormq", "asyncpg",
+        "aio_pika.robust_connection", "aio_pika.connection",
+        "aio_pika.channel", "aio_pika.queue",
+        "aiormq.connection", "bleak",
+    ]
+    app_level = get_log_level(config.level)
+    lib_level = logging.WARNING if app_level <= logging.DEBUG else app_level
+    for lib_name in noisy_loggers:
+        logging.getLogger(lib_name).setLevel(lib_level)
+
     # 파일 핸들러
     if config.file_path:
         log_path = Path(config.file_path)

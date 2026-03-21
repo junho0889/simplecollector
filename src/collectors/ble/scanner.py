@@ -196,8 +196,8 @@ class BleScanner:
         if self._scanner:
             try:
                 await self._scanner.stop()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"[BleScanner] Error stopping scanner: {e}")
             self._scanner = None
 
         self._adv_cache.clear()
@@ -241,8 +241,8 @@ class BleScanner:
                 if self._scanner:
                     try:
                         await self._scanner.stop()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[BleScanner] Cleanup stop error: {e}")
                     self._scanner = None
 
     def _detection_callback(self, device: Any, adv_data: Any) -> None:

@@ -126,7 +126,10 @@ class BleProcessor(BaseProcessor):
                 if len(result) > len(best_result):
                     best_result = result
                     best_profile_name = name
-            except Exception:
+            except Exception as e:
+                logger.debug(
+                    f"[{self._name}] Profile '{name}' parse failed: {e}"
+                )
                 continue
 
         # 캐시에 저장
