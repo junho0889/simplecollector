@@ -14,13 +14,18 @@ from typing import Dict, List, Tuple
 # Application Version
 # =============================================================================
 APP_NAME = "Simple Collector"
-APP_VERSION = "0.3.2"
-APP_BUILD_DATE = "2026-03-05"
+APP_VERSION = "0.3.3"
+APP_BUILD_DATE = "2026-03-21"
 
 # =============================================================================
 # Changelog
 # =============================================================================
 CHANGELOG: List[Dict[str, str]] = [
+    {
+        "version": "0.3.3",
+        "date": "2026-03-21",
+        "changes": "BLE device_type 지원 + GitHub 미러 설정",
+    },
     {
         "version": "0.3.2",
         "date": "2026-03-05",
