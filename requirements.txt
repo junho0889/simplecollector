@@ -12,8 +12,8 @@ aio-pika>=9.4.0        # RabbitMQ 비동기 클라이언트 (AMQP 0-9-1)
 # Industrial Protocols
 # pyserial>=3.5        # Modbus RTU 시리얼 모드 (선택, TCP/RTU-over-TCP는 불필요)
 
-# Security
-cryptography>=41.0.0   # Fernet 암호화 (RabbitMQ 페이로드, OPC UA 인증서)
+# Security (선택: encryption_enabled: true 시에만 필요)
+# cryptography>=41.0.0   # Fernet 암호화 (RabbitMQ 페이로드)
 
 # Development (프로덕션에서는 제외)
 # pytest>=7.4.0

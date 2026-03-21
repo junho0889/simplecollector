@@ -86,7 +86,7 @@ _FORMAT_TO_OUTPUT_TYPE: Dict[str, str] = {
 # 주의: UINT32는 PostgreSQL INTEGER 범위(~21억)를 초과할 수 있으므로 bigint 사용
 _DATATYPE_TO_OUTPUT_TYPE: Dict[DataType, str] = {
     DataType.BOOL: 'bool',
-    DataType.INT8: 'byte', DataType.UINT8: 'byte', DataType.BYTE: 'byte',
+    DataType.INT8: 'int', DataType.UINT8: 'int', DataType.BYTE: 'int',
     DataType.INT16: 'int', DataType.UINT16: 'int', DataType.WORD: 'int',
     DataType.INT32: 'int', DataType.DWORD: 'int',
     DataType.UINT32: 'bigint',  # UINT32 범위(0~4294967295)가 int32 범위 초과
@@ -315,8 +315,6 @@ class BaseProcessor(IProcessor):
                 v_bool = bool(scaled_value)
             elif output_type == 'text':
                 v_text = str(scaled_value)
-            elif output_type == 'byte':
-                v_int = int(scaled_value) & 0xFF
             else:
                 v_float = float(scaled_value)
 
@@ -371,7 +369,7 @@ class BaseProcessor(IProcessor):
             tag: 태그 정의
 
         Returns:
-            출력 타입 문자열 ('bool', 'byte', 'int', 'bigint', 'float', 'text')
+            출력 타입 문자열 ('bool', 'int', 'bigint', 'float', 'text')
         """
         # format 필드가 있으면 룩업 테이블에서 검색
         if tag.format:
@@ -397,38 +395,6 @@ class BaseProcessor(IProcessor):
         if cached:
             return cached
         return self._compute_output_type(tag)
-
-    def _calculate_raw_byte(self, raw_value: Any, data_type: DataType) -> Optional[int]:
-        """
-        Raw 바이트 값 계산.
-
-        원시 데이터의 첫 번째 바이트 또는 전체 바이트를 정수로 변환합니다.
-
-        Args:
-            raw_value: 원시 값
-            data_type: 데이터 타입
-
-        Returns:
-            0~255 범위의 바이트 값 또는 None
-        """
-        if raw_value is None:
-            return None
-
-        try:
-            if data_type == DataType.BOOL:
-                return 1 if raw_value else 0
-            elif isinstance(raw_value, bool):
-                return 1 if raw_value else 0
-            elif isinstance(raw_value, int):
-                return raw_value & 0xFF  # 하위 바이트
-            elif isinstance(raw_value, float):
-                return int(raw_value) & 0xFF
-            elif isinstance(raw_value, bytes):
-                return raw_value[0] if raw_value else None
-            else:
-                return int(raw_value) & 0xFF
-        except (ValueError, TypeError, IndexError):
-            return None
 
     # =========================================================================
     # Change Detection (on_change 모드)

@@ -1,0 +1,48 @@
+# ============================================================================
+# LoRa RAK5146 Collector — ~53MB (ARM64)
+# ============================================================================
+# 순수 Python (SX1303 HAL 기반)
+# RAK5146 concentrator 모듈 지원
+# 주의: SPI 접근을 위해 privileged 모드 필요
+# ============================================================================
+
+# --- Builder ---
+FROM python:3.11-slim AS builder
+WORKDIR /build
+RUN pip install --no-cache-dir --upgrade pip wheel
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir --wheel-dir /build/wheels -r requirements.txt
+
+# --- Runtime ---
+FROM python:3.11-slim
+LABEL maintainer="NEUROSENSE Inc."
+RUN groupadd -r collector && useradd -r -g collector collector
+WORKDIR /app
+
+COPY --from=builder /build/wheels /wheels
+RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
+
+COPY --chown=collector:collector src/core/ ./src/core/
+COPY --chown=collector:collector src/collectors/__init__.py ./src/collectors/
+COPY --chown=collector:collector src/collectors/base.py ./src/collectors/
+COPY --chown=collector:collector src/collectors/lora_rak5146/ ./src/collectors/lora_rak5146/
+COPY --chown=collector:collector src/processors/ ./src/processors/
+COPY --chown=collector:collector src/publishers/ ./src/publishers/
+COPY --chown=collector:collector src/pipeline/ ./src/pipeline/
+COPY --chown=collector:collector src/services/ ./src/services/
+COPY --chown=collector:collector src/utils/ ./src/utils/
+COPY --chown=collector:collector src/main.py ./src/
+COPY --chown=collector:collector src/version.py ./src/
+COPY --chown=collector:collector src/__init__.py ./src/
+
+RUN mkdir -p /app/config /app/logs && \
+    chown -R collector:collector /app/config /app/logs
+
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 LOG_LEVEL=INFO
+VOLUME ["/app/config", "/app/logs"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
+
+# SPI 접근을 위해 root 실행 (privileged 컨테이너)
+ENTRYPOINT ["python", "-m", "src.main"]
+CMD ["--config", "/app/config/collector.yaml"]

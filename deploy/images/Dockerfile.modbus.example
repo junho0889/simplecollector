@@ -1,0 +1,47 @@
+# ============================================================================
+# Modbus Collector — ~53MB (ARM64)
+# ============================================================================
+# 순수 Python (pymodbus 미사용, 자체 구현)
+# TCP / RTU-over-TCP 지원 (RTU 시리얼은 pyserial 추가 필요)
+# ============================================================================
+
+# --- Builder ---
+FROM python:3.11-slim AS builder
+WORKDIR /build
+RUN pip install --no-cache-dir --upgrade pip wheel
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir --wheel-dir /build/wheels -r requirements.txt
+
+# --- Runtime ---
+FROM python:3.11-slim
+LABEL maintainer="NEUROSENSE Inc."
+RUN groupadd -r collector && useradd -r -g collector collector
+WORKDIR /app
+
+COPY --from=builder /build/wheels /wheels
+RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
+
+COPY --chown=collector:collector src/core/ ./src/core/
+COPY --chown=collector:collector src/collectors/__init__.py ./src/collectors/
+COPY --chown=collector:collector src/collectors/base.py ./src/collectors/
+COPY --chown=collector:collector src/collectors/modbus/ ./src/collectors/modbus/
+COPY --chown=collector:collector src/processors/ ./src/processors/
+COPY --chown=collector:collector src/publishers/ ./src/publishers/
+COPY --chown=collector:collector src/pipeline/ ./src/pipeline/
+COPY --chown=collector:collector src/services/ ./src/services/
+COPY --chown=collector:collector src/utils/ ./src/utils/
+COPY --chown=collector:collector src/main.py ./src/
+COPY --chown=collector:collector src/version.py ./src/
+COPY --chown=collector:collector src/__init__.py ./src/
+
+RUN mkdir -p /app/config /app/logs && \
+    chown -R collector:collector /app/config /app/logs
+
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 LOG_LEVEL=INFO
+VOLUME ["/app/config", "/app/logs"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
+
+USER collector
+ENTRYPOINT ["python", "-m", "src.main"]
+CMD ["--config", "/app/config/collector.yaml"]

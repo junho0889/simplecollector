@@ -33,7 +33,6 @@ class ProtocolRegistry:
         'modbus': ('src.collectors.modbus', []),  # 순수 Python (RTU 시리얼: pyserial 선택)
         's7_protocol': ('src.collectors.s7_protocol', ['snap7']),
         's7': ('src.collectors.s7_protocol', ['snap7']),    # alias
-        'opcua': ('src.collectors.opcua', ['asyncua']),
         'fenet': ('src.collectors.fenet', []),              # 순수 Python
         'ble': ('src.collectors.ble', ['bleak']),             # BLE advertisement
         'lora_rak5146': ('src.collectors.lora_rak5146', []),   # LoRa RAK5146 (SX1303 HAL)

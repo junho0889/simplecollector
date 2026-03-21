@@ -1,0 +1,50 @@
+# ============================================================================
+# Collector Publisher — ~87MB (ARM64)
+# ============================================================================
+# RabbitMQ → TimescaleDB 저장 + OPC UA Server + MQTT 발행
+# asyncpg(libpq) + asyncua + cryptography 포함
+# ============================================================================
+
+# --- Builder ---
+FROM python:3.11-slim AS builder
+WORKDIR /build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir --upgrade pip wheel
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir --wheel-dir /build/wheels -r requirements.txt
+
+# --- Runtime ---
+FROM python:3.11-slim
+LABEL maintainer="NEUROSENSE Inc."
+RUN groupadd -r publisher && useradd -r -g publisher publisher
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    gosu \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+COPY --from=builder /build/wheels /wheels
+RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
+
+COPY --chown=publisher:publisher src/ ./src/
+
+RUN mkdir -p /app/config /app/logs /app/certs && \
+    chown -R publisher:publisher /app/config /app/logs /app/certs
+
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 LOG_LEVEL=INFO
+VOLUME ["/app/config", "/app/logs", "/app/certs"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
+
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["--config", "/app/config/publisher.yaml"]

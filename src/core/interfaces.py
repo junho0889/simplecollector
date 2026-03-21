@@ -88,20 +88,6 @@ class DataType(Enum):
         }
         return size_map.get(self, 2)
 
-    @property
-    def db_column(self) -> str:
-        """해당 데이터 타입이 저장될 DB 컬럼명."""
-        column_map = {
-            DataType.BOOL: "v_bool",
-            DataType.INT8: "v_byte", DataType.UINT8: "v_byte", DataType.BYTE: "v_byte",
-            DataType.INT16: "v_int", DataType.UINT16: "v_int", DataType.WORD: "v_int",
-            DataType.INT32: "v_int", DataType.UINT32: "v_int", DataType.DWORD: "v_int",
-            DataType.INT64: "v_bigint", DataType.UINT64: "v_bigint", DataType.LWORD: "v_bigint",
-            DataType.FLOAT32: "v_float", DataType.FLOAT64: "v_float",
-            DataType.STRING: "v_text",
-        }
-        return column_map.get(self, "v_float")
-
 
 @dataclass
 class TagDefinition:
@@ -328,8 +314,7 @@ class ProcessedData:
         tag_id: 태그 식별자
         data_type: 원본 데이터 타입
         v_bool: Boolean 값
-        v_byte: Raw 바이트 값 (항상 저장)
-        v_int: 정수 값 (INT16~INT32, UINT16~UINT32)
+        v_int: 정수 값 (INT8~INT32, UINT8~UINT32)
         v_bigint: 큰 정수 값 (INT64, UINT64)
         v_float: 실수 값 (FLOAT32, FLOAT64)
         v_text: 문자열 값
@@ -337,12 +322,10 @@ class ProcessedData:
 
     DB Schema:
         CREATE TABLE plc_data_integrated (
-            source_time     TIMESTAMPTZ       NOT NULL,
-            server_time     TIMESTAMPTZ       NOT NULL DEFAULT NOW(),
+            timestamp       TIMESTAMPTZ       NOT NULL,
             plc_id          SMALLINT          NOT NULL,
             tag_id          INTEGER           NOT NULL,
             v_bool          BOOLEAN,
-            v_byte          SMALLINT,         -- Raw 바이트 (항상 저장)
             v_int           INTEGER,
             v_bigint        BIGINT,
             v_float         DOUBLE PRECISION,
@@ -358,8 +341,7 @@ class ProcessedData:
 
     # 타입별 값 컬럼
     v_bool: Optional[bool] = None
-    v_byte: Optional[int] = None          # Raw 바이트 값 (0~255 또는 바이트 배열의 정수 표현)
-    v_int: Optional[int] = None           # INT16~INT32, UINT16~UINT32
+    v_int: Optional[int] = None           # INT8~INT32, UINT8~UINT32
     v_bigint: Optional[int] = None        # INT64, UINT64, LWORD
     v_float: Optional[float] = None       # FLOAT32, FLOAT64
     v_text: Optional[str] = None          # STRING
@@ -369,7 +351,7 @@ class ProcessedData:
     # 메타데이터 (DB 직접 컬럼 아님, 라우팅용)
     collection_group: str = "default"      # 수집 그룹 (fast, alm, log 등)
     device_id_key: str = "plc_id"          # 디바이스 ID 키 ("plc_id" 또는 "ble_id")
-    tag_name: str = ""                     # 태그 이름 (OPC UA display name 등)
+    tag_name: str = ""                     # 태그 이름 (display name)
 
     @property
     def value(self) -> Any:
@@ -384,7 +366,7 @@ class ProcessedData:
             return self.v_int
         if self.v_text is not None:
             return self.v_text
-        return self.v_byte
+        return None
 
     def to_dict(self) -> Dict[str, Any]:
         """딕셔너리로 변환 (JSON/MQTT 직렬화용)."""
@@ -417,21 +399,6 @@ class ProcessedData:
 
         return result
 
-    def to_tuple(self) -> tuple:
-        """튜플로 변환 (DB INSERT용)."""
-        return (
-            self.source_time,
-            self.server_time,
-            self.plc_id,
-            self.tag_id,
-            self.v_bool,
-            self.v_byte,
-            self.v_int,
-            self.v_bigint,
-            self.v_float,
-            self.v_text,
-            self.quality_code,
-        )
 
 
 class ICollector(ABC):

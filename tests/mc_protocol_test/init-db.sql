@@ -7,12 +7,10 @@ CREATE EXTENSION IF NOT EXISTS timescaledb;
 
 -- Main data table
 CREATE TABLE IF NOT EXISTS plc_data_integrated (
-    source_time     TIMESTAMPTZ       NOT NULL,
-    server_time     TIMESTAMPTZ       NOT NULL DEFAULT NOW(),
+    timestamp       TIMESTAMPTZ       NOT NULL,
     plc_id          SMALLINT          NOT NULL,
     tag_id          INTEGER           NOT NULL,
     v_bool          BOOLEAN,
-    v_byte          SMALLINT,
     v_int           INTEGER,
     v_bigint        BIGINT,
     v_float         DOUBLE PRECISION,
@@ -21,7 +19,7 @@ CREATE TABLE IF NOT EXISTS plc_data_integrated (
 );
 
 -- Convert to hypertable
-SELECT create_hypertable('plc_data_integrated', 'source_time', if_not_exists => TRUE);
+SELECT create_hypertable('plc_data_integrated', 'timestamp', if_not_exists => TRUE);
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_plc_data_plc_tag

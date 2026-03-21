@@ -85,7 +85,6 @@ def generate_value(tag: dict) -> dict:
     dtype = tag["data_type"]
     result = {
         "v_bool": None,
-        "v_byte": None,
         "v_int": None,
         "v_bigint": None,
         "v_float": None,
@@ -120,7 +119,6 @@ def generate_batch(plc_id: int, tags: List[dict], group: str) -> List[dict]:
             "tag_name": tag["tag_name"],
             "data_type": tag["data_type"].upper(),
             "source_time": now,
-            "server_time": now,
             "collection_group": group,
             "quality": 1,
             **values,
