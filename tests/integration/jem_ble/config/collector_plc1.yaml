@@ -1,0 +1,16 @@
+# Test PLC1 collector config (master_sync 스캔용)
+collector:
+  plc_id: 1
+  name: "PLC-TEST1"
+  description: "테스트 PLC 1"
+  site: "test"
+  tags_file: "config/tags_plc_test.csv"
+  protocol:
+    type: "mc"
+    host: "127.0.0.1"
+    port: 5007
+  collection_groups:
+    - name: "plc_data"
+      interval_ms: 1000
+    - name: "alm"
+      interval_ms: 1000

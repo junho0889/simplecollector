@@ -1,0 +1,44 @@
+# BLE 멀티디바이스 수집기 — JEM 통합용
+# 3개 BLE 센서를 1 컨테이너에서 수집, ble_data 단일 그룹
+collector:
+  ble_id: 1
+  name: "BLE_JEM"
+  description: "JEM BLE 센서 수집기"
+  site: "진영전기"
+  area: ""
+  line: ""
+  tags_file: "config/tags_ble.csv"
+
+  protocol:
+    type: "ble"
+    extra:
+      cache_ttl: 30.0
+      duplicate_filter_s: 4.0
+
+  collection_groups:
+    - name: "ble_data"
+      interval_ms: 1000
+
+publisher:
+  rabbitmq:
+    enabled: true
+    host: "${RMQ_HOST:rabbitmq}"
+    port: ${RMQ_PORT:5672}
+    virtual_host: "/"
+    username: "${RMQ_USER:admin}"
+    password: "${RMQ_PASS:admin}"
+    exchange_name: "plc.data"
+    routing_key_prefix: "plc"
+    compression: "zlib"
+    encryption_enabled: false
+  publish_interval_ms: 1000
+
+buffer:
+  max_size: 5000
+  batch_size: 200
+  threshold_ratio: 0.8
+
+logging:
+  level: "INFO"
+  collection_level: "INFO"
+  publish_level: "INFO"

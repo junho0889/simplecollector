@@ -1,0 +1,57 @@
+# JEM+BLE Integration Test — Publisher Config
+rabbitmq:
+  host: "rabbitmq"
+  port: 5672
+  username: "admin"
+  password: "admin"
+  virtual_host: "/"
+  exchange_name: "plc.data"
+  exchange_type: "topic"
+  routing_key_pattern: "*.*.data"
+  queue_db: "queue.db"
+  queue_monitor: "queue.monitor"
+  prefetch_count: 50
+  monitor_prefetch: 10
+  monitor_message_ttl: 30000
+  monitor_max_length: 10000
+  heartbeat: 60
+  connection_timeout: 10
+  compression: "zlib"
+  encryption_enabled: false
+
+database:
+  enabled: true
+  host: "timescaledb"
+  port: 5432
+  database: "test_collector"
+  user: "postgres"
+  password: "postgres"
+  schema_name: "public"
+  device_types: ["plc", "ble"]
+  insert_method: "copy"
+  auto_init_schema: true
+  master_sync_enabled: true
+  collection_groups:
+    - name: "plc_data"
+      mode: "all"
+      device_type: "plc"
+    - name: "alm"
+      mode: "latest"
+      device_type: "plc"
+    - name: "ble_data"
+      mode: "all"
+      device_type: "ble"
+  flush_interval_sec: 1
+  flush_batch_size: 2000
+  compression_after: "7 days"
+  compression_segmentby: "plc_id, tag_id"
+  compression_orderby: "timestamp DESC"
+
+mqtt:
+  enabled: false
+
+logging:
+  level: "DEBUG"
+  file_path: ""
+  max_size_mb: 10
+  backup_count: 5

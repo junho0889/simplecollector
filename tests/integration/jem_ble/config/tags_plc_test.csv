@@ -1,0 +1,6 @@
+tag_id,tag_name,memory,address,data_type,collection_group,scale,offset,decimals,unit,string_length,word_length,format,description
+1,D200,D,200,uint16,plc_data,1,0,,,,,,생산수량
+2,D201,D,201,float32,plc_data,1,0,2,,,,,,온도
+3,D202,D,202,bool,plc_data,1,0,,,,,,운전상태
+4,M100,M,100,bool,alm,1,0,,,,,,비상정지
+5,M101,M,101,bool,alm,1,0,,,,,,과열알람

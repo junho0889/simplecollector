@@ -1,0 +1,108 @@
+# ============================================================================
+# JEM+BLE Integration Test
+# ============================================================================
+# 10 PLC + BLE → 1 Publisher → 1 DB 통합 테스트
+#
+# Usage:
+#   bash run_test.sh
+# ============================================================================
+
+networks:
+  test-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+
+services:
+
+  # ==========================================================================
+  # Infrastructure
+  # ==========================================================================
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: jem-ble-test-rabbitmq
+    ports:
+      - "56730:5672"
+      - "56731:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 5s
+      timeout: 10s
+      retries: 10
+    networks:
+      - test-net
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: jem-ble-test-timescaledb
+    ports:
+      - "55433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: test_collector
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./config/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: pg_isready -U postgres
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - test-net
+
+  # ==========================================================================
+  # Publisher (RabbitMQ → TimescaleDB, device_types: plc+ble)
+  # ==========================================================================
+
+  publisher:
+    build:
+      context: ../../../../collector-publisher
+      dockerfile: ../simplecollector/tests/integration/Dockerfile.publisher
+    container_name: jem-ble-test-publisher
+    volumes:
+      - ./config:/app/config:ro
+    command: ["--config", "/app/config/publisher_test.yaml"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - test-net
+
+  # ==========================================================================
+  # Mock Producer (PLC + BLE 데이터 → RabbitMQ)
+  # ==========================================================================
+
+  mock-producer:
+    build:
+      context: .
+      dockerfile: Dockerfile.mock
+    container_name: jem-ble-test-mock
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - test-net
+
+  # ==========================================================================
+  # Test Runner (DB 검증)
+  # ==========================================================================
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: jem-ble-test-runner
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - test-net

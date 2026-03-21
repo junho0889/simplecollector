@@ -1,0 +1,15 @@
+# Test BLE collector config (master_sync 스캔용)
+collector:
+  ble_id: 1
+  name: "BLE-TEST"
+  description: "테스트 BLE 수집기"
+  site: "test"
+  tags_file: "config/tags_ble_test.csv"
+  protocol:
+    type: "ble"
+    extra:
+      cache_ttl: 30.0
+      duplicate_filter_s: 4.0
+  collection_groups:
+    - name: "ble_data"
+      interval_ms: 1000

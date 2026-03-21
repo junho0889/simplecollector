@@ -1,0 +1,192 @@
+# ============================================================================
+# JEM + BLE 통합 배포 — docker-compose.yml
+# ============================================================================
+# 구성:
+#   - simpleCollector  ×10 (PLC-A ~ PLC-L, 각 PLC 1개씩)
+#   - BLE Collector    ×1  (3개 BLE 센서를 1 컨테이너에서 수집)
+#   - collector-publisher ×1 (DB1: 로컬, device_types: plc+ble)
+#
+# 네트워크:
+#   - collector-net: 기존 RabbitMQ가 속한 외부 Docker 네트워크
+#     (RabbitMQ 호스트명: rabbitmq, 계정: admin/admin)
+#
+# 볼륨 구조:
+#   collector: 개별 YAML + CSV 마운트 → /app/config/
+#   publisher: deploy/jem_ble/ 폴더 전체 마운트 → /app/config/
+#              (master_sync가 collector_*.yaml + tags CSV를 스캔)
+# ============================================================================
+
+networks:
+  collector-net:
+    external: true
+
+services:
+
+  # ========================================================================
+  # Collectors — PLC 데이터 수집 (10개)
+  # ========================================================================
+
+  # PLC-A: PS 접점 조립 (192.168.0.1:5007)
+  collector-plc-a:
+    image: neuro_collector_mc:mc-latest
+    container_name: jem-collector-plc-a
+    volumes:
+      - ./collector_plc1.yaml:/app/config/collector.yaml:ro
+      - ./tags_04_PLC-A.csv:/app/config/tags_04_PLC-A.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    networks:
+      - collector-net
+    restart: unless-stopped
+
+  # PLC-B: YOKE 조립 (192.168.0.2:5007)
+  collector-plc-b:
+    image: neuro_collector_mc:mc-latest
+    container_name: jem-collector-plc-b
+    volumes:
+      - ./collector_plc2.yaml:/app/config/collector.yaml:ro
+      - ./tags_02_PLC-B.csv:/app/config/tags_02_PLC-B.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    networks:
+      - collector-net
+    restart: unless-stopped
+
+  # PLC-C: TER 조립 (192.168.0.3:5007)
+  collector-plc-c:
+    image: neuro_collector_mc:mc-latest
+    container_name: jem-collector-plc-c
+    volumes:
+      - ./collector_plc3.yaml:/app/config/collector.yaml:ro
+      - ./tags_05_PLC-C.csv:/app/config/tags_05_PLC-C.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    networks:
+      - collector-net
+    restart: unless-stopped
+
+  # PLC-D: 중간 검사 (192.168.0.4:5007)
+  collector-plc-d:
+    image: neuro_collector_mc:mc-latest
+    container_name: jem-collector-plc-d
+    volumes:
+      - ./collector_plc4.yaml:/app/config/collector.yaml:ro
+      - ./tags_10_PLC-D.csv:/app/config/tags_10_PLC-D.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    networks:
+      - collector-net
+    restart: unless-stopped
+
+  # PLC-EFG: AIR 청소 (192.168.0.5:5007)
+  collector-plc-efg:
+    image: neuro_collector_mc:mc-latest
+    container_name: jem-collector-plc-efg
+    volumes:
+      - ./collector_plc5.yaml:/app/config/collector.yaml:ro
+      - ./tags_01_PLC-EFG.csv:/app/config/tags_01_PLC-EFG.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    networks:
+      - collector-net
+    restart: unless-stopped
+
+  # PLC-H: 1차 SEAL 도포 및 건조 (192.168.0.6:5007)
+  collector-plc-h:
+    image: neuro_collector_mc:mc-latest
+    container_name: jem-collector-plc-h
+    volumes:
+      - ./collector_plc6.yaml:/app/config/collector.yaml:ro
+      - ./tags_06_PLC-H.csv:/app/config/tags_06_PLC-H.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    networks:
+      - collector-net
+    restart: unless-stopped
+
+  # PLC-I: 예비납땜 (192.168.0.7:5007)
+  collector-plc-i:
+    image: neuro_collector_mc:mc-latest
+    container_name: jem-collector-plc-i
+    volumes:
+      - ./collector_plc7.yaml:/app/config/collector.yaml:ro
+      - ./tags_07_PLC-I.csv:/app/config/tags_07_PLC-I.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    networks:
+      - collector-net
+    restart: unless-stopped
+
+  # PLC-J: 최종검사 (192.168.0.8:5007)
+  collector-plc-j:
+    image: neuro_collector_mc:mc-latest
+    container_name: jem-collector-plc-j
+    volumes:
+      - ./collector_plc8.yaml:/app/config/collector.yaml:ro
+      - ./tags_03_PLC-J.csv:/app/config/tags_03_PLC-J.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    networks:
+      - collector-net
+    restart: unless-stopped
+
+  # PLC-K: LASER 날인 (192.168.0.9:5007)
+  collector-plc-k:
+    image: neuro_collector_mc:mc-latest
+    container_name: jem-collector-plc-k
+    volumes:
+      - ./collector_plc9.yaml:/app/config/collector.yaml:ro
+      - ./tags_08_PLC-K.csv:/app/config/tags_08_PLC-K.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    networks:
+      - collector-net
+    restart: unless-stopped
+
+  # PLC-L: 동작검사 및 CASE and TER 검사 (192.168.0.10:5007)
+  collector-plc-l:
+    image: neuro_collector_mc:mc-latest
+    container_name: jem-collector-plc-l
+    volumes:
+      - ./collector_plc10.yaml:/app/config/collector.yaml:ro
+      - ./tags_09_PLC-L.csv:/app/config/tags_09_PLC-L.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    networks:
+      - collector-net
+    restart: unless-stopped
+
+  # ========================================================================
+  # BLE Collector — 3개 BLE 센서를 1 컨테이너에서 수집
+  # ========================================================================
+
+  collector-ble:
+    image: neuro_collector_ble:latest
+    container_name: jem-collector-ble
+    network_mode: host
+    privileged: true
+    volumes:
+      - /var/run/dbus:/var/run/dbus:ro
+      - ./collector_ble.yaml:/app/config/collector.yaml:ro
+      - ./tags_ble.csv:/app/config/tags_ble.csv:ro
+    environment:
+      RMQ_HOST: 127.0.0.1
+      RMQ_PORT: 5672
+    restart: unless-stopped
+
+  # ========================================================================
+  # Publisher — DB 저장 (1개, PLC + BLE 통합)
+  # ========================================================================
+  # deploy/jem_ble/ 폴더 전체를 /app/config/에 마운트합니다.
+  # master_sync가 /app/config/collector_*.yaml 을 스캔하여
+  # plc_master + ble_master + {group}_master 테이블을 자동 채웁니다.
+
+  publisher-db1:
+    image: neuro_publisher:latest
+    container_name: jem-publisher-db1
+    volumes:
+      - ./:/app/config:ro
+    command: ["--config", "/app/config/publisher_db1.yaml"]
+    networks:
+      - collector-net
+    restart: unless-stopped

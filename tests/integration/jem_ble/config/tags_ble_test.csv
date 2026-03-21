@@ -1,0 +1,7 @@
+tag_id,tag_name,memory,address,data_type,collection_group,scale,offset,decimals,unit,mac_address,device_name,byte_offset,description
+1,temperature,,0,float32,ble_data,1,0,2,℃,D4:BB:36:61:27:AC,POSIOT,,1호기 온도
+2,humidity,,0,float32,ble_data,1,0,2,%,D4:BB:36:61:27:AC,POSIOT,,1호기 습도
+3,battery,,0,uint16,ble_data,1,0,,,D4:BB:36:61:27:AC,POSIOT,,1호기 배터리
+4,rssi,,0,int16,ble_data,1,0,,dBm,D4:BB:36:61:27:AC,POSIOT,,1호기 신호강도
+5,temperature,,0,float32,ble_data,1,0,2,℃,F6:5A:83:C7:DB:C7,POSIOT,,2호기 온도
+6,humidity,,0,float32,ble_data,1,0,2,%,F6:5A:83:C7:DB:C7,POSIOT,,2호기 습도

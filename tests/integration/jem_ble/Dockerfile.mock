@@ -1,0 +1,6 @@
+# Mock Producer — PLC + BLE 데이터 → RabbitMQ
+FROM python:3.11-slim
+WORKDIR /app
+RUN pip install --no-cache-dir aio-pika
+COPY mock_producer.py .
+ENTRYPOINT ["python", "mock_producer.py"]

@@ -1,0 +1,91 @@
+﻿# ============================================================================
+# PLC-L: 동작검사 및 CASE and TER 검사
+# ============================================================================
+# 192.168.0.10:5007 → RabbitMQ Exchange: PLC_L
+
+collector:
+  plc_id: 10
+  name: "PLC-L"
+  description: "동작검사 및 CASE and TER 검사"
+  site: "진영전기"
+  area: "릴레이 생산"
+  line: "JH-2HO"
+  tags_file: "config/tags_09_PLC-L.csv"
+
+  protocol:
+    type: "mc_protocol"
+    host: "192.168.0.10"
+    port: 5007
+    unit_id: 1
+    timeout_ms: 5000
+    reconnect_interval_ms: 3000
+
+    extra:
+      plc_series: "iq-r"
+      frame_type: "binary_3e"
+      network_no: 0
+      pc_no: 0xFF
+      unit_io: 0x03FF
+      unit_station: 0
+      max_address_gap: 500
+
+  collection_groups:
+    - name: "plc_data"
+      interval_ms: 1000
+      timeout_ms: 5000
+      retry_count: 2
+      retry_delay_ms: 500
+
+    - name: "alm"
+      interval_ms: 500
+      timeout_ms: 5000
+      retry_count: 2
+      retry_delay_ms: 500
+      mode: "on_change"
+      deadband: 0
+
+    - name: "log"
+      interval_ms: 100
+      timeout_ms: 5000
+      retry_count: 2
+      retry_delay_ms: 500
+      mode: "on_change"
+      deadband: 0
+
+    - name: "action"
+      interval_ms: 500
+      timeout_ms: 5000
+      retry_count: 2
+      retry_delay_ms: 500
+      mode: "on_change"
+      deadband: 0
+
+buffer:
+  max_size: 10000
+  flush_threshold: 1000
+  flush_interval_ms: 3000
+
+publisher:
+  batch_size: 1100
+  retry_count: 3
+  retry_delay_ms: 1000
+
+  rabbitmq:
+    enabled: true
+    host: "${RABBITMQ_HOST:rabbitmq}"
+    port: 5672
+    virtual_host: "/"
+    username: "${RABBITMQ_USER:admin}"
+    password: "${RABBITMQ_PASSWORD:admin}"
+    exchange_name: "plc.data"
+    exchange_type: "topic"
+    routing_key_prefix: "plc"
+    compression: "zlib"
+    encryption_enabled: false
+    heartbeat: 60
+    connection_timeout: 10
+    delivery_mode: 2
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
