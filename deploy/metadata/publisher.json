@@ -2,7 +2,7 @@
   "name": "neuro_publisher",
   "display_name": "Collector Publisher Service",
   "description": "RabbitMQ 소비자 → Database(TimescaleDB) / MQTT 포워더 서비스",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "docker_image": "neuro_publisher",
   "service_type": "publisher",
   "icon": "database",
@@ -712,10 +712,64 @@
     ],
     "ports": [],
     "restart_policy": "unless-stopped",
-    "network": "collector-net"
+    "network": "neuronetwork"
   },
 
-  "depends_on": ["rabbitmq"],
+  "environment": [
+    {
+      "key": "CONFIG_PATH",
+      "default": "/app/config/publisher.yaml",
+      "description": "YAML 설정 파일 경로",
+      "required": true
+    },
+    {
+      "key": "LOG_LEVEL",
+      "default": "INFO",
+      "description": "로그 레벨 (환경변수 오버라이드)",
+      "required": false,
+      "options": ["DEBUG", "INFO", "WARNING", "ERROR"]
+    },
+    {
+      "key": "RABBITMQ_HOST",
+      "default": "rabbitmq",
+      "description": "RabbitMQ 호스트",
+      "required": false
+    },
+    {
+      "key": "RABBITMQ_USER",
+      "default": "admin",
+      "description": "RabbitMQ 사용자",
+      "required": false
+    },
+    {
+      "key": "RABBITMQ_PASSWORD",
+      "default": "",
+      "description": "RabbitMQ 비밀번호",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "DB_HOST",
+      "default": "timescaledb",
+      "description": "Database 호스트",
+      "required": false
+    },
+    {
+      "key": "DB_PASSWORD",
+      "default": "",
+      "description": "Database 비밀번호",
+      "required": false,
+      "secret": true
+    }
+  ],
+
+  "volumes": [
+    { "container_path": "/app/config", "description": "설정 파일 (YAML + Collector CSV)", "mode": "ro" },
+    { "container_path": "/app/logs", "description": "로그 파일", "mode": "rw" }
+  ],
+
+  "network": "neuronetwork",
+  "depends_on": ["rabbitmq", "timescaledb"],
 
   "tables": {
     "description": "auto_init_schema 활성화 시 자동 생성되는 테이블 목록",
