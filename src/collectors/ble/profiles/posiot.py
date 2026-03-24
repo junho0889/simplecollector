@@ -1,8 +1,9 @@
 """
-POSIOT 산업용 진동/환경 센서 프로파일
-=====================================
+PTS-2305BP 산업용 진동/환경 센서 프로파일
+==========================================
 
-SensorProcessServer의 parse_beacon_data() 로직을 이식.
+POSIOT PTS-2305BP (구 pulley) 센서.
+Manufacturer Data만 사용하는 단순 AD 구조.
 
 Manufacturer Data Layout (company_id + data bytes):
     company_id: temperature (int16, /100, ℃)
@@ -34,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 class PosiotProfile(DeviceProfile):
-    """POSIOT 산업용 진동/환경 센서."""
+    """PTS-2305BP 산업용 진동/환경 센서."""
 
     FIELDS = [
         'temperature', 'humidity', 'pressure', 'battery',
@@ -50,7 +51,7 @@ class PosiotProfile(DeviceProfile):
 
     @property
     def name(self) -> str:
-        return "posiot"
+        return "pts-2305bp"
 
     def get_field_names(self) -> List[str]:
         return list(self.FIELDS)

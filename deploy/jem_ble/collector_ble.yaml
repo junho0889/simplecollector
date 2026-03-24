@@ -1,7 +1,6 @@
 # BLE 멀티디바이스 수집기 — JEM 통합용
-# 3개 BLE 센서를 1 컨테이너에서 수집, ble_data 단일 그룹
+# devices 섹션에서 디바이스별 MAC/프로파일 관리, CSV에는 device_id+tag_id만 기입
 collector:
-  ble_id: 1
   name: "BLE_JEM"
   description: "JEM BLE 센서 수집기"
   site: "진영전기"
@@ -14,6 +13,25 @@ collector:
     extra:
       cache_ttl: 30.0
       duplicate_filter_s: 4.0
+
+  devices:
+    - device_id: 1
+      mac_address: "F6:5A:83:C7:DB:C7"
+      device_name_filter: "POSIOT"
+      device_profile: "pts-2305bp"
+      description: "1호기 진동센서"
+
+    - device_id: 2
+      mac_address: "F5:12:5E:BE:EE:12"
+      device_name_filter: "POSIOT"
+      device_profile: "pts-2305bp"
+      description: "2호기 온도센서"
+
+    - device_id: 3
+      mac_address: "E5:79:FD:DB:0A:38"
+      device_name_filter: "POSIOT"
+      device_profile: "pts-0624b"
+      description: "3호기 전류센서"
 
   collection_groups:
     - name: "ble_data"
@@ -42,3 +60,4 @@ logging:
   level: "INFO"
   collection_level: "INFO"
   publish_level: "INFO"
+  loss_level: "ERROR"

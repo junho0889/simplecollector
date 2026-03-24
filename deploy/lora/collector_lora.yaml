@@ -25,10 +25,11 @@ collector:
     reconnect_interval_ms: 5000
 
     extra:
-      device_id: 1                             # 대상 end device ID (1~255)
+      device_ids: [1]                          # 대상 end device ID 리스트 (1~255, 최대 100대)
       device_profile: "posiot_lora"            # 디바이스 프로파일
       lib_path: "/app/lib/libloragw.so"        # HAL 라이브러리 경로
-      spi_path: "/dev/spidev0.0"               # SPI 디바이스 경로
+      com_path: "/dev/ttyRAK5146"               # USB 디바이스 경로 (udev symlink)
+      com_type: "usb"                          # 통신 타입 (spi 또는 usb)
       freq_hz: 923300000                       # 중심 주파수 (Hz) — KR920 대역
       cache_ttl: 30.0                          # 패킷 캐시 만료 (초)
       poll_interval: 0.01                      # 수신 폴링 간격 (초, 10ms)
@@ -77,7 +78,7 @@ publisher:
     delivery_mode: 2
 
 logging:
-  level: "INFO"
-  collection_level: "INFO"
+  level: "DEBUG"
+  collection_level: "DEBUG"
   publish_level: "INFO"
   format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"

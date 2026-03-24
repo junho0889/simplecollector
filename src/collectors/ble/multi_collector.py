@@ -3,27 +3,26 @@ BLE Multi-Device Collector
 ==========================
 
 여러 BLE 디바이스를 하나의 컨테이너에서 수집하는 컬렉터.
-태그 CSV의 mac_address 컬럼으로 디바이스를 자동 식별하고,
-MAC별로 그룹핑하여 각 디바이스의 advertisement 데이터를 수집합니다.
-
-1개의 CSV 파일로 1000개 이상의 BLE 센서를 관리할 수 있습니다.
+YAML devices 설정에서 디바이스 목록을 로드하고,
+디바이스별로 device_id를 부여하여 CollectedData를 발행합니다.
 
 Data Flow:
     [N개 BLE 센서] ─광고패킷─> [BleScanner 싱글톤]
                                     ↓ (MAC 캐시)
                                [BleMultiCollector]
-                                    ↓ MAC별 순회
+                                    ↓ device_id별 순회
                                [CollectedData × N] → Pipeline → RabbitMQ
+                               (각 CollectedData.plc_id = device_id)
 """
 
 import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 from ..base import BaseCollector
-from ...core.config import CollectorConfig, CollectionGroup
+from ...core.config import CollectorConfig, CollectionGroup, BleDeviceEntry
 from ...core.events import EventBus
 from ...core.interfaces import CollectedData, TagDefinition
 from .scanner import BleScanner
@@ -33,9 +32,12 @@ logger = logging.getLogger('collector.collection')
 
 @dataclass
 class BleDeviceInfo:
-    """태그 CSV에서 추출한 BLE 디바이스 정보."""
+    """BLE 디바이스 정보 (YAML devices + CSV 태그에서 병합)."""
+    device_id: int
     mac_address: str
     device_name_filter: str = ""
+    device_profile: str = ""
+    description: str = ""
     tag_count: int = 0
 
 
@@ -43,10 +45,11 @@ class BleMultiCollector(BaseCollector):
     """
     BLE 멀티디바이스 수집기.
 
-    태그 CSV의 mac_address 컬럼에서 디바이스 목록을 자동 추출하고,
+    YAML devices 섹션에서 디바이스 목록을 로드하고,
     BleScanner 싱글톤을 공유하여 모든 디바이스를 수집합니다.
 
-    plc_id는 YAML config에서 하나만 사용 (tag_id가 전역 고유).
+    각 디바이스별로 device_id를 CollectedData.plc_id에 설정하여
+    publisher에서 ble_id로 구분합니다.
     """
 
     def __init__(
@@ -56,13 +59,13 @@ class BleMultiCollector(BaseCollector):
         tags: List[TagDefinition],
         event_bus: Optional[EventBus] = None,
     ):
-        # ble_id 우선, 없으면 plc_id (0도 허용)
-        device_id = config.device_id
-        super().__init__(plc_id=device_id, name=name, config=config, event_bus=event_bus)
+        # plc_id=0 (멀티디바이스 — 개별 device_id는 CollectedData에서 설정)
+        super().__init__(plc_id=0, name=name, config=config, event_bus=event_bus)
 
-        # MAC별 디바이스 정보 추출
+        # YAML devices에서 디바이스 맵 구축
         self._devices: Dict[str, BleDeviceInfo] = {}
-        self._build_device_map(tags)
+        self._device_id_to_mac: Dict[int, str] = {}
+        self._build_device_map(config.devices, tags)
 
         extra = self._protocol_config.extra if self._protocol_config else {}
         self._cache_ttl: float = float(extra.get('cache_ttl', 30.0))
@@ -79,28 +82,46 @@ class BleMultiCollector(BaseCollector):
 
         logger.info(
             f"[{self._name}] BleMultiCollector initialized with "
-            f"{len(self._devices)} devices from tags CSV"
+            f"{len(self._devices)} devices from YAML config"
         )
         for mac, info in self._devices.items():
             logger.info(
-                f"  mac={mac} name_filter='{info.device_name_filter}' "
+                f"  device_id={info.device_id} mac={mac} "
+                f"profile='{info.device_profile}' "
+                f"name_filter='{info.device_name_filter}' "
                 f"tags={info.tag_count}"
             )
 
-    def _build_device_map(self, tags: List[TagDefinition]) -> None:
-        """태그 목록에서 MAC 주소별 디바이스 정보를 추출."""
-        for tag in tags:
-            if not tag.mac_address:
-                continue
+    def _build_device_map(
+        self,
+        devices: List[BleDeviceEntry],
+        tags: List[TagDefinition],
+    ) -> None:
+        """YAML devices + CSV 태그에서 디바이스 맵 구축."""
+        # YAML devices 기본 등록
+        for d in devices:
+            mac = d.mac_address.upper()
+            self._devices[mac] = BleDeviceInfo(
+                device_id=d.device_id,
+                mac_address=mac,
+                device_name_filter=d.device_name_filter,
+                device_profile=d.device_profile,
+                description=d.description,
+                tag_count=0,
+            )
+            self._device_id_to_mac[d.device_id] = mac
 
-            mac = tag.mac_address.upper()
-            if mac not in self._devices:
-                self._devices[mac] = BleDeviceInfo(
-                    mac_address=mac,
-                    device_name_filter=tag.device_name_filter,
-                    tag_count=0,
-                )
-            self._devices[mac].tag_count += 1
+        # CSV 태그에서 태그 카운트 집계
+        for tag in tags:
+            if tag.device_id is not None:
+                mac = self._device_id_to_mac.get(tag.device_id)
+                if mac and mac in self._devices:
+                    self._devices[mac].tag_count += 1
+            elif tag.mac_address:
+                # 레거시: mac_address가 CSV에 있는 경우 (하위 호환)
+                mac = tag.mac_address.upper()
+                if mac in self._devices:
+                    self._devices[mac].tag_count += 1
 
     async def _do_connect(self) -> bool:
         """BLE 스캐너 참조 획득."""
@@ -156,8 +177,9 @@ class BleMultiCollector(BaseCollector):
         """
         멀티디바이스 수집 루프.
 
-        매 사이클마다 모든 MAC을 순회하고,
-        데이터가 있는 디바이스마다 CollectedData를 개별 발행합니다.
+        매 사이클마다 모든 디바이스를 순회하고,
+        데이터가 있는 디바이스마다 device_id를 plc_id에 설정하여
+        CollectedData를 개별 발행합니다.
         """
         interval = group_config.interval_ms / 1000.0
         from ...core.interfaces import ConnectionState
@@ -214,7 +236,7 @@ class BleMultiCollector(BaseCollector):
         group: str,
         collection_time: datetime,
     ) -> Optional[CollectedData]:
-        """단일 디바이스에서 데이터 수집."""
+        """단일 디바이스에서 데이터 수집. plc_id = device_id."""
         if not self._scanner:
             return None
 
@@ -230,7 +252,7 @@ class BleMultiCollector(BaseCollector):
         return CollectedData(
             source_time=entry.timestamp,
             collection_time=collection_time,
-            plc_id=self._plc_id,
+            plc_id=device_info.device_id,  # device_id를 plc_id로 설정
             raw_data=b'',
             collection_group=group,
             metadata={
@@ -240,6 +262,8 @@ class BleMultiCollector(BaseCollector):
                 'device_name': entry.device_name,
                 'rssi': entry.rssi,
                 'mac_address': entry.mac_address,
+                'device_profile': device_info.device_profile,
+                'device_id': device_info.device_id,
             },
         )
 
@@ -249,6 +273,8 @@ class BleMultiCollector(BaseCollector):
         stats['device_count'] = len(self._devices)
         stats['devices'] = {
             mac: {
+                'device_id': info.device_id,
+                'profile': info.device_profile,
                 'name_filter': info.device_name_filter,
                 'tag_count': info.tag_count,
                 'last_seen': (

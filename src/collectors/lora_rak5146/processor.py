@@ -76,7 +76,12 @@ class LoRaRak5146Processor(BaseProcessor):
         results: List[Tuple[TagDefinition, Any]] = []
 
         for tag in tags:
-            field_name = tag.address.lower() if tag.address else ''
+            # config loader가 memory+address를 연결 (예: "LORAtemperature")
+            # memory prefix를 제거하여 프로파일 필드 이름과 매칭
+            if tag.memory and tag.address:
+                field_name = tag.address[len(tag.memory):].lower()
+            else:
+                field_name = tag.address.lower() if tag.address else ''
             value = parsed_values.get(field_name)
 
             if value is not None:

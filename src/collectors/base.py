@@ -468,9 +468,9 @@ class BaseCollector(ICollector):
             f"time={collection_time.isoformat()}"
         )
 
-        # 연속 손실이 임계값 초과 시 경고 (10회마다)
+        # 연속 손실이 임계값 초과 시 경고 (10회마다) — loss 로거로 통합
         if consecutive > 0 and consecutive % 10 == 0:
-            logger.warning(
+            self._loss_logger.warning(
                 f"[{self._name}] High consecutive loss count for '{group_name}': "
                 f"{consecutive} consecutive failures"
             )

@@ -1,13 +1,14 @@
 """
-POSIOT V2 환경/진동 센서 프로파일
+PTS-0624B 환경/진동 센서 프로파일
 ==================================
 
-V1(posiot)과 다른 AD 패킷 구조를 가진 POSIOT 센서.
-GAP + UUID 헤더 후 manufacturer_data 시작.
+PTS-2305BP와 다른 AD 패킷 구조를 가진 POSIOT 센서.
+GAP(3B) + Service UUID(3B) + Manufacturer Data 헤더(2B) 후 페이로드 시작.
 
-Manufacturer Data Layout (company_id + data bytes):
-    company_id 2바이트를 데이터 앞에 복원하여 full payload 구성 (22 bytes):
+bleak는 AD 헤더를 제거하고 manufacturer_data = {company_id: data_bytes}로 전달.
+company_id 2바이트를 데이터 앞에 복원하여 full payload 구성 (22 bytes):
 
+    Full Payload Layout:
     [0]     mode/version      (uint8, upper 4bit=mode, lower 4bit=version)
     [1:3]   sound_db          (uint16_be, dB)
     [3:5]   velocity_rms      (uint16_be, mm/s)
@@ -32,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 class PosiotV2Profile(DeviceProfile):
-    """POSIOT V2 환경/진동 센서 (다른 AD 패킷 구조)."""
+    """PTS-0624B 환경/진동 센서."""
 
     FIELDS = [
         'mode', 'version',
@@ -47,13 +48,13 @@ class PosiotV2Profile(DeviceProfile):
 
     @property
     def name(self) -> str:
-        return "posiot_v2"
+        return "pts-0624b"
 
     def get_field_names(self) -> List[str]:
         return list(self.FIELDS)
 
     def parse(self, company_id: int, data: bytes) -> Dict[str, Any]:
-        """POSIOT V2 manufacturer_data 파싱.
+        """PTS-0624B manufacturer_data 파싱.
 
         company_id 2바이트 + data를 합쳐 full payload로 복원 후 파싱.
         """
@@ -107,7 +108,7 @@ class PosiotV2Profile(DeviceProfile):
                 result['sound_fft_freq'] = struct.unpack_from('>H', full, 17)[0]
 
             if len(full) >= 21:
-                # [19:21] probe (int16_le, /100)
+                # [19:21] probe (int16_le, /100, ℃ or A)
                 result['probe'] = struct.unpack_from('<h', full, 19)[0] / 100.0
 
             if len(full) >= 22:
@@ -115,6 +116,6 @@ class PosiotV2Profile(DeviceProfile):
                 result['battery'] = full[21]
 
         except struct.error as e:
-            logger.warning(f"[PosiotV2Profile] Parsing error: {e}")
+            logger.warning(f"[PTS-0624B] Parsing error: {e}")
 
         return result

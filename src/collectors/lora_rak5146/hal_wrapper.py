@@ -3,10 +3,10 @@ SX1303 HAL ctypes Wrapper
 =========================
 
 Semtech sx1302_hal (libloragw.so) Python 바인딩.
-RAK5146 모듈의 SPI 통신을 추상화합니다.
+RAK5146 모듈의 SPI/USB 통신을 추상화합니다.
 
 HAL API Flow:
-    lgw_board_setconf()  → 보드 설정 (SPI 경로, 클럭)
+    lgw_board_setconf()  → 보드 설정 (SPI/USB 경로, 클럭)
     lgw_rxrf_setconf()   → RF 채널 설정 (주파수, 라디오 타입)
     lgw_rxif_setconf()   → IF 채널 설정 (다채널 수신)
     lgw_start()          → 수신 시작
@@ -14,8 +14,9 @@ HAL API Flow:
     lgw_stop()           → 수신 종료
 
 Requirements:
-    - libloragw.so (ARM64, RPi용 크로스 빌드 필요)
-    - SPI 활성화: sudo raspi-config → Interface → SPI
+    - libloragw.so (ARM64, RPi용 빌드 필요)
+    - SPI 버전: SPI 활성화 필요
+    - USB 버전: /dev/ttyACMx 접근 필요
 
 References:
     https://github.com/Lora-net/sx1302_hal
@@ -94,31 +95,31 @@ class LgwRssiTcomp(ctypes.Structure):
 
 
 class LgwConfRxRf(ctypes.Structure):
-    """RF 채널 설정 (lgw_conf_rxrf_s)."""
+    """RF 채널 설정 (lgw_conf_rxrf_s) — loragw_hal.h 구조체 미러링."""
     _fields_ = [
         ("enable", ctypes.c_bool),
         ("freq_hz", ctypes.c_uint32),
         ("rssi_offset", ctypes.c_float),
         ("rssi_tcomp", LgwRssiTcomp),
-        ("type", ctypes.c_int),             # RadioType enum
+        ("type", ctypes.c_int),             # lgw_radio_type_t enum (int in C)
         ("tx_enable", ctypes.c_bool),
         ("single_input_mode", ctypes.c_bool),
     ]
 
 
 class LgwConfRxIf(ctypes.Structure):
-    """IF 채널 설정 (lgw_conf_rxif_s)."""
+    """IF 채널 설정 (lgw_conf_rxif_s) — loragw_hal.h 구조체 미러링."""
     _fields_ = [
         ("enable", ctypes.c_bool),
         ("rf_chain", ctypes.c_uint8),
-        ("freq_hz", ctypes.c_int32),        # RF 중심 주파수 대비 오프셋
-        ("datarate", ctypes.c_uint32),       # LoRa SF or FSK datarate
-        ("bandwidth", ctypes.c_uint8),
-        ("sync_word_size", ctypes.c_uint8),
-        ("sync_word", ctypes.c_uint64),
-        ("implicit_hdr", ctypes.c_bool),
-        ("implicit_crc_en", ctypes.c_bool),
+        ("freq_hz", ctypes.c_int32),            # RF 중심 주파수 대비 오프셋 (Hz)
+        ("bandwidth", ctypes.c_uint8),           # BW_125KHZ=0x04, 0=default
+        ("datarate", ctypes.c_uint32),           # LoRa SF (0=multi-SF) or FSK datarate
+        ("sync_word_size", ctypes.c_uint8),      # FSK only
+        ("sync_word", ctypes.c_uint64),          # FSK only
+        ("implicit_hdr", ctypes.c_bool),         # LoRa service implicit header
         ("implicit_payload_length", ctypes.c_uint8),
+        ("implicit_crc_en", ctypes.c_bool),
         ("implicit_coderate", ctypes.c_uint8),
     ]
 
@@ -131,12 +132,13 @@ class LgwConfDemod(ctypes.Structure):
 
 
 class LgwPktRx(ctypes.Structure):
-    """수신 패킷 구조체 (lgw_pkt_rx_s)."""
+    """수신 패킷 구조체 (lgw_pkt_rx_s) — loragw_hal.h 구조체 미러링."""
     _fields_ = [
         ("freq_hz", ctypes.c_uint32),
         ("freq_offset", ctypes.c_int32),
         ("if_chain", ctypes.c_uint8),
         ("status", ctypes.c_uint8),         # CrcStatus
+        ("count_us", ctypes.c_uint32),      # 내부 타임스탬프 (μs) — status 바로 뒤
         ("rf_chain", ctypes.c_uint8),
         ("modem_id", ctypes.c_uint8),
         ("modulation", ctypes.c_uint8),
@@ -153,7 +155,6 @@ class LgwPktRx(ctypes.Structure):
         ("payload", ctypes.c_uint8 * LGW_PAYLOAD_MAX),
         ("ftime_received", ctypes.c_bool),
         ("ftime", ctypes.c_uint32),
-        ("count_us", ctypes.c_uint32),
     ]
 
 
@@ -185,12 +186,15 @@ class HalWrapper:
     """
     sx1302_hal (libloragw.so) Python 래퍼.
 
-    SPI를 통해 RAK5146 칩을 제어합니다.
-    HAL이 SPI 통신을 전부 추상화하므로, 직접 SPI를 다룰 필요 없습니다.
+    SPI 또는 USB를 통해 RAK5146 칩을 제어합니다.
+    HAL이 통신을 전부 추상화하므로, 직접 SPI/USB를 다룰 필요 없습니다.
 
     Usage:
         hal = HalWrapper("/path/to/libloragw.so")
-        hal.configure(spi_path="/dev/spidev0.0", freq_hz=923_300_000)
+        # SPI 버전
+        hal.configure(com_path="/dev/spidev0.0", freq_hz=923_300_000)
+        # USB 버전
+        hal.configure(com_path="/dev/ttyACM0", com_type=ComType.USB, freq_hz=923_300_000)
         hal.start()
 
         packets = hal.receive()
@@ -232,28 +236,41 @@ class HalWrapper:
         radio_type: RadioType = RadioType.SX1250,
         lorawan_public: bool = False,
         clksrc: int = 0,
+        com_type: Optional[ComType] = None,
+        com_path: Optional[str] = None,
     ) -> bool:
         """
         RAK5146 설정.
 
         Args:
-            spi_path: SPI 디바이스 경로
+            spi_path: SPI 디바이스 경로 (하위 호환용, com_path 미지정 시 사용)
             freq_hz: 중심 주파수 (Hz) — KR920: 920.9~923.3 MHz
             radio_type: 라디오 칩 타입 (RAK5146 = SX1250)
             lorawan_public: LoRaWAN public 네트워크 여부 (raw LoRa = False)
             clksrc: 클럭 소스 RF 체인 (0 또는 1)
+            com_type: 통신 타입 (SPI 또는 USB, None이면 경로에서 자동 감지)
+            com_path: 디바이스 경로 (/dev/spidev0.0 또는 /dev/ttyACMx)
         """
         if not self._lib:
             logger.error("[HAL] Library not loaded")
             return False
+
+        # com_path / com_type 결정 (하위 호환: spi_path 우선)
+        actual_path = com_path or spi_path
+        if com_type is not None:
+            actual_com_type = com_type
+        elif "ttyACM" in actual_path or "ttyUSB" in actual_path:
+            actual_com_type = ComType.USB
+        else:
+            actual_com_type = ComType.SPI
 
         # 1. Board 설정
         board_conf = LgwConfBoard()
         board_conf.lorawan_public = lorawan_public
         board_conf.clksrc = clksrc
         board_conf.full_duplex = False
-        board_conf.com_type = ComType.SPI
-        board_conf.com_path = spi_path.encode('utf-8')
+        board_conf.com_type = actual_com_type
+        board_conf.com_path = actual_path.encode('utf-8')
 
         ret = self._lib.lgw_board_setconf(ctypes.byref(board_conf))
         if ret != LGW_HAL_SUCCESS:
@@ -274,10 +291,10 @@ class HalWrapper:
                 return False
 
         # 3. Multi-SF 채널 설정 (8개 IF chain, SF7~SF12 동시 수신)
-        # 채널 간격: 200kHz
+        # P2P: 채널 0에 오프셋 0 → 정확한 중심 주파수 수신
         channel_offsets = [
-            -300000, -100000, 100000, 300000,
-            -300000, -100000, 100000, 300000,
+            0, -200000, 200000, -400000,
+            0, -200000, 200000, 400000,
         ]
         for i in range(LGW_MULTI_NB):
             if_conf = LgwConfRxIf()
@@ -290,6 +307,20 @@ class HalWrapper:
                 logger.error(f"[HAL] lgw_rxif_setconf({i}) failed")
                 return False
 
+            logger.debug(
+                f"[HAL] IF ch{i}: rf_chain={if_conf.rf_chain} "
+                f"offset={channel_offsets[i]:+d}Hz "
+                f"→ {(freq_hz + channel_offsets[i])/1e6:.3f}MHz"
+            )
+
+        # 3b. LoRa service 채널 (ch8) + FSK 채널 (ch9) 비활성화 (명시적 설정)
+        for ch in (8, 9):
+            if_conf = LgwConfRxIf()
+            if_conf.enable = False
+            ret = self._lib.lgw_rxif_setconf(ch, ctypes.byref(if_conf))
+            if ret != LGW_HAL_SUCCESS:
+                logger.warning(f"[HAL] lgw_rxif_setconf({ch}) failed (non-critical)")
+
         # 4. Demod 설정 (모든 SF 활성화)
         demod_conf = LgwConfDemod()
         demod_conf.multisf_datarate = 0xFF  # SF5~SF12 전부
@@ -299,8 +330,13 @@ class HalWrapper:
             return False
 
         logger.info(
-            f"[HAL] Configured: SPI={spi_path}, "
+            f"[HAL] Configured: {actual_com_type.name}={actual_path}, "
             f"freq={freq_hz/1e6:.1f}MHz, radio={radio_type.name}"
+        )
+        logger.info(
+            f"[HAL] RX setup: lorawan_public={lorawan_public} "
+            f"(sync={'0x34' if lorawan_public else '0x12'}), "
+            f"multisf=0xFF (SF5-SF12), 8 IF channels"
         )
         return True
 
@@ -353,6 +389,19 @@ class HalWrapper:
         packets: List[LoRaPacket] = []
         for i in range(nb_pkt):
             raw = pkt_array[i]
+
+            # 모든 수신 패킷 상세 디버그 (status 무관)
+            raw_hex = bytes(raw.payload[:raw.size]).hex() if raw.size > 0 else ""
+            status_name = CrcStatus(raw.status).name if raw.status in CrcStatus._value2member_map_ else f"0x{raw.status:02x}"
+            logger.debug(
+                f"[HAL] RAW_PKT[{i}] status={status_name} "
+                f"size={raw.size} freq={raw.freq_hz} "
+                f"SF={raw.datarate} BW={raw.bandwidth} CR={raw.coderate} "
+                f"rf={raw.rf_chain} if={raw.if_chain} modem={raw.modem_id} "
+                f"RSSI={raw.rssic:.1f}/{raw.rssis:.1f} SNR={raw.snr:.1f} "
+                f"CRC=0x{raw.crc:04x} raw={raw_hex}"
+            )
+
             pkt = LoRaPacket(
                 payload=bytes(raw.payload[:raw.size]),
                 size=raw.size,
@@ -369,7 +418,7 @@ class HalWrapper:
             packets.append(pkt)
 
         if packets:
-            logger.debug(f"[HAL] Received {len(packets)} packet(s)")
+            logger.info(f"[HAL] Received {len(packets)} packet(s)")
 
         return packets
 

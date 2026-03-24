@@ -769,7 +769,7 @@ def _setup_child_loggers(config: LoggingConfig) -> None:
         "collection": config.collection_level,
         "publish": config.publish_level,
         "system": config.level,
-        "loss": "WARNING",
+        "loss": getattr(config, 'loss_level', 'WARNING'),
         "error": "ERROR" if config.error_detail_enabled else "CRITICAL",
     }
 

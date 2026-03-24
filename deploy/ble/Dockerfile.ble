@@ -47,7 +47,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean
 
 COPY --from=builder /app/wheels /wheels
-RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
+RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels \
+    && pip uninstall -y pip wheel 2>/dev/null; \
+    rm -rf /usr/local/lib/python3.11/site-packages/pip* \
+           /usr/local/lib/python3.11/site-packages/wheel* \
+    && find /usr/local/lib/python3.11/site-packages \
+        \( -name '__pycache__' -o -name '*.pyc' \) \
+        -exec rm -rf {} + 2>/dev/null; true
 
 # 애플리케이션 코드 복사 (BLE 프로토콜)
 COPY --chown=collector:collector src/core/ ./src/core/

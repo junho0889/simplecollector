@@ -398,6 +398,8 @@ async def create_pipeline(
     # BLE 멀티디바이스 판별
     protocol_type = (config.collector.protocol.type.lower()
                      if config.collector.protocol else "")
+    has_ble_devices = (protocol_type == "ble" and
+                       bool(config.collector.devices))
     has_ble_mac = (protocol_type == "ble" and
                    any(t.mac_address for t in tags))
 
@@ -410,7 +412,7 @@ async def create_pipeline(
         publisher = ComponentFactory._create_demo_publisher(config)
     else:
         # 실제 모드
-        if has_ble_mac:
+        if has_ble_devices or has_ble_mac:
             from src.collectors.ble import BleMultiCollector
             collector = BleMultiCollector(
                 name=config.collector.name,
@@ -444,7 +446,7 @@ async def create_pipeline(
         logger.info(f"Created Publisher: {publisher.__class__.__name__}")
 
     # 파이프라인 생성
-    is_multi = config.collector.devices_file or has_ble_mac
+    is_multi = config.collector.devices_file or has_ble_devices or has_ble_mac
     pipeline_name = (
         f"Pipeline_{config.collector.name}"
         if is_multi
@@ -548,7 +550,11 @@ async def main(args: argparse.Namespace) -> int:
     tags_path = Path(config.collector.tags_file)
     if tags_path.exists():
         try:
-            tags = ConfigLoader.load_tags(tags_path)
+            # BLE devices 설정이 있으면 BLE 전용 로더 사용
+            if config.collector.devices:
+                tags = ConfigLoader.load_ble_tags(tags_path, config.collector.devices)
+            else:
+                tags = ConfigLoader.load_tags(tags_path)
             logger.info(f"Loaded {len(tags)} tags from: {tags_path}")
 
             # 그룹별 태그 수 로깅

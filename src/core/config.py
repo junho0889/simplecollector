@@ -103,6 +103,9 @@ class LoggingConfig:
     json_file_path: Optional[str] = None
     ecs_enabled: bool = True  # Elastic Common Schema
 
+    # 손실 로그 레벨 (WARNING=기본, ERROR=센서 미설치 시 숨김)
+    loss_level: str = "WARNING"
+
     # 상세 에러 로깅
     error_detail_enabled: bool = True
     include_traceback: bool = True
@@ -189,16 +192,16 @@ class ProtocolConfig:
 @dataclass
 class BleDeviceEntry:
     """
-    BLE 디바이스 엔트리 (devices CSV 한 행).
+    BLE 디바이스 엔트리 (YAML devices 또는 devices CSV 한 행).
 
     Attributes:
-        ble_id: BLE 센서 고유 ID (내부적으로 plc_id에 매핑)
+        device_id: 디바이스 고유 ID (publisher에서 plc_id로 매핑)
         mac_address: BLE MAC 주소
-        device_profile: 프로파일 이름 (posiot, posiot_v2 등)
+        device_profile: 프로파일 이름 (posiot, posiot_v2, pts-2305bp 등)
         device_name_filter: BLE LocalName 필터 (선택)
         description: 설명
     """
-    ble_id: int
+    device_id: int
     mac_address: str
     device_profile: str = "posiot"
     device_name_filter: str = ""
@@ -218,6 +221,7 @@ class CollectorConfig:
         collection_groups: 수집 그룹 리스트
         tags_file: 태그 정의 CSV 파일 경로
         devices_file: BLE 디바이스 목록 CSV 경로 (멀티디바이스 모드, 레거시)
+        devices: YAML에서 파싱된 BLE 디바이스 리스트 (devices_file보다 우선)
         mode: BLE 수집 모드 ("hardcoded": 프로파일 기반, "flexible": CSV byte_offset 기반)
     """
     plc_id: int = 0
@@ -232,6 +236,12 @@ class CollectorConfig:
     collection_groups: List[CollectionGroup] = field(default_factory=list)
     tags_file: str = "config/tags.csv"
     devices_file: Optional[str] = None
+    devices: List[BleDeviceEntry] = field(default_factory=list)
+
+    @property
+    def is_ble(self) -> bool:
+        """BLE 모드 여부 (ble_id 또는 devices 설정 시)."""
+        return self.ble_id is not None or bool(self.devices)
 
     @property
     def device_id(self) -> int:
@@ -240,13 +250,13 @@ class CollectorConfig:
 
     @property
     def device_type(self) -> str:
-        """디바이스 타입 (ble_id 설정 시 'ble', 아니면 'plc')."""
-        return "ble" if self.ble_id is not None else "plc"
+        """디바이스 타입 (BLE 모드면 'ble', 아니면 'plc')."""
+        return "ble" if self.is_ble else "plc"
 
     @property
     def device_id_key(self) -> str:
         """메시지 키 이름 ('ble_id' 또는 'plc_id')."""
-        return "ble_id" if self.ble_id is not None else "plc_id"
+        return "ble_id" if self.is_ble else "plc_id"
 
 
 @dataclass
@@ -425,6 +435,130 @@ class ConfigLoader:
                     continue
 
         logger.info(f"Loaded {len(tags)} tags")
+
+        # BLE 태그 검증 (mac_address가 있으면 BLE 태그로 판단)
+        ble_tags = [t for t in tags if t.mac_address]
+        if ble_tags:
+            addr_tags = [t for t in ble_tags if t.address and t.address != '0']
+            if addr_tags:
+                logger.warning(
+                    f"BLE 태그 {len(addr_tags)}개에 address 값이 설정되어 있습니다 "
+                    f"(tag_id: {', '.join(str(t.tag_id) for t in addr_tags[:5])}"
+                    f"{'...' if len(addr_tags) > 5 else ''}) "
+                    f"— BLE에서는 address가 무시되고 tag_name이 "
+                    f"프로파일 필드명으로 사용됩니다"
+                )
+            no_mode = [t for t in ble_tags if not t.ble_mode]
+            if no_mode:
+                logger.warning(
+                    f"BLE 태그 {len(no_mode)}/{len(ble_tags)}개에 mode 미설정 "
+                    f"— 자동 감지 모드로 동작합니다. "
+                    f"CSV에 'mode' 컬럼 추가를 권장합니다 "
+                    f"(예: pts-2305bp, pts-0624b, manual)"
+                )
+
+        return tags
+
+    @classmethod
+    def load_ble_tags(
+        cls,
+        tags_path: Union[str, Path],
+        devices: List['BleDeviceEntry'],
+    ) -> List[TagDefinition]:
+        """
+        BLE 전용 태그 CSV 로드 (device_id + tag_id 포맷).
+
+        CSV 컬럼:
+            device_id, tag_id, tag_name, data_type, collection_group,
+            scale, offset, decimals, unit, description
+
+        device_id로 YAML devices 리스트를 참조하여 mac_address, device_profile 자동 매핑.
+
+        Args:
+            tags_path: 태그 CSV 경로
+            devices: YAML에서 파싱된 BleDeviceEntry 리스트
+
+        Returns:
+            TagDefinition 리스트
+        """
+        tags_path = Path(tags_path)
+        if not tags_path.exists():
+            raise FileNotFoundError(f"Tags file not found: {tags_path}")
+
+        logger.info(f"Loading BLE tags from: {tags_path}")
+
+        # device_id → BleDeviceEntry 맵
+        device_map = {d.device_id: d for d in devices}
+
+        tags: List[TagDefinition] = []
+
+        def parse_optional_int(value: str) -> Optional[int]:
+            if value and value.strip():
+                try:
+                    return int(value.strip())
+                except ValueError:
+                    return None
+            return None
+
+        def parse_optional_float(value: str, default: float = 1.0) -> float:
+            if value and value.strip():
+                try:
+                    return float(value.strip())
+                except ValueError:
+                    return default
+            return default
+
+        with open(tags_path, 'r', encoding='utf-8-sig') as f:
+            lines = [line for line in f if not line.strip().startswith('#')]
+            reader = csv.DictReader(lines)
+
+            for row_num, row in enumerate(reader, start=2):
+                try:
+                    dev_id = int(row['device_id'])
+                    device = device_map.get(dev_id)
+                    if not device:
+                        logger.warning(
+                            f"Row {row_num}: device_id={dev_id} not found in YAML devices, skipped"
+                        )
+                        continue
+
+                    raw_type = row.get('data_type', 'float32').strip().upper()
+                    data_type = cls._resolve_data_type(raw_type, 16)
+
+                    tag = TagDefinition(
+                        tag_id=int(row['tag_id']),
+                        tag_name=row['tag_name'].strip(),
+                        address='',
+                        data_type=data_type,
+                        raw_type=raw_type,
+                        scale=parse_optional_float(row.get('scale', ''), 1.0),
+                        offset=parse_optional_float(row.get('offset', ''), 0.0),
+                        unit=row.get('unit', '').strip(),
+                        description=row.get('description', '').strip(),
+                        collection_group=row.get('collection_group', 'ble_data').strip(),
+                        decimals=parse_optional_int(row.get('decimals', '')),
+                        # BLE 필드 — YAML devices에서 매핑
+                        mac_address=device.mac_address,
+                        device_name_filter=device.device_name_filter,
+                        ble_mode=device.device_profile.lower(),
+                        device_id=dev_id,
+                    )
+                    tags.append(tag)
+                except Exception as e:
+                    logger.warning(f"Failed to parse BLE tag at row {row_num}: {e}")
+                    continue
+
+        # 디바이스별 태그 수 로그
+        from collections import Counter
+        dev_counts = Counter(t.device_id for t in tags)
+        for dev_id, count in sorted(dev_counts.items()):
+            device = device_map.get(dev_id)
+            logger.info(
+                f"  device_id={dev_id} mac={device.mac_address if device else '?'} "
+                f"tags={count}"
+            )
+
+        logger.info(f"Loaded {len(tags)} BLE tags across {len(dev_counts)} devices")
         return tags
 
     @classmethod
@@ -566,6 +700,19 @@ class ConfigLoader:
         ble_id_raw = collector_dict.get('ble_id')
         ble_id = int(ble_id_raw) if ble_id_raw is not None else None
 
+        # YAML devices 리스트 파싱 (BLE 멀티디바이스)
+        devices_list = collector_dict.get('devices', [])
+        devices = [
+            BleDeviceEntry(
+                device_id=int(d['device_id']),
+                mac_address=d['mac_address'].strip().upper(),
+                device_profile=d.get('device_profile', 'posiot').strip(),
+                device_name_filter=d.get('device_name_filter', '').strip(),
+                description=d.get('description', '').strip(),
+            )
+            for d in devices_list
+        ] if devices_list else []
+
         collector = CollectorConfig(
             plc_id=int(collector_dict.get('plc_id', 0)),
             ble_id=ble_id,
@@ -579,6 +726,7 @@ class ConfigLoader:
             collection_groups=collection_groups,
             tags_file=collector_dict.get('tags_file', 'config/tags.csv'),
             devices_file=collector_dict.get('devices_file'),
+            devices=devices,
         )
 
         # Publisher 설정
@@ -644,6 +792,8 @@ class ConfigLoader:
             json_enabled=logging_dict.get('json_enabled', False),
             json_file_path=logging_dict.get('json_file_path'),
             ecs_enabled=logging_dict.get('ecs_enabled', True),
+            # 손실 로그 레벨
+            loss_level=logging_dict.get('loss_level', 'WARNING'),
             # 상세 에러 로깅
             error_detail_enabled=logging_dict.get('error_detail_enabled', True),
             include_traceback=logging_dict.get('include_traceback', True),

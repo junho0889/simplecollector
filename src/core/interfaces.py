@@ -142,6 +142,7 @@ class TagDefinition:
     device_name_filter: str = ""       # BLE LocalName 필터 (선택)
     ble_mode: str = ""                 # BLE 파싱 모드 ("hardcoded" | "manual")
     byte_offset: Optional[str] = None  # BLE payload 바이트 슬라이스 (manual 모드, "0:2" 형식)
+    device_id: Optional[int] = None    # BLE device_id (YAML devices 또는 CSV device_id)
 
     @property
     def output_type(self) -> DataType:

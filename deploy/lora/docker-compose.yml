@@ -60,13 +60,11 @@ services:
   collector-lora:
     image: neuro_collector_lora:latest
     container_name: lora-collector
-    privileged: true                    # SPI 접근 필요
+    privileged: true                    # USB/SPI 접근 필요
     volumes:
       - ./collector_lora.yaml:/app/config/collector.yaml:ro
       - ./tags_lora.csv:/app/config/tags_lora.csv:ro
       - ./lib/libloragw.so:/app/lib/libloragw.so:ro
-    devices:
-      - /dev/spidev0.0:/dev/spidev0.0  # SPI 디바이스
     environment:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672

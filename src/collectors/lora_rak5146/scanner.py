@@ -113,17 +113,22 @@ class LoRaScanner:
         freq_hz: int = 923_300_000,
         cache_ttl: float = 30.0,
         poll_interval: float = 0.01,
+        com_path: Optional[str] = None,
+        com_type: Optional[str] = None,
     ) -> None:
         """
         스캐너 참조 획득. 첫 호출 시 HAL 초기화 + 수신 시작.
 
         Args:
             lib_path: libloragw.so 파일 경로
-            spi_path: SPI 디바이스 경로
+            spi_path: SPI 디바이스 경로 (하위 호환용)
             freq_hz: 중심 주파수 (Hz)
             cache_ttl: 패킷 캐시 만료 시간 (초)
             poll_interval: lgw_receive() 폴링 간격 (초)
+            com_path: 디바이스 경로 (USB: /dev/ttyACMx, SPI: /dev/spidev0.0)
+            com_type: 통신 타입 문자열 ("usb" 또는 "spi", None이면 자동 감지)
         """
+        actual_path = com_path or spi_path
         lock = await self._get_lock()
         async with lock:
             self._ref_count += 1
@@ -134,7 +139,7 @@ class LoRaScanner:
             if self._ref_count == 1:
                 self._cache_ttl = cache_ttl
                 self._poll_interval = poll_interval
-                await self._start(lib_path, spi_path, freq_hz)
+                await self._start(lib_path, actual_path, freq_hz, com_type)
             else:
                 if cache_ttl != self._cache_ttl:
                     logger.warning(
@@ -190,8 +195,9 @@ class LoRaScanner:
     async def _start(
         self,
         lib_path: str,
-        spi_path: str,
+        com_path: str,
         freq_hz: int,
+        com_type: Optional[str] = None,
     ) -> None:
         """HAL 초기화 + 수신 루프 시작."""
         if self._is_running:
@@ -202,7 +208,13 @@ class LoRaScanner:
         if not self._hal.load():
             raise RuntimeError("HAL library load failed")
 
-        if not self._hal.configure(spi_path=spi_path, freq_hz=freq_hz):
+        # com_type 문자열 → ComType enum 변환
+        from .hal_wrapper import ComType as HalComType
+        hal_com_type = None
+        if com_type:
+            hal_com_type = HalComType.USB if com_type.lower() == "usb" else HalComType.SPI
+
+        if not self._hal.configure(com_path=com_path, freq_hz=freq_hz, com_type=hal_com_type):
             raise RuntimeError("HAL configure failed")
 
         if not self._hal.start():
@@ -243,6 +255,10 @@ class LoRaScanner:
         backoff = 0.01
         max_backoff = 5.0
         cleanup_counter = 0
+        poll_count = 0
+        log_interval = 300  # 300회(~30초)마다 상태 로그
+
+        logger.info("[LoRaScanner] Receive loop started, polling lgw_receive()...")
 
         while self._is_running:
             try:
@@ -251,6 +267,7 @@ class LoRaScanner:
 
                 # non-blocking 수신
                 packets = self._hal.receive()
+                poll_count += 1
 
                 for pkt in packets:
                     self._process_packet(pkt)
@@ -264,9 +281,16 @@ class LoRaScanner:
 
                 await asyncio.sleep(backoff)
 
-                # 100 루프마다 캐시 정리
+                # 주기적 상태 로그 (패킷 없을 때도 살아있음 확인)
                 cleanup_counter += 1
-                if cleanup_counter >= 100:
+                if cleanup_counter >= log_interval:
+                    logger.debug(
+                        f"[LoRaScanner] POLL_STATUS | polls={poll_count} "
+                        f"total_rx={self._total_received} "
+                        f"crc_err={self._total_crc_error} "
+                        f"cached={len(self._pkt_cache)} "
+                        f"backoff={backoff:.3f}s"
+                    )
                     self._cleanup_expired_cache()
                     cleanup_counter = 0
 
@@ -282,26 +306,32 @@ class LoRaScanner:
     def _process_packet(self, pkt: LoRaPacket) -> None:
         """수신 패킷 처리 → 캐시 저장."""
         self._total_received += 1
+        now = datetime.now()
 
         # CRC 체크
         if not pkt.crc_ok:
             self._total_crc_error += 1
-            logger.debug(
-                f"[LoRaScanner] CRC error (freq={pkt.freq_hz}, "
-                f"rssi={pkt.rssi:.1f})"
+            raw_hex = pkt.payload[:pkt.size].hex() if pkt.size > 0 else ""
+            logger.warning(
+                f"[LoRaScanner] CRC_FAIL | size={pkt.size}B "
+                f"freq={pkt.freq_hz} SF={pkt.datarate} "
+                f"RSSI={pkt.rssi:.1f} SNR={pkt.snr:.1f} "
+                f"raw={raw_hex}"
             )
             return
 
         # 페이로드 길이 확인 (최소 2바이트: device_id + 데이터)
         if pkt.size < 2:
-            logger.debug(
-                f"[LoRaScanner] Packet too short: {pkt.size} bytes"
+            logger.warning(
+                f"[LoRaScanner] PKT_SHORT | size={pkt.size}B "
+                f"raw={pkt.payload[:pkt.size].hex()}"
             )
             return
 
         # device_id 추출 (첫 바이트)
         device_id = pkt.payload[0]
         data_payload = pkt.payload[1:]
+        raw_hex = pkt.payload[:pkt.size].hex()
 
         entry = LoRaPacketEntry(
             device_id=device_id,
@@ -311,14 +341,17 @@ class LoRaScanner:
             snr=pkt.snr,
             freq_hz=pkt.freq_hz,
             datarate=pkt.datarate,
-            timestamp=datetime.now(),
+            timestamp=now,
         )
 
         self._pkt_cache[device_id] = entry
 
-        logger.debug(
-            f"[LoRaScanner] Device {device_id}: "
-            f"{len(data_payload)}B, RSSI={pkt.rssi:.1f}, SNR={pkt.snr:.1f}"
+        logger.info(
+            f"[LoRaScanner] RX | dev={device_id} size={pkt.size}B "
+            f"RSSI={pkt.rssi:.1f} SNR={pkt.snr:.1f} "
+            f"freq={pkt.freq_hz} SF={pkt.datarate} "
+            f"time={now.strftime('%H:%M:%S.%f')[:-3]} "
+            f"raw={raw_hex}"
         )
 
     def _cleanup_expired_cache(self) -> None:

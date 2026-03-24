@@ -32,7 +32,7 @@ PUBLISHER_TAR = SCRIPT_DIR / "neuro_publisher.tar"
 # ============================================================================
 # 배포 설정
 # ============================================================================
-PI_HOST = "pi@192.168.1.2"
+PI_HOST = "pi@192.168.0.14"
 PI_DEPLOY_DIR = "/home/pi/deploy/ble"
 
 # 배포할 파일 목록
@@ -162,8 +162,8 @@ def deploy_to_pi() -> bool:
         "서비스 상태"
     )
 
-    print(f"\n  Node-RED: http://192.168.1.2:1881")
-    print(f"  RabbitMQ: http://192.168.1.2:15682 (admin/admin)")
+    print(f"\n  Node-RED: http://192.168.0.14:1882")
+    print(f"  RabbitMQ: http://192.168.0.14:15682 (admin/admin)")
     return True
 
 

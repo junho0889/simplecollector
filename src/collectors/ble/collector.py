@@ -12,7 +12,7 @@ Connection Model:
 YAML Config (protocol.extra):
     mac_address: "AA:BB:CC:DD:EE:FF"    # 대상 디바이스 MAC (필수)
     device_name_filter: "POSIOT"         # 이름 필터 (선택)
-    device_profile: "posiot"             # 프로파일 이름 (기본 "posiot")
+    device_profile: "pts-2305bp"          # 프로파일 이름 (기본 "pts-2305bp")
     cache_ttl: 30.0                      # 캐시 만료 (초)
     duplicate_filter_s: 4.0              # 중복 필터 (초)
 """
@@ -50,7 +50,7 @@ class BleCollector(BaseCollector):
         extra = self._protocol_config.extra if self._protocol_config else {}
         self._mac_address: str = extra.get('mac_address', '').upper()
         self._device_name_filter: str = extra.get('device_name_filter', '')
-        self._device_profile: str = extra.get('device_profile', 'posiot')
+        self._device_profile: str = extra.get('device_profile', 'pts-2305bp')
         self._cache_ttl: float = float(extra.get('cache_ttl', 30.0))
         self._duplicate_filter_s: float = float(
             extra.get('duplicate_filter_s', 4.0)

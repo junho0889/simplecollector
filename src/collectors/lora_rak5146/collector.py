@@ -10,7 +10,8 @@ Connection Model:
     - collect()  = LoRaScanner 캐시에서 최신 패킷 조회
 
 YAML Config (protocol.extra):
-    device_id: 1                              # 대상 end device ID (필수, 1~255)
+    device_ids: [1, 2, 3]                     # 대상 end device ID 리스트 (1~255)
+    device_id: 1                              # 단일 디바이스 하위호환 (device_ids 우선)
     device_profile: "posiot_lora"             # 프로파일 이름 (기본 "posiot_lora")
     lib_path: "/app/lib/libloragw.so"         # HAL 라이브러리 경로
     spi_path: "/dev/spidev0.0"                # SPI 디바이스 경로
@@ -21,7 +22,7 @@ YAML Config (protocol.extra):
 
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Dict, List, Optional
 
 from ..base import BaseCollector
 from ...core.config import CollectorConfig
@@ -36,7 +37,7 @@ class LoRaRak5146Collector(BaseCollector):
     """
     LoRa RAK5146 수집기.
 
-    하나의 end device (device_id)에서 LoRa 패킷을 수집합니다.
+    여러 end device에서 LoRa 패킷을 수집합니다 (라운드 로빈).
     LoRaScanner 싱글톤을 통해 HAL 수신 데이터를 공유합니다.
     """
 
@@ -50,19 +51,30 @@ class LoRaRak5146Collector(BaseCollector):
         super().__init__(plc_id, name, config, event_bus)
 
         extra = self._protocol_config.extra if self._protocol_config else {}
-        self._device_id: int = int(extra.get('device_id', 0))
+
+        # 멀티디바이스: device_ids 우선, 없으면 device_id 하위호환
+        device_ids_raw = extra.get('device_ids')
+        if device_ids_raw and isinstance(device_ids_raw, list):
+            self._device_ids: List[int] = [int(d) for d in device_ids_raw]
+        else:
+            single_id = int(extra.get('device_id', 0))
+            self._device_ids = [single_id] if single_id else []
+
         self._device_profile: str = extra.get('device_profile', 'posiot_lora')
         self._lib_path: str = extra.get('lib_path', '/app/lib/libloragw.so')
         self._spi_path: str = extra.get('spi_path', '/dev/spidev0.0')
+        self._com_path: Optional[str] = extra.get('com_path')  # USB: /dev/ttyACMx
+        self._com_type: Optional[str] = extra.get('com_type')  # "usb" or "spi"
         self._freq_hz: int = int(extra.get('freq_hz', 923_300_000))
         self._cache_ttl: float = float(extra.get('cache_ttl', 30.0))
         self._poll_interval: float = float(extra.get('poll_interval', 0.01))
 
         self._scanner: Optional[LoRaScanner] = None
+        self._rr_index: Dict[str, int] = {}  # 그룹별 라운드 로빈 인덱스
 
-        if not self._device_id:
+        if not self._device_ids:
             logger.warning(
-                f"[{self._name}] device_id not configured in protocol.extra"
+                f"[{self._name}] No device_id(s) configured in protocol.extra"
             )
 
     async def _do_connect(self) -> bool:
@@ -75,11 +87,13 @@ class LoRaRak5146Collector(BaseCollector):
                 freq_hz=self._freq_hz,
                 cache_ttl=self._cache_ttl,
                 poll_interval=self._poll_interval,
+                com_path=self._com_path,
+                com_type=self._com_type,
             )
 
             logger.info(
                 f"[{self._name}] LoRa scanner acquired, "
-                f"device_id={self._device_id} "
+                f"device_ids={self._device_ids} "
                 f"(profile={self._device_profile})"
             )
             return True
@@ -103,33 +117,43 @@ class LoRaRak5146Collector(BaseCollector):
             logger.info(f"[{self._name}] LoRa scanner released")
 
     async def _do_collect(self, group: str) -> Optional[CollectedData]:
-        """LoRaScanner 캐시에서 최신 패킷 데이터 조회."""
-        if not self._scanner or not self._device_id:
+        """LoRaScanner 캐시에서 최신 패킷 데이터 조회 (라운드 로빈)."""
+        if not self._scanner or not self._device_ids:
             return None
 
-        entry = self._scanner.get_latest(self._device_id)
+        n = len(self._device_ids)
+        idx = self._rr_index.get(group, 0)
 
-        if entry is None:
-            return None
+        for _ in range(n):
+            dev_id = self._device_ids[idx % n]
+            idx += 1
+            entry = self._scanner.get_latest(dev_id)
+            if entry is not None:
+                self._rr_index[group] = idx
+                return CollectedData(
+                    source_time=entry.timestamp,
+                    collection_time=datetime.now(),
+                    plc_id=self._plc_id,
+                    raw_data=entry.payload,
+                    collection_group=group,
+                    metadata={
+                        'device_id': entry.device_id,
+                        'rssi': entry.rssi,
+                        'snr': entry.snr,
+                        'freq_hz': entry.freq_hz,
+                        'datarate': entry.datarate,
+                        'device_profile': self._device_profile,
+                    },
+                )
 
-        return CollectedData(
-            source_time=entry.timestamp,
-            collection_time=datetime.now(),
-            plc_id=self._plc_id,
-            raw_data=entry.payload,
-            collection_group=group,
-            metadata={
-                'device_id': entry.device_id,
-                'rssi': entry.rssi,
-                'snr': entry.snr,
-                'freq_hz': entry.freq_hz,
-                'datarate': entry.datarate,
-                'device_profile': self._device_profile,
-            },
-        )
+        self._rr_index[group] = idx
+        return None
 
     async def _do_health_check(self) -> bool:
-        """디바이스가 최근 TTL 내에 패킷을 보냈는지 확인."""
-        if not self._scanner or not self._device_id:
+        """아무 디바이스라도 최근 TTL 내에 패킷을 보냈는지 확인."""
+        if not self._scanner or not self._device_ids:
             return False
-        return self._scanner.is_device_available(self._device_id)
+        return any(
+            self._scanner.is_device_available(dev_id)
+            for dev_id in self._device_ids
+        )
