@@ -25,7 +25,7 @@ from ..base import BaseCollector
 from ...core.config import CollectorConfig, CollectionGroup, BleDeviceEntry
 from ...core.events import EventBus
 from ...core.interfaces import CollectedData, TagDefinition
-from .scanner import BleScanner
+from .scanner import BleScanner, _sanitize_float
 
 logger = logging.getLogger('collector.collection')
 
@@ -68,9 +68,13 @@ class BleMultiCollector(BaseCollector):
         self._build_device_map(config.devices, tags)
 
         extra = self._protocol_config.extra if self._protocol_config else {}
-        self._cache_ttl: float = float(extra.get('cache_ttl', 30.0))
-        self._duplicate_filter_s: float = float(
-            extra.get('duplicate_filter_s', 4.0)
+        self._cache_ttl: float = _sanitize_float(
+            extra.get('cache_ttl', 30.0), 30.0, "cache_ttl",
+            allow_zero=False,
+        )
+        self._duplicate_filter_s: float = _sanitize_float(
+            extra.get('duplicate_filter_s', 4.0), 4.0, "duplicate_filter_s",
+            allow_zero=True,
         )
 
         self._scanner: Optional[BleScanner] = None
@@ -97,10 +101,24 @@ class BleMultiCollector(BaseCollector):
         devices: List[BleDeviceEntry],
         tags: List[TagDefinition],
     ) -> None:
-        """YAML devices + CSV 태그에서 디바이스 맵 구축."""
+        """YAML devices + CSV 태그에서 디바이스 맵 구축.
+
+        설정 오류(orphan 디바이스 / orphan 태그)를 startup log로 노출해
+        silently data loss 방지.
+        """
         # YAML devices 기본 등록
         for d in devices:
+            if not d.mac_address:
+                logger.warning(
+                    f"[{self._name}] device_id={d.device_id} has empty mac_address — skip"
+                )
+                continue
             mac = d.mac_address.upper()
+            if mac in self._devices:
+                logger.warning(
+                    f"[{self._name}] duplicate mac_address {mac} "
+                    f"(device_id={d.device_id}) — overwriting earlier entry"
+                )
             self._devices[mac] = BleDeviceInfo(
                 device_id=d.device_id,
                 mac_address=mac,
@@ -111,17 +129,42 @@ class BleMultiCollector(BaseCollector):
             )
             self._device_id_to_mac[d.device_id] = mac
 
-        # CSV 태그에서 태그 카운트 집계
+        # CSV 태그에서 태그 카운트 집계 + orphan 태그 감지
+        orphan_device_ids: set = set()
+        orphan_macs: set = set()
         for tag in tags:
             if tag.device_id is not None:
                 mac = self._device_id_to_mac.get(tag.device_id)
                 if mac and mac in self._devices:
                     self._devices[mac].tag_count += 1
+                else:
+                    orphan_device_ids.add(tag.device_id)
             elif tag.mac_address:
                 # 레거시: mac_address가 CSV에 있는 경우 (하위 호환)
                 mac = tag.mac_address.upper()
                 if mac in self._devices:
                     self._devices[mac].tag_count += 1
+                else:
+                    orphan_macs.add(mac)
+
+        # 설정 오류 경고
+        if orphan_device_ids:
+            logger.warning(
+                f"[{self._name}] CSV tags reference unknown device_id(s) "
+                f"{sorted(orphan_device_ids)} (not in YAML devices) — these tags ignored"
+            )
+        if orphan_macs:
+            logger.warning(
+                f"[{self._name}] CSV tags reference unknown mac_address(es) "
+                f"{sorted(orphan_macs)} (not in YAML devices) — these tags ignored"
+            )
+        # 태그 없는 디바이스 (설정 오류일 가능성)
+        for mac, info in self._devices.items():
+            if info.tag_count == 0:
+                logger.warning(
+                    f"[{self._name}] device_id={info.device_id} mac={mac} "
+                    f"has 0 tags in CSV — device will be collected but no data published"
+                )
 
     async def _do_connect(self) -> bool:
         """BLE 스캐너 참조 획득."""

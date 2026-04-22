@@ -25,11 +25,36 @@ Usage:
 
 import asyncio
 import logging
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger('collector.collection')
+
+
+def _sanitize_float(
+    value: Any, default: float, name: str,
+    allow_zero: bool = False,
+) -> float:
+    """음수/NaN 방어. 유효하지 않으면 default로 폴백.
+
+    allow_zero=False: 0도 유효하지 않음 (예: cache_ttl)
+    allow_zero=True:  0은 허용 (예: duplicate_filter_s=0 → 필터 비활성)
+    """
+    try:
+        v = float(value)
+        if v != v:  # NaN
+            raise ValueError("NaN")
+        min_val = 0.0 if allow_zero else 1e-9
+        if v >= min_val:
+            return v
+    except (TypeError, ValueError):
+        pass
+    logger.warning(
+        f"[BleScanner] {name}={value!r} invalid, falling back to {default}"
+    )
+    return default
 
 
 @dataclass
@@ -111,8 +136,13 @@ class BleScanner:
 
             if self._ref_count == 1:
                 # 첫 acquire — 설정 적용 및 시작
-                self._cache_ttl = cache_ttl
-                self._duplicate_filter_s = duplicate_filter_s
+                # 음수/NaN 방어: 정리 로직(age > ttl*2)이 망가지지 않도록 보장
+                self._cache_ttl = _sanitize_float(
+                    cache_ttl, 30.0, "cache_ttl", allow_zero=False,
+                )
+                self._duplicate_filter_s = _sanitize_float(
+                    duplicate_filter_s, 4.0, "duplicate_filter_s", allow_zero=True,
+                )
                 await self._start_scanning()
             else:
                 if cache_ttl != self._cache_ttl:
@@ -139,6 +169,8 @@ class BleScanner:
 
         TTL 초과 시 None 반환.
         """
+        if not mac_address:
+            return None
         mac = mac_address.upper()
         entry = self._adv_cache.get(mac)
 
@@ -154,7 +186,9 @@ class BleScanner:
 
     def is_device_available(self, mac_address: str) -> bool:
         """디바이스가 TTL 내에 보였는지 확인."""
-        return self.get_latest(mac_address.upper()) is not None
+        if not mac_address:
+            return False
+        return self.get_latest(mac_address) is not None
 
     # =========================================================================
     # 내부 메서드
@@ -251,38 +285,56 @@ class BleScanner:
 
         BLE advertisement 수신 시 호출됩니다.
         중복 필터 적용 후 캐시를 갱신합니다.
+
+        콜백은 Bleak 내부 태스크에서 호출되므로 예외를 반드시 흡수해야 합니다
+        — 여기서 예외가 escape되면 Bleak이 스캐너를 중단시킬 수 있습니다.
         """
-        import time
-
-        mac = device.address.upper()
-        now = time.time()
-
-        # 중복 필터
-        if mac in self._last_seen:
-            if now - self._last_seen[mac] < self._duplicate_filter_s:
+        try:
+            raw_addr = getattr(device, 'address', None)
+            if not raw_addr:
                 return
+            mac = str(raw_addr).upper()
 
-        self._last_seen[mac] = now
+            # 중복 필터 — monotonic clock 사용 (시계 점프 영향 없음)
+            now = time.monotonic()
+            if self._duplicate_filter_s > 0 and mac in self._last_seen:
+                if now - self._last_seen[mac] < self._duplicate_filter_s:
+                    return
+            self._last_seen[mac] = now
 
-        # manufacturer_data 변환 (Bleak은 dict[int, bytes] 반환)
-        mfr_data: Dict[int, bytes] = {}
-        if hasattr(adv_data, 'manufacturer_data') and adv_data.manufacturer_data:
-            mfr_data = dict(adv_data.manufacturer_data)
+            # manufacturer_data 변환 (Bleak은 dict[int, bytes] 반환)
+            mfr_data: Dict[int, bytes] = {}
+            if hasattr(adv_data, 'manufacturer_data') and adv_data.manufacturer_data:
+                mfr_data = dict(adv_data.manufacturer_data)
 
-        entry = AdvertisementEntry(
-            mac_address=mac,
-            device_name=device.name,
-            rssi=adv_data.rssi if hasattr(adv_data, 'rssi') else 0,
-            manufacturer_data=mfr_data,
-            timestamp=datetime.now(),
-        )
+            device_name = getattr(device, 'name', None)
+            rssi_raw = getattr(adv_data, 'rssi', 0)
+            try:
+                rssi = int(rssi_raw) if rssi_raw is not None else 0
+            except (TypeError, ValueError):
+                rssi = 0
 
-        self._adv_cache[mac] = entry
+            entry = AdvertisementEntry(
+                mac_address=mac,
+                device_name=device_name,
+                rssi=rssi,
+                manufacturer_data=mfr_data,
+                timestamp=datetime.now(),
+            )
 
-        logger.debug(
-            f"[BleScanner] {mac} ({device.name}) "
-            f"RSSI={entry.rssi} mfr_keys={list(mfr_data.keys())}"
-        )
+            self._adv_cache[mac] = entry
+
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    f"[BleScanner] {mac} ({device_name}) "
+                    f"RSSI={rssi} mfr_keys={list(mfr_data.keys())}"
+                )
+
+        except Exception as e:
+            # 콜백 예외는 로그만 남기고 흡수 (스캐너 중단 방지)
+            logger.warning(
+                f"[BleScanner] detection_callback error: {e.__class__.__name__}: {e}"
+            )
 
     def _cleanup_expired_cache(self) -> None:
         """만료된 캐시 엔트리 정리."""

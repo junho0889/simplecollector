@@ -25,7 +25,7 @@ from ..base import BaseCollector
 from ...core.config import CollectorConfig
 from ...core.events import EventBus
 from ...core.interfaces import CollectedData
-from .scanner import BleScanner
+from .scanner import BleScanner, _sanitize_float
 
 logger = logging.getLogger('collector.collection')
 
@@ -48,12 +48,19 @@ class BleCollector(BaseCollector):
         super().__init__(plc_id, name, config, event_bus)
 
         extra = self._protocol_config.extra if self._protocol_config else {}
-        self._mac_address: str = extra.get('mac_address', '').upper()
-        self._device_name_filter: str = extra.get('device_name_filter', '')
-        self._device_profile: str = extra.get('device_profile', 'pts-2305bp')
-        self._cache_ttl: float = float(extra.get('cache_ttl', 30.0))
-        self._duplicate_filter_s: float = float(
-            extra.get('duplicate_filter_s', 4.0)
+        raw_mac = extra.get('mac_address') or ''
+        self._mac_address: str = str(raw_mac).upper()
+        self._device_name_filter: str = str(extra.get('device_name_filter') or '')
+        self._device_profile: str = str(
+            extra.get('device_profile') or 'pts-2305bp'
+        )
+        self._cache_ttl: float = _sanitize_float(
+            extra.get('cache_ttl', 30.0), 30.0, "cache_ttl",
+            allow_zero=False,
+        )
+        self._duplicate_filter_s: float = _sanitize_float(
+            extra.get('duplicate_filter_s', 4.0), 4.0, "duplicate_filter_s",
+            allow_zero=True,
         )
 
         self._scanner: Optional[BleScanner] = None

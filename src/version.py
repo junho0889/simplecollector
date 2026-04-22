@@ -14,13 +14,25 @@ from typing import Dict, List, Tuple
 # Application Version
 # =============================================================================
 APP_NAME = "Simple Collector"
-APP_VERSION = "0.3.3"
-APP_BUILD_DATE = "2026-03-21"
+APP_VERSION = "0.3.4"
+APP_BUILD_DATE = "2026-04-22"
 
 # =============================================================================
 # Changelog
 # =============================================================================
 CHANGELOG: List[Dict[str, str]] = [
+    {
+        "version": "0.3.4",
+        "date": "2026-04-22",
+        "changes": (
+            "BLE 예외 처리 보강 — cache_ttl/duplicate_filter_s 입력 검증 "
+            "(음수/NaN/invalid → default), scanner detection_callback 전체 "
+            "예외 흡수 + null 가드(device.address/.name), monotonic clock 사용 "
+            "(시계 점프 내성), byte_offset 파싱 방어('1:'/'x:y'/'2:0' 등 말포먼드), "
+            "BleMultiCollector 설정 오류 경고 (orphan device_id/mac, 태그 없는 "
+            "디바이스). on_change 모드 적용은 collector_ble.yaml에서."
+        ),
+    },
     {
         "version": "0.3.3",
         "date": "2026-03-21",

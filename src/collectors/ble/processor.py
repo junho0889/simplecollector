@@ -198,10 +198,19 @@ class BleProcessor(BaseProcessor):
                     best_result = result
                     best_name = name
             except Exception as e:
+                # 자동 감지 중에는 일부 프로파일이 실패하는 게 정상 (다른 센서용)
+                # 그러나 완전한 미매칭은 runtime 문제이므로 DEBUG로 유지 + warning 한번만
                 logger.debug(
-                    f"[{self._name}] Profile '{name}' parse failed: {e}"
+                    f"[{self._name}] Profile '{name}' parse raised "
+                    f"{e.__class__.__name__}: {e}"
                 )
                 continue
+
+        if not best_result:
+            logger.warning(
+                f"[{self._name}] Auto-detect: no profile matched "
+                f"company_id=0x{company_id:04X} ({len(raw_bytes)}B)"
+            )
 
         mac = metadata.get('mac_address', '').upper()
         if mac:
@@ -265,14 +274,26 @@ class BleProcessor(BaseProcessor):
             # 슬라이스 파싱
             if ':' in byte_offset:
                 parts = byte_offset.split(':')
-                start = int(parts[0])
-                end = int(parts[1])
+                if len(parts) != 2 or not parts[0].strip() or not parts[1].strip():
+                    logger.warning(
+                        f"[{self._name}] manual parse: byte_offset='{byte_offset}' "
+                        f"malformed (expected 'start:end' with both values)"
+                    )
+                    return None
+                start = int(parts[0].strip())
+                end = int(parts[1].strip())
+                if end <= start:
+                    logger.warning(
+                        f"[{self._name}] manual parse: byte_offset='{byte_offset}' "
+                        f"end({end}) <= start({start})"
+                    )
+                    return None
             else:
-                start = int(byte_offset)
+                start = int(byte_offset.strip())
                 fmt = _STRUCT_FORMAT.get(data_type)
                 end = start + (struct.calcsize(fmt) if fmt else data_type.byte_size)
 
-            if start >= len(raw_bytes):
+            if start < 0 or start >= len(raw_bytes):
                 return None
 
             chunk = raw_bytes[start:end]
@@ -289,9 +310,9 @@ class BleProcessor(BaseProcessor):
             # fallback: 정수로 해석
             return int.from_bytes(chunk, byteorder='little', signed=False)
 
-        except (ValueError, struct.error) as e:
+        except (ValueError, struct.error, TypeError) as e:
             logger.warning(
                 f"[{self._name}] manual parse error: "
-                f"byte_offset={byte_offset}, error={e}"
+                f"byte_offset={byte_offset!r}, data_type={data_type}, error={e}"
             )
             return None
