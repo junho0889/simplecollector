@@ -2,7 +2,7 @@
   "name": "neuro_publisher",
   "display_name": "Collector Publisher Service",
   "description": "RabbitMQ 소비자 → Database(TimescaleDB) / MQTT 포워더 서비스",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "docker_image": "neuro_publisher",
   "service_type": "publisher",
   "icon": "database",

@@ -57,23 +57,36 @@
 -- 그룹별 공통 객체 ({group} 플레이스홀더 — 모든 그룹에 대해 반복 실행)
 -- ============================================================================
 
--- {group}_latest + {group}_master + plc_master 조인 뷰
+-- {group}_latest + {group}_master + plc_master 조인 뷰 (PLC 그룹 전용)
 -- 용도: 최신값 조회 시 PLC명 + 태그 메타정보를 함께 표시
-CREATE OR REPLACE VIEW {schema}.vw_{group}_latest AS
-SELECT
-    l.plc_id,
-    p.plc_name,
-    p.description                AS plc_description,
-    l.tag_id,
-    m.tag_name,
-    m.description                AS tag_description,
-    l.v_bool, l.v_int, l.v_bigint, l.v_float, l.v_text,
-    l.quality_code
-FROM {schema}.{group}_latest l
-LEFT JOIN {schema}.{group}_master m
-    ON l.plc_id = m.plc_id AND l.tag_id = m.tag_id
-LEFT JOIN {schema}.plc_master p
-    ON l.plc_id = p.plc_id;
+-- BLE 그룹은 plc_id 컬럼이 없으므로 컬럼 존재 여부로 가드 (BLE는 아래 별도 블록 사용)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = '{schema}'
+          AND table_name = '{group}_latest'
+          AND column_name = 'plc_id'
+    ) THEN
+        EXECUTE $sql$
+            CREATE OR REPLACE VIEW {schema}.vw_{group}_latest AS
+            SELECT
+                l.plc_id,
+                p.plc_name,
+                p.description                AS plc_description,
+                l.tag_id,
+                m.tag_name,
+                m.description                AS tag_description,
+                l.v_bool, l.v_int, l.v_bigint, l.v_float, l.v_text,
+                l.quality_code
+            FROM {schema}.{group}_latest l
+            LEFT JOIN {schema}.{group}_master m
+                ON l.plc_id = m.plc_id AND l.tag_id = m.tag_id
+            LEFT JOIN {schema}.plc_master p
+                ON l.plc_id = p.plc_id
+        $sql$;
+    END IF;
+END $$;
 
 -- {group}_master 수정 시 updated_at 자동 갱신 트리거
 CREATE OR REPLACE FUNCTION {schema}.{group}_master_updated_at()
@@ -89,6 +102,46 @@ CREATE TRIGGER trg_{group}_master_updated_at
     BEFORE UPDATE ON {schema}.{group}_master
     FOR EACH ROW
     EXECUTE FUNCTION {schema}.{group}_master_updated_at();
+
+
+-- ============================================================================
+-- BLE 전용 뷰 ({group} 템플릿 밖에서 1회만 실행)
+-- ============================================================================
+-- 용도: BLE 최신값 조회 시 디바이스명 + 태그 메타정보를 함께 표시
+-- 존재 여부로 가드 — ble_data 그룹이 배포되지 않은 환경에서도 에러 없이 스킵
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = '{schema}' AND table_name = 'ble_data_latest'
+    ) AND EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = '{schema}' AND table_name = 'ble_master'
+    ) THEN
+        EXECUTE $sql$
+            CREATE OR REPLACE VIEW {schema}.vw_ble_data_latest AS
+            SELECT
+                l.ble_id,
+                b.ble_name,
+                b.mac_address,
+                b.device_profile,
+                b.description                AS ble_description,
+                l.tag_id,
+                m.tag_name,
+                m.unit,
+                m.description                AS tag_description,
+                l.v_bool, l.v_int, l.v_bigint, l.v_float, l.v_text,
+                l.quality_code,
+                l.timestamp,
+                l.updated_at
+            FROM {schema}.ble_data_latest l
+            LEFT JOIN {schema}.ble_data_master m
+                ON l.ble_id = m.ble_id AND l.tag_id = m.tag_id
+            LEFT JOIN {schema}.ble_master b
+                ON l.ble_id = b.ble_id
+        $sql$;
+    END IF;
+END $$;
 
 
 -- ============================================================================
@@ -427,7 +480,7 @@ CREATE TABLE IF NOT EXISTS {schema}.tb_prod_shift_current (
     auto_run_min        NUMERIC(10,2) DEFAULT 0,    -- 자동운전 누적시간 (분)
 
     -- 계산값 (트리거에서 자동 갱신)
-    production_rate    NUMERIC(8,2) DEFAULT 0,     -- 생산률(%) = shift_production / target_qty * 100
+    production_rate    NUMERIC(8,2) DEFAULT 0,     -- 생산률(%) = (shift_production - shift_ng_qty) / target_qty * 100
     first_pass_yield    NUMERIC(8,2) DEFAULT 0,     -- 직행률(%) = (shift_production - shift_ng_qty) / shift_production * 100
     alm_operating_rate  NUMERIC(8,2) DEFAULT 0,     -- 알람 가동률(%) = (target_time - alm_downtime) / target_time * 100
     action_operating_rate NUMERIC(8,2) DEFAULT 0,   -- 액션 가동률(%)
@@ -619,14 +672,14 @@ BEGIN
     SELECT l.v_bool INTO v_manual_mode FROM {schema}.plc_data_latest l
         JOIN {schema}.plc_data_master m ON m.plc_id = l.plc_id AND m.tag_id = l.tag_id
         WHERE l.plc_id = NEW.plc_id AND m.tag_name = 'Y402' LIMIT 1;
-    SELECT l.v_bool INTO v_tl_red      FROM {schema}.plc_data_latest l
-        JOIN {schema}.plc_data_master m ON m.plc_id = l.plc_id AND m.tag_id = l.tag_id
+    SELECT l.v_bool INTO v_tl_red      FROM {schema}.tl_data_latest l
+        JOIN {schema}.tl_data_master m ON m.plc_id = l.plc_id AND m.tag_id = l.tag_id
         WHERE l.plc_id = NEW.plc_id AND m.tag_name = 'Y40C' LIMIT 1;
-    SELECT l.v_bool INTO v_tl_green    FROM {schema}.plc_data_latest l
-        JOIN {schema}.plc_data_master m ON m.plc_id = l.plc_id AND m.tag_id = l.tag_id
+    SELECT l.v_bool INTO v_tl_green    FROM {schema}.tl_data_latest l
+        JOIN {schema}.tl_data_master m ON m.plc_id = l.plc_id AND m.tag_id = l.tag_id
         WHERE l.plc_id = NEW.plc_id AND m.tag_name = 'Y40D' LIMIT 1;
-    SELECT l.v_bool INTO v_tl_yellow   FROM {schema}.plc_data_latest l
-        JOIN {schema}.plc_data_master m ON m.plc_id = l.plc_id AND m.tag_id = l.tag_id
+    SELECT l.v_bool INTO v_tl_yellow   FROM {schema}.tl_data_latest l
+        JOIN {schema}.tl_data_master m ON m.plc_id = l.plc_id AND m.tag_id = l.tag_id
         WHERE l.plc_id = NEW.plc_id AND m.tag_name = 'Y40E' LIMIT 1;
 
     -- line_id 조회 (plc_master에서)
@@ -801,6 +854,18 @@ BEGIN
             -- PLC 카운터 리셋: 기존 생산량 보존 + 리셋 후 값 합산
             -- run_start를 -(기존생산량)으로 보정 → 이후 공식 동일하게 동작
             v_shift_val := v_cur.shift_production + v_new_val;
+            -- 리셋 로그 기록
+            INSERT INTO {schema}.tb_prod_reset_log (
+                plc_id, reset_type, shift_type,
+                before_accumulated, after_value,
+                shift_production, shift_ok_qty, shift_ng_qty
+            ) VALUES (
+                NEW.plc_id, 'prod', v_cur.shift_type,
+                v_cur.prod_accumulated, v_new_val,
+                v_cur.shift_production,
+                v_cur.shift_production - v_cur.shift_ng_qty,
+                v_cur.shift_ng_qty
+            );
         ELSE
             v_shift_val := v_new_val - v_cur.prod_run_start;
         END IF;
@@ -811,9 +876,9 @@ BEGIN
                                     THEN -(v_shift_val - v_new_val)
                                     ELSE prod_run_start END,
             shift_production = v_shift_val,
-            -- 달성률 갱신
+            -- 달성률 갱신 (양품 기준: 생산 - NG)
             production_rate = CASE
-                WHEN target_qty > 0 THEN LEAST(ROUND(v_shift_val::NUMERIC / target_qty * 100, 2), 999999.99)
+                WHEN target_qty > 0 THEN LEAST(ROUND((v_shift_val - shift_ng_qty)::NUMERIC / target_qty * 100, 2), 999999.99)
                 ELSE 0 END,
             -- 직행률: (생산 - NG) / 생산 × 100
             first_pass_yield = CASE
@@ -852,6 +917,18 @@ BEGIN
         -- NG도 동일한 리셋 감지
         IF v_new_val < v_cur.ng_accumulated THEN
             v_shift_val := v_cur.shift_ng_qty + v_new_val;
+            -- 리셋 로그 기록
+            INSERT INTO {schema}.tb_prod_reset_log (
+                plc_id, reset_type, shift_type,
+                before_accumulated, after_value,
+                shift_production, shift_ok_qty, shift_ng_qty
+            ) VALUES (
+                NEW.plc_id, 'ng', v_cur.shift_type,
+                v_cur.ng_accumulated, v_new_val,
+                v_cur.shift_production,
+                v_cur.shift_production - v_cur.shift_ng_qty,
+                v_cur.shift_ng_qty
+            );
         ELSE
             v_shift_val := v_new_val - v_cur.ng_run_start;
         END IF;
@@ -1304,9 +1381,9 @@ SELECT
     SUM(daily_action_downtime_min)       AS weekly_action_downtime_min,
     SUM(daily_total_downtime_min)        AS weekly_total_downtime_min,
     SUM(daily_target_time_min)           AS weekly_target_time_min,
-    -- 계산값 (합산 기준 재계산)
+    -- 계산값 (합산 기준 재계산, 양품 = 생산 - NG)
     CASE WHEN SUM(daily_target_qty) > 0
-        THEN ROUND(SUM(daily_production) / SUM(daily_target_qty) * 100, 2)
+        THEN ROUND((SUM(daily_production) - SUM(daily_ng_qty)) / SUM(daily_target_qty) * 100, 2)
         ELSE 0 END                       AS production_rate,
     CASE WHEN SUM(daily_production) > 0
         THEN ROUND((SUM(daily_production) - SUM(daily_ng_qty)) / SUM(daily_production) * 100, 2)
@@ -1344,9 +1421,9 @@ SELECT
     SUM(daily_action_downtime_min)       AS monthly_action_downtime_min,
     SUM(daily_total_downtime_min)        AS monthly_total_downtime_min,
     SUM(daily_target_time_min)           AS monthly_target_time_min,
-    -- 계산값
+    -- 계산값 (양품 = 생산 - NG)
     CASE WHEN SUM(daily_target_qty) > 0
-        THEN ROUND(SUM(daily_production) / SUM(daily_target_qty) * 100, 2)
+        THEN ROUND((SUM(daily_production) - SUM(daily_ng_qty)) / SUM(daily_target_qty) * 100, 2)
         ELSE 0 END                       AS production_rate,
     CASE WHEN SUM(daily_production) > 0
         THEN ROUND((SUM(daily_production) - SUM(daily_ng_qty)) / SUM(daily_production) * 100, 2)
@@ -1384,9 +1461,9 @@ SELECT
     SUM(daily_action_downtime_min)       AS yearly_action_downtime_min,
     SUM(daily_total_downtime_min)        AS yearly_total_downtime_min,
     SUM(daily_target_time_min)           AS yearly_target_time_min,
-    -- 계산값
+    -- 계산값 (양품 = 생산 - NG)
     CASE WHEN SUM(daily_target_qty) > 0
-        THEN ROUND(SUM(daily_production) / SUM(daily_target_qty) * 100, 2)
+        THEN ROUND((SUM(daily_production) - SUM(daily_ng_qty)) / SUM(daily_target_qty) * 100, 2)
         ELSE 0 END                       AS production_rate,
     CASE WHEN SUM(daily_production) > 0
         THEN ROUND((SUM(daily_production) - SUM(daily_ng_qty)) / SUM(daily_production) * 100, 2)
@@ -1426,9 +1503,9 @@ SELECT
     SUM(h.action_downtime_min)           AS weekly_action_downtime_min,
     SUM(h.total_downtime_min)            AS weekly_total_downtime_min,
     SUM(h.target_time_min)               AS weekly_target_time_min,
-    -- 계산값
+    -- 계산값 (양품 = 생산 - NG)
     CASE WHEN SUM(h.target_qty) > 0
-        THEN ROUND(SUM(h.shift_production) / SUM(h.target_qty) * 100, 2)
+        THEN ROUND((SUM(h.shift_production) - SUM(h.shift_ng_qty)) / SUM(h.target_qty) * 100, 2)
         ELSE 0 END                       AS production_rate,
     CASE WHEN SUM(h.shift_production) > 0
         THEN ROUND((SUM(h.shift_production) - SUM(h.shift_ng_qty)) / SUM(h.shift_production) * 100, 2)
@@ -1467,9 +1544,9 @@ SELECT
     SUM(h.action_downtime_min)           AS monthly_action_downtime_min,
     SUM(h.total_downtime_min)            AS monthly_total_downtime_min,
     SUM(h.target_time_min)               AS monthly_target_time_min,
-    -- 계산값
+    -- 계산값 (양품 = 생산 - NG)
     CASE WHEN SUM(h.target_qty) > 0
-        THEN ROUND(SUM(h.shift_production) / SUM(h.target_qty) * 100, 2)
+        THEN ROUND((SUM(h.shift_production) - SUM(h.shift_ng_qty)) / SUM(h.target_qty) * 100, 2)
         ELSE 0 END                       AS production_rate,
     CASE WHEN SUM(h.shift_production) > 0
         THEN ROUND((SUM(h.shift_production) - SUM(h.shift_ng_qty)) / SUM(h.shift_production) * 100, 2)
@@ -1771,14 +1848,14 @@ BEGIN
     SELECT l.v_bool INTO v_manual_mode FROM {schema}.plc_data_latest l
         JOIN {schema}.plc_data_master m ON m.plc_id = l.plc_id AND m.tag_id = l.tag_id
         WHERE l.plc_id = NEW.plc_id AND m.tag_name = 'Y402' LIMIT 1;
-    SELECT l.v_bool INTO v_tl_red      FROM {schema}.plc_data_latest l
-        JOIN {schema}.plc_data_master m ON m.plc_id = l.plc_id AND m.tag_id = l.tag_id
+    SELECT l.v_bool INTO v_tl_red      FROM {schema}.tl_data_latest l
+        JOIN {schema}.tl_data_master m ON m.plc_id = l.plc_id AND m.tag_id = l.tag_id
         WHERE l.plc_id = NEW.plc_id AND m.tag_name = 'Y40C' LIMIT 1;
-    SELECT l.v_bool INTO v_tl_green    FROM {schema}.plc_data_latest l
-        JOIN {schema}.plc_data_master m ON m.plc_id = l.plc_id AND m.tag_id = l.tag_id
+    SELECT l.v_bool INTO v_tl_green    FROM {schema}.tl_data_latest l
+        JOIN {schema}.tl_data_master m ON m.plc_id = l.plc_id AND m.tag_id = l.tag_id
         WHERE l.plc_id = NEW.plc_id AND m.tag_name = 'Y40D' LIMIT 1;
-    SELECT l.v_bool INTO v_tl_yellow   FROM {schema}.plc_data_latest l
-        JOIN {schema}.plc_data_master m ON m.plc_id = l.plc_id AND m.tag_id = l.tag_id
+    SELECT l.v_bool INTO v_tl_yellow   FROM {schema}.tl_data_latest l
+        JOIN {schema}.tl_data_master m ON m.plc_id = l.plc_id AND m.tag_id = l.tag_id
         WHERE l.plc_id = NEW.plc_id AND m.tag_name = 'Y40E' LIMIT 1;
 
     -- 교대별 UPSERT
@@ -2327,9 +2404,9 @@ BEGIN
         COALESCE(pt.target_qty, d.target_qty),
         d.alm_down, d.action_down, d.total_down,
         d.target_time, d.auto_run,
-        -- 달성률 (NUMERIC(8,2) overflow 방지)
+        -- 달성률 (양품 기준, NUMERIC(8,2) overflow 방지)
         CASE WHEN COALESCE(pt.target_qty, d.target_qty) > 0
-            THEN LEAST(ROUND(d.production / COALESCE(pt.target_qty, d.target_qty) * 100, 2), 999999.99)
+            THEN LEAST(ROUND((d.production - d.ng_qty) / COALESCE(pt.target_qty, d.target_qty) * 100, 2), 999999.99)
             ELSE 0 END,
         -- 직행률: (생산 - NG) / 생산 × 100
         CASE WHEN d.production > 0
@@ -2811,7 +2888,60 @@ $$ LANGUAGE plpgsql;
 
 
 -- ============================================================================
--- 12. 권한 부여 (모든 테이블/뷰에 대해)
+-- 13. PLC 카운터 리셋 로그
+-- ============================================================================
+-- PLC 생산/NG 카운터가 리셋되는 순간의 스냅샷을 기록
+-- 리셋 감지: fn_production_shift_tracker에서 new_val < accumulated 시 INSERT
+
+CREATE TABLE IF NOT EXISTS {schema}.tb_prod_reset_log (
+    reset_at            TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    plc_id              INTEGER         NOT NULL,
+    reset_type          VARCHAR(10)     NOT NULL,    -- 'prod' / 'ng'
+    shift_type          VARCHAR(10),                 -- 교대 정보
+    before_accumulated  NUMERIC(12,2),               -- 리셋 직전 PLC 누적값
+    after_value         NUMERIC(12,2),               -- 리셋 후 PLC 값
+    shift_production    NUMERIC(12,2),               -- 리셋 시점 교대 생산량
+    shift_ok_qty        NUMERIC(12,2),               -- 리셋 시점 OK 수량 (생산 - NG)
+    shift_ng_qty        NUMERIC(12,2)                -- 리셋 시점 NG 수량
+);
+
+-- Hypertable 변환 + 압축/보관 정책
+DO $$
+BEGIN
+    PERFORM create_hypertable(
+        '{schema}.tb_prod_reset_log', 'reset_at',
+        chunk_time_interval => INTERVAL '30 days',
+        if_not_exists => TRUE,
+        migrate_data => TRUE
+    );
+
+    ALTER TABLE {schema}.tb_prod_reset_log SET (
+        timescaledb.compress,
+        timescaledb.compress_segmentby = 'plc_id',
+        timescaledb.compress_orderby = 'reset_at DESC'
+    );
+    PERFORM add_compression_policy(
+        '{schema}.tb_prod_reset_log',
+        INTERVAL '1 day',
+        if_not_exists => TRUE
+    );
+    PERFORM add_retention_policy(
+        '{schema}.tb_prod_reset_log',
+        INTERVAL '3 years',
+        if_not_exists => TRUE
+    );
+
+    PERFORM {schema}.fn_log_init('hypertable_reset_log', 'success');
+EXCEPTION WHEN OTHERS THEN
+    PERFORM {schema}.fn_log_init('hypertable_reset_log', 'error', SQLERRM);
+END $$;
+
+-- 인덱스
+CREATE INDEX IF NOT EXISTS idx_reset_log_plc_time
+    ON {schema}.tb_prod_reset_log (plc_id, reset_at DESC);
+
+-- ============================================================================
+-- 14. 권한 부여 (모든 테이블/뷰에 대해)
 -- ============================================================================
 GRANT USAGE ON SCHEMA {schema} TO api_reader;
 GRANT SELECT ON ALL TABLES IN SCHEMA {schema} TO api_reader;
