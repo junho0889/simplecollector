@@ -1,8 +1,9 @@
 # ============================================================================
-# Publisher DB1 — 로컬 TimescaleDB (192.168.200.4:15432)
+# Publisher DB2 — 원격 TimescaleDB (10.8.0.2:5432)
 # ============================================================================
-# 10개 PLC + BLE 데이터를 수신하여 DB에 저장
-# 큐: queue.db (COPY), queue.monitor (UPSERT), queue.mqtt (미사용)
+# 10개 PLC + BLE 데이터를 별도 큐(*.copy)로 복사하여 원격 DB에 저장
+# 큐: queue.db.copy (COPY), queue.monitor.copy (UPSERT)
+# RabbitMQ에서 동일 exchange에 바인딩된 별도 큐로 메시지 복사 수신
 
 rabbitmq:
   host: "${RABBITMQ_HOST:rabbitmq}"
@@ -12,9 +13,9 @@ rabbitmq:
   password: "${RABBITMQ_PASSWORD:admin}"
   exchange_name: "plc.data"
   exchange_type: "topic"
-  queue_db: "queue.db"
-  queue_mqtt: "queue.mqtt"
-  queue_monitor: "queue.monitor"
+  queue_db: "queue.db.copy"
+  queue_mqtt: "queue.mqtt.copy"
+  queue_monitor: "queue.monitor.copy"
   routing_key_pattern: "plc.*.data"
   prefetch_count: 500
   monitor_prefetch: 30
@@ -28,13 +29,13 @@ rabbitmq:
 
 database:
   enabled: true
-  host: "192.168.200.4"
-  port: 15432
+  host: "10.8.0.2"
+  port: 5432
   database: "neurosense"
   user: "user"
   password: "neuro0901"
-  pool_size: 20
-  pool_min_size: 5
+  pool_size: 5
+  pool_min_size: 2
   schema_name: "jem_jh02"
   device_types: ["plc", "ble"]
   insert_method: "copy"
@@ -241,6 +242,6 @@ mqtt:
 
 logging:
   level: "INFO"
-  file_path: "logs/publisher-db1.log"
+  file_path: "logs/publisher-db2.log"
   max_size_mb: 10
   backup_count: 5
