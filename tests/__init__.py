@@ -2,7 +2,7 @@
 테스트 모듈
 ==========
 
-Simple Collector 테스트 패키지입니다.
+NeuroForge Collector 테스트 패키지입니다.
 
 테스트 실행:
     pytest tests/

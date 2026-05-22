@@ -1,0 +1,3 @@
+tag_id,tag_name,memory,address,data_type,collection_group,scale,offset,decimals,unit,string_length,word_length,format,description
+1021,M180,M,180,bool,log,1,0,,,,,,"Log1 watch bit"
+1022,M188,M,188,bool,log,1,0,,,,,,"Log3 watch bit"

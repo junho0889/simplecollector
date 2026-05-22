@@ -1,0 +1,30 @@
+# M비트 모니터링 테스트 스택
+# collector: host 네트워크 (PLC 직접 접근)
+# rabbitmq: bridge + 포트 매핑
+
+services:
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: mbit-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    restart: unless-stopped
+
+  collector:
+    image: neuroforge_collector_mc:mc-latest
+    container_name: mbit-collector
+    network_mode: host
+    volumes:
+      - ./collector_test.yaml:/app/config/collector.yaml:ro
+      - ./tags_mbit_test.csv:/app/config/tags_mbit_test.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+      RABBITMQ_HOST: 127.0.0.1
+    restart: unless-stopped
+    depends_on:
+      - rabbitmq

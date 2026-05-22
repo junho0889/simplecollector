@@ -6,7 +6,10 @@ PTS-2305BP와 다른 AD 패킷 구조를 가진 POSIOT 센서.
 GAP(3B) + Service UUID(3B) + Manufacturer Data 헤더(2B) 후 페이로드 시작.
 
 bleak는 AD 헤더를 제거하고 manufacturer_data = {company_id: data_bytes}로 전달.
-company_id 2바이트를 데이터 앞에 복원하여 full payload 구성 (22 bytes):
+company_id 2바이트를 데이터 앞에 복원하여 full payload 구성 (22 bytes).
+
+Profile은 **raw 정수**만 반환합니다. 단위 변환(÷100 등)은 CSV의
+scale/offset/decimals 스케일링에서 일괄 처리됩니다.
 
     Full Payload Layout:
     [0]     mode/version      (uint8, upper 4bit=mode, lower 4bit=version)
@@ -15,11 +18,11 @@ company_id 2바이트를 데이터 앞에 복원하여 full payload 구성 (22 b
     [5:7]   accel_x           (int16_be, mg)
     [7:9]   accel_y           (int16_be, mg)
     [9:11]  accel_z           (int16_be, mg)
-    [11:13] temperature       (int16_le, /100, ℃)
-    [13:15] humidity          (uint16_le, /100, %)
+    [11:13] temperature       (int16_le, raw, ℃*100)
+    [13:15] humidity          (uint16_le, raw, %*100)
     [15:17] vib_fft_freq      (uint16_be, Hz)
     [17:19] sound_fft_freq    (uint16_be, Hz)
-    [19:21] probe             (int16_le, /100, ℃ or A)
+    [19:21] probe             (int16_le, raw, ℃*100 or A*100)
     [21]    battery           (uint8, %)
 """
 
@@ -92,12 +95,12 @@ class PosiotV2Profile(DeviceProfile):
                 result['accel_z'] = struct.unpack_from('>h', full, 9)[0]
 
             if len(full) >= 13:
-                # [11:13] temperature (int16_le, /100 ℃)
-                result['temperature'] = struct.unpack_from('<h', full, 11)[0] / 100.0
+                # [11:13] temperature (int16_le raw, CSV decimals=2로 ÷100)
+                result['temperature'] = struct.unpack_from('<h', full, 11)[0]
 
             if len(full) >= 15:
-                # [13:15] humidity (uint16_le, /100 %)
-                result['humidity'] = struct.unpack_from('<H', full, 13)[0] / 100.0
+                # [13:15] humidity (uint16_le raw, CSV decimals=2로 ÷100)
+                result['humidity'] = struct.unpack_from('<H', full, 13)[0]
 
             if len(full) >= 17:
                 # [15:17] vib_fft_freq (uint16_be, Hz)
@@ -108,8 +111,8 @@ class PosiotV2Profile(DeviceProfile):
                 result['sound_fft_freq'] = struct.unpack_from('>H', full, 17)[0]
 
             if len(full) >= 21:
-                # [19:21] probe (int16_le, /100, ℃ or A)
-                result['probe'] = struct.unpack_from('<h', full, 19)[0] / 100.0
+                # [19:21] probe (int16_le raw, CSV decimals=2로 ÷100)
+                result['probe'] = struct.unpack_from('<h', full, 19)[0]
 
             if len(full) >= 22:
                 # [21] battery (uint8, %)

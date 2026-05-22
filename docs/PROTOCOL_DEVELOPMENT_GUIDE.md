@@ -570,7 +570,7 @@ collectorhub/local-images/{protocol_name}.json
 
 ```json
 {
-  "name": "neuro_collector-{protocol}",
+  "name": "neuroforge_collector-{protocol}",
   "display_name": "표시 이름",
   "description": "설명",
   "version": "0.x.x",

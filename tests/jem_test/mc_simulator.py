@@ -63,6 +63,7 @@ class PLCMemory:
     plc_id: int
     name: str
     d_regs: Dict[int, int] = field(default_factory=dict)  # D register: addr -> uint16
+    r_regs: Dict[int, int] = field(default_factory=dict)  # R file register: addr -> uint16
     l_bits: Dict[int, bool] = field(default_factory=dict)  # L device: addr -> bool
     m_bits: Dict[int, bool] = field(default_factory=dict)  # M device: addr -> bool
     x_bits: Dict[int, bool] = field(default_factory=dict)  # X device: addr -> bool
@@ -468,18 +469,20 @@ def apply_data_frame(
         num_val, text_val = get_value_from_row(row)
 
         if tag.data_type == "string":
-            if text_val is not None and tag.memory == "D":
-                write_string(plc_mem.d_regs, tag.address, text_val, tag.word_length)
+            if text_val is not None and tag.memory in ("D", "R"):
+                regs = plc_mem.d_regs if tag.memory == "D" else plc_mem.r_regs
+                write_string(regs, tag.address, text_val, tag.word_length)
             continue
 
         if num_val is None:
             continue
 
-        if tag.memory == "D":
+        if tag.memory in ("D", "R"):
             # Reverse scale the final value back to raw PLC register value
             raw = reverse_scale(num_val, tag.data_type, tag.scale, tag.offset, tag.decimals)
+            regs = plc_mem.d_regs if tag.memory == "D" else plc_mem.r_regs
             write_register(
-                plc_mem.d_regs,
+                regs,
                 tag.address,
                 raw,
                 tag.data_type,
@@ -506,13 +509,14 @@ DEVICE_CODES = {
     0x9C: "X",   # X input (bit device)
     0x9D: "Y",   # Y output (bit device)
     0xB4: "W",   # W link register (word device)
-    0xB0: "R",   # R file register (word device)
+    0xAF: "R",   # R file register (word device)
+    0xB0: "ZR",  # ZR extended file register (word device)
 }
 
 # Bit devices (need bit-to-word packing)
 BIT_DEVICES = {"L", "M", "X", "Y"}
 # Word devices
-WORD_DEVICES = {"D", "W", "R"}
+WORD_DEVICES = {"D", "W", "R", "ZR"}
 
 
 def pack_bits_to_words(bits: Dict[int, bool], start_addr: int, count: int) -> bytes:
@@ -575,8 +579,10 @@ def handle_batch_read(plc_mem: PLCMemory, data: bytes) -> bytes:
             addr = start_addr + i
             if device_name == "D":
                 word = plc_mem.get_d_reg(addr)
+            elif device_name == "R":
+                word = plc_mem.r_regs.get(addr, 0)
             else:
-                word = 0  # W, R devices default to 0
+                word = 0  # W, ZR devices default to 0
             result.extend(struct.pack("<H", word & 0xFFFF))
         response_data = bytes(result)
     else:

@@ -1,0 +1,345 @@
+# ============================================================================
+# 통합 테스트 환경 — 10 PLC (MC Simulator) + BLE + Publisher + DB
+# ============================================================================
+# 구성:
+#   - rabbitmq:      메시지 브로커 (46672:5672, 46673:15672)
+#   - timescaledb:   시계열 DB     (45432:5432)
+#   - mc-simulator:  MC Protocol 시뮬레이터 (10 PLC, ports 5001-5010)
+#   - collector x10: PLC-A ~ PLC-L (각 mc-simulator:500X 접속)
+#   - publisher:     RabbitMQ → TimescaleDB
+#
+# BLE collector는 192.168.0.14에서 실행 → RabbitMQ 46672 접속
+#
+# 사용법:
+#   cd deploy/test_fullstack
+#   docker compose up -d
+#   # BLE: 192.168.0.14에서 collector_ble.yaml + tags_ble.csv 배포
+# ============================================================================
+
+networks:
+  test-net:
+    driver: bridge
+
+services:
+
+  # ========================================================================
+  # Infrastructure
+  # ========================================================================
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: fulltest-rabbitmq
+    ports:
+      - "46672:5672"
+      - "46673:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    networks:
+      - test-net
+    restart: unless-stopped
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg17
+    container_name: fulltest-timescaledb
+    ports:
+      - "45432:5432"
+    environment:
+      POSTGRES_DB: neurosense
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: neuro0901
+    volumes:
+      - fulltest-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d neurosense"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    networks:
+      - test-net
+    restart: unless-stopped
+
+  # ========================================================================
+  # MC Protocol Simulator — 10 PLCs on ports 5001-5010
+  # ========================================================================
+
+  mc-simulator:
+    build:
+      context: ../../tests/jem_test
+      dockerfile: Dockerfile.simulator
+    image: jem_test-mc-simulator:latest
+    container_name: fulltest-mc-simulator
+    ports:
+      - "5001:5001"
+      - "5002:5002"
+      - "5003:5003"
+      - "5004:5004"
+      - "5005:5005"
+      - "5006:5006"
+      - "5007:5007"
+      - "5008:5008"
+      - "5009:5009"
+      - "5010:5010"
+    volumes:
+      - ../../tests/jem_test/mc_simulator.py:/app/mc_simulator.py:ro
+      - ../../tests/jem_test/test_data.csv:/app/test_data.csv:ro
+      - ./config/:/app/config/:ro
+    networks:
+      - test-net
+    restart: unless-stopped
+
+  # ========================================================================
+  # Collectors — PLC 데이터 수집 (10개)
+  # ========================================================================
+
+  collector-plc-a:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    image: fulltest-collector-mc:latest
+    container_name: fulltest-collector-plc-a
+    volumes:
+      - ./config/collector_plc1.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_04_PLC-A.csv:/app/config/tags_04_PLC-A.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - test-net
+    restart: unless-stopped
+
+  collector-plc-b:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    image: fulltest-collector-mc:latest
+    container_name: fulltest-collector-plc-b
+    volumes:
+      - ./config/collector_plc2.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_02_PLC-B.csv:/app/config/tags_02_PLC-B.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - test-net
+    restart: unless-stopped
+
+  collector-plc-c:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    image: fulltest-collector-mc:latest
+    container_name: fulltest-collector-plc-c
+    volumes:
+      - ./config/collector_plc3.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_05_PLC-C.csv:/app/config/tags_05_PLC-C.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - test-net
+    restart: unless-stopped
+
+  collector-plc-d:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    image: fulltest-collector-mc:latest
+    container_name: fulltest-collector-plc-d
+    volumes:
+      - ./config/collector_plc4.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_10_PLC-D.csv:/app/config/tags_10_PLC-D.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - test-net
+    restart: unless-stopped
+
+  collector-plc-efg:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    image: fulltest-collector-mc:latest
+    container_name: fulltest-collector-plc-efg
+    volumes:
+      - ./config/collector_plc5.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_01_PLC-EFG.csv:/app/config/tags_01_PLC-EFG.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - test-net
+    restart: unless-stopped
+
+  collector-plc-h:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    image: fulltest-collector-mc:latest
+    container_name: fulltest-collector-plc-h
+    volumes:
+      - ./config/collector_plc6.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_06_PLC-H.csv:/app/config/tags_06_PLC-H.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - test-net
+    restart: unless-stopped
+
+  collector-plc-i:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    image: fulltest-collector-mc:latest
+    container_name: fulltest-collector-plc-i
+    volumes:
+      - ./config/collector_plc7.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_07_PLC-I.csv:/app/config/tags_07_PLC-I.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - test-net
+    restart: unless-stopped
+
+  collector-plc-j:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    image: fulltest-collector-mc:latest
+    container_name: fulltest-collector-plc-j
+    volumes:
+      - ./config/collector_plc8.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_03_PLC-J.csv:/app/config/tags_03_PLC-J.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - test-net
+    restart: unless-stopped
+
+  collector-plc-k:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    image: fulltest-collector-mc:latest
+    container_name: fulltest-collector-plc-k
+    volumes:
+      - ./config/collector_plc9.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_08_PLC-K.csv:/app/config/tags_08_PLC-K.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - test-net
+    restart: unless-stopped
+
+  collector-plc-l:
+    build:
+      context: ../..
+      dockerfile: build/collector/Dockerfile
+      args:
+        PROTOCOL: mc_protocol
+    image: fulltest-collector-mc:latest
+    container_name: fulltest-collector-plc-l
+    volumes:
+      - ./config/collector_plc10.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_09_PLC-L.csv:/app/config/tags_09_PLC-L.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    depends_on:
+      mc-simulator:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - test-net
+    restart: unless-stopped
+
+  # ========================================================================
+  # Publisher — RabbitMQ → TimescaleDB (PLC + BLE 통합)
+  # ========================================================================
+
+  publisher:
+    build:
+      context: ../../../collector-publisher
+      dockerfile: Dockerfile
+    image: fulltest-publisher:latest
+    container_name: fulltest-publisher
+    volumes:
+      - ./config/:/app/config/:ro
+    command: ["--config", "/app/config/publisher_test.yaml"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - test-net
+    restart: unless-stopped
+
+volumes:
+  fulltest-pgdata:

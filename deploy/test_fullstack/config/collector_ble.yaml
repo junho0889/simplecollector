@@ -1,0 +1,62 @@
+# BLE 멀티디바이스 수집기 — JEM 통합용
+# devices 섹션에서 디바이스별 MAC/프로파일 관리, CSV에는 device_id+tag_id만 기입
+collector:
+  name: "BLE_JEM"
+  description: "JEM BLE 센서 수집기"
+  site: "진영전기"
+  area: ""
+  line: ""
+  tags_file: "config/tags_ble.csv"
+
+  protocol:
+    type: "ble"
+    extra:
+      cache_ttl: 30.0
+      duplicate_filter_s: 4.0
+
+  devices:
+    - device_id: 1
+      mac_address: "F6:5A:83:C7:DB:C7"
+      device_name_filter: "POSIOT"
+      device_profile: "pts-2305bp"
+      description: "1호기 진동센서"
+
+    - device_id: 2
+      mac_address: "F5:12:5E:BE:EE:12"
+      device_name_filter: "POSIOT"
+      device_profile: "pts-2305bp"
+      description: "2호기 온도센서"
+
+    - device_id: 3
+      mac_address: "E5:79:FD:DB:0A:38"
+      device_name_filter: "POSIOT"
+      device_profile: "pts-0624b"
+      description: "3호기 전류센서"
+
+  collection_groups:
+    - name: "ble_data"
+      interval_ms: 1000
+
+publisher:
+  rabbitmq:
+    enabled: true
+    host: "${RMQ_HOST:rabbitmq}"
+    port: ${RMQ_PORT:5672}
+    virtual_host: "/"
+    username: "${RMQ_USER:admin}"
+    password: "${RMQ_PASS:admin}"
+    exchange_name: "plc.data"
+    routing_key_prefix: "plc"
+    compression: "zlib"
+    encryption_enabled: false
+  publish_interval_ms: 1000
+
+buffer:
+  max_size: 5000
+  batch_size: 200
+  threshold_ratio: 0.8
+
+logging:
+  level: "INFO"
+  collection_level: "INFO"
+  publish_level: "INFO"

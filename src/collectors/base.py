@@ -60,6 +60,7 @@ Example:
 """
 
 import asyncio
+import time
 from abc import abstractmethod
 from datetime import datetime
 from typing import Callable, Dict, List, Optional, Any
@@ -140,6 +141,15 @@ class BaseCollector(ICollector):
         self._start_time: Optional[datetime] = None
         self._total_loss: Dict[str, int] = {}  # 그룹별 손실 횟수
         self._consecutive_loss: Dict[str, int] = {}  # 연속 손실 횟수
+
+        # 손실 로그 throttle (group별, 동일 사유 반복 시 폭주 방지)
+        # _last_loss_log_at: 마지막 LOSS WARNING을 출력한 monotonic time
+        self._last_loss_log_at: Dict[str, float] = {}
+        self._loss_log_interval_sec: float = 30.0
+
+        # 재연결 로그 throttle
+        self._last_reconnect_log_at: float = 0.0
+        self._reconnect_log_interval_sec: float = 60.0
 
         # 콜백 (선택적)
         self._on_data_callback: Optional[Callable[[CollectedData], Any]] = None
@@ -285,10 +295,12 @@ class BaseCollector(ICollector):
             f"[{self._name}] Collector started at {self._start_time.isoformat()}"
         )
 
-        # 연결 시도
-        if not await self.connect():
-            # 재연결 태스크 시작
-            self._reconnect_task = asyncio.create_task(self._reconnect_loop())
+        # 첫 연결 시도 (실패해도 _reconnect_loop이 책임지고 복구)
+        await self.connect()
+
+        # 재연결 루프는 collector 수명 동안 항상 실행 — 운영 중 끊김도 자동 복구
+        # (정상 상태에서는 짧게 대기만, 끊긴 상태에서는 지수 백오프로 connect 시도)
+        self._reconnect_task = asyncio.create_task(self._reconnect_loop())
 
         # 각 그룹별 수집 태스크 시작
         for group_name, group_config in self._collection_groups.items():
@@ -368,8 +380,15 @@ class BaseCollector(ICollector):
                 data = await self._collect_with_retry(group_name, group_config)
 
                 if data:
-                    # 성공: 연속 손실 카운트 리셋
+                    # 성공: 연속 손실 누적이 있었다면 복구 알림
+                    prior_consecutive = self._consecutive_loss.get(group_name, 0)
+                    if prior_consecutive > 0:
+                        self._loss_logger.info(
+                            f"[{self._name}] Recovered group='{group_name}' "
+                            f"after {prior_consecutive} consecutive losses"
+                        )
                     self._consecutive_loss[group_name] = 0
+                    self._last_loss_log_at[group_name] = 0.0
                     await self._notify_data_collected(data)
                 else:
                     # 실패: 손실 기록 및 quality_code=0 데이터 생성
@@ -454,26 +473,26 @@ class BaseCollector(ICollector):
             collection_time: 수집 시도 시간
             reason: 실패 사유 (collection_failed, not_connected, timeout 등)
         """
-        # 손실 카운트 증가
+        # 손실 카운트 증가 (실제 손실 통계는 항상 정확하게 누적)
         self._total_loss[group_name] = self._total_loss.get(group_name, 0) + 1
         self._consecutive_loss[group_name] = self._consecutive_loss.get(group_name, 0) + 1
 
         total_loss = self._total_loss[group_name]
         consecutive = self._consecutive_loss[group_name]
 
-        # 손실 로깅
-        self._loss_logger.warning(
-            f"[{self._name}] LOSS group='{group_name}' reason={reason} "
-            f"consecutive={consecutive} total={total_loss} "
-            f"time={collection_time.isoformat()}"
-        )
+        # 로그 throttle: 첫 실패 + N초 주기로만 WARNING 출력 (PLC 다운 시 폭주 방지)
+        # 카운터/quality_code=0 데이터는 throttle 없이 항상 처리
+        now = time.monotonic()
+        last_at = self._last_loss_log_at.get(group_name, 0.0)
+        should_log = consecutive == 1 or (now - last_at) >= self._loss_log_interval_sec
 
-        # 연속 손실이 임계값 초과 시 경고 (10회마다) — loss 로거로 통합
-        if consecutive > 0 and consecutive % 10 == 0:
+        if should_log:
             self._loss_logger.warning(
-                f"[{self._name}] High consecutive loss count for '{group_name}': "
-                f"{consecutive} consecutive failures"
+                f"[{self._name}] LOSS group='{group_name}' reason={reason} "
+                f"consecutive={consecutive} total={total_loss} "
+                f"time={collection_time.isoformat()}"
             )
+            self._last_loss_log_at[group_name] = now
 
         # quality_code=0인 실패 데이터 생성 및 전달
         failed_data = self._create_failed_data(group_name, collection_time, reason)
@@ -532,48 +551,76 @@ class BaseCollector(ICollector):
 
     async def _reconnect_loop(self) -> None:
         """
-        재연결 루프 (지수 백오프, 최대 5초).
+        재연결 루프 (collector 수명 동안 항상 동작).
 
-        연결이 끊어진 경우 지수 백오프로 재연결을 시도합니다.
-        성공 시 백오프가 초기값으로 리셋됩니다.
+        - 정상(CONNECTED) 상태에서는 짧은 주기로 sleep만 — 상태 변화 감시
+        - 끊긴 상태(ERROR/RECONNECTING/DISCONNECTED)면 지수 백오프로 connect 재시도
+        - 실패 시 최초 1회 + N회마다 ERROR 로그 (throttle)
+        - 성공 시 'Reconnected to PLC after N attempt(s)' INFO 1줄
         """
         if not self._protocol_config:
             return
 
-        BACKOFF_INITIAL = 1.0   # 초기 대기 (초)
-        BACKOFF_MAX = 5.0       # 최대 대기 (초, 하드캡)
-        BACKOFF_FACTOR = 2.0    # 배수
+        BACKOFF_INITIAL = 1.0    # 초기 대기 (초)
+        BACKOFF_MAX = 30.0       # 최대 대기 — 끊긴 PLC를 매초 두드릴 필요 없음
+        BACKOFF_FACTOR = 2.0
+        HEALTHY_POLL_INTERVAL = 1.0  # 정상 상태 감시 주기 (초)
 
         backoff = BACKOFF_INITIAL
         attempt = 0
 
+        host = self._protocol_config.host
+        port = self._protocol_config.port
+
         while self._is_running:
             try:
+                # 정상 상태면 가볍게 폴링만
+                if self._state == ConnectionState.CONNECTED:
+                    await asyncio.sleep(HEALTHY_POLL_INTERVAL)
+                    continue
+
+                # 끊긴 상태 — 백오프 후 재연결 시도
                 await asyncio.sleep(backoff)
+                if not self._is_running:
+                    break
+                # 백오프 sleep 동안 다른 경로(예: _ensure_connection)로 복구된 경우
+                if self._state == ConnectionState.CONNECTED:
+                    backoff = BACKOFF_INITIAL
+                    attempt = 0
+                    self._last_reconnect_log_at = 0.0
+                    continue
 
-                if self._state != ConnectionState.CONNECTED:
-                    attempt += 1
+                attempt += 1
+                self._state = ConnectionState.RECONNECTING
+
+                # connect()는 내부적으로 self._state를 갱신 (성공: CONNECTED, 실패: ERROR)
+                success = await self.connect()
+                if success:
+                    # _reconnect_loop은 끊긴 상태에서만 진입하므로 성공은 항상 '복구'
+                    # (start 시점 첫 연결 성공은 _reconnect_loop을 거치지 않고 connect() 직접 호출)
                     logger.info(
-                        f"[{self._name}] Attempting reconnection "
-                        f"(attempt={attempt}, backoff={backoff:.1f}s)..."
+                        f"[{self._name}] Reconnected to {host}:{port} "
+                        f"after {attempt} attempt(s)"
                     )
-                    self._state = ConnectionState.RECONNECTING
-
-                    if await self.connect():
-                        logger.info(f"[{self._name}] Reconnected successfully")
-                        backoff = BACKOFF_INITIAL
-                        attempt = 0
-                    else:
-                        logger.warning(
-                            f"[{self._name}] Reconnection failed "
-                            f"(next backoff={min(backoff * BACKOFF_FACTOR, BACKOFF_MAX):.1f}s)"
+                    backoff = BACKOFF_INITIAL
+                    attempt = 0
+                    self._last_reconnect_log_at = 0.0
+                else:
+                    next_backoff = min(backoff * BACKOFF_FACTOR, BACKOFF_MAX)
+                    # 첫 실패 + 60초 주기 ERROR 로그 (스팸 방지)
+                    now = time.monotonic()
+                    if attempt == 1 or (now - self._last_reconnect_log_at) >= self._reconnect_log_interval_sec:
+                        logger.error(
+                            f"[{self._name}] Cannot reconnect to PLC {host}:{port} "
+                            f"(attempt={attempt}, next retry in {next_backoff:.0f}s)"
                         )
-                        backoff = min(backoff * BACKOFF_FACTOR, BACKOFF_MAX)
+                        self._last_reconnect_log_at = now
+                    backoff = next_backoff
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"[{self._name}] Reconnection error: {e}")
+                logger.error(f"[{self._name}] Reconnect loop error: {e}")
                 backoff = min(backoff * BACKOFF_FACTOR, BACKOFF_MAX)
 
     # =========================================================================

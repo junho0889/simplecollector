@@ -1,0 +1,87 @@
+# ============================================================================
+# testpublisher — 통합 테스트 docker-compose
+# ============================================================================
+# 구성:
+#   - RabbitMQ       (포트 25672/35672 — testwindow와 충돌 방지)
+#   - TimescaleDB    (포트 15432)
+#   - simpleCollector (PLC-D, MC Protocol → RabbitMQ)
+#   - collector-publisher (RabbitMQ → TimescaleDB)
+#
+# 용도: master sync DELETE→INSERT 통합 테스트
+
+networks:
+  tp-net:
+    driver: bridge
+
+services:
+
+  # ========================================================================
+  # 인프라
+  # ========================================================================
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: tp-rabbitmq
+    ports:
+      - "25672:5672"
+      - "35672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    networks:
+      - tp-net
+    restart: unless-stopped
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: tp-timescaledb
+    ports:
+      - "15432:5432"
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    networks:
+      - tp-net
+    restart: unless-stopped
+
+  # ========================================================================
+  # Collector — PLC-D (MC Protocol → RabbitMQ)
+  # ========================================================================
+
+  collector:
+    image: neuroforge_collector_mc:mc-latest
+    container_name: tp-collector
+    volumes:
+      - ./collector_plc4.yaml:/app/config/collector.yaml:ro
+      - ./tags_plc_d.csv:/app/config/tags_plc_d.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+      RABBITMQ_HOST: rabbitmq
+    networks:
+      - tp-net
+    restart: unless-stopped
+    depends_on:
+      - rabbitmq
+
+  # ========================================================================
+  # Publisher — RabbitMQ → TimescaleDB
+  # ========================================================================
+
+  publisher:
+    image: neuroforge_publisher:latest
+    container_name: tp-publisher
+    volumes:
+      - ./publisher.yaml:/app/config/publisher.yaml:ro
+      - ./collector_plc4.yaml:/app/config/collector_plc4.yaml:ro
+      - ./tags_plc_d.csv:/app/config/tags_plc_d.csv:ro
+    command: ["--config", "/app/config/publisher.yaml"]
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      DB_HOST: timescaledb
+    networks:
+      - tp-net
+    restart: unless-stopped
+    depends_on:
+      - rabbitmq
+      - timescaledb

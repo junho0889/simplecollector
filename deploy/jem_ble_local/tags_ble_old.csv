@@ -1,0 +1,17 @@
+tag_id,tag_name,memory,address,data_type,collection_group,scale,offset,decimals,unit,string_length,word_length,format,description
+1,temperature,,temperature,int16,ble_env,1,0,2,℃,,,,Pulley 진동프로브 온도
+2,humidity,,humidity,int16,ble_env,1,0,2,%,,,,Pulley 진동프로브 습도
+3,pressure,,pressure,uint16,ble_env,0.0622559,12.207,,hPa,,,,Pulley 진동프로브 기압
+4,battery,,battery,uint8,ble_env,1,0,,%,,,,Pulley 진동프로브 배터리
+5,accel_rms_x,,accel_rms_x,uint16,ble_env,1,0,2,m/s²,,,,Pulley 진동프로브 가속도X
+6,accel_rms_y,,accel_rms_y,uint16,ble_env,1,0,2,m/s²,,,,Pulley 진동프로브 가속도Y
+7,accel_rms_z,,accel_rms_z,uint16,ble_env,1,0,2,m/s²,,,,Pulley 진동프로브 가속도Z
+8,velocity_rms_under_1k,,velocity_rms_under_1k,uint16,ble_env,1,0,2,mm/s,,,,Pulley 진동프로브 속도RMS
+9,accel_rms_1k_5k,,accel_rms_1k_5k,uint16,ble_env,1,0,2,m/s²,,,,Pulley 진동프로브 가속도1-5k
+10,vibration_peak,,vibration_peak,uint16,ble_env,1,0,,Hz,,,,Pulley 진동프로브 진동피크
+11,harmony_cnt_under_1k,,harmony_cnt_under_1k,uint8,ble_env,1,0,,count,,,,Pulley 진동프로브 하모니카운트저
+12,harmony_cnt_1k_5k,,harmony_cnt_1k_5k,uint8,ble_env,1,0,,count,,,,Pulley 진동프로브 하모니카운트고
+13,gravity_mag_xyz,,gravity_mag_xyz,uint16,ble_env,1,0,,mg,,,,Pulley 진동프로브 중력크기
+14,sound_db,,sound_db,uint8,ble_env,1,0,,dB,,,,Pulley 진동프로브 소음
+15,sound_peak,,sound_peak,uint16,ble_env,1,0,,Hz,,,,Pulley 진동프로브 소음피크
+16,prob_temp,,prob_temp,int16,ble_env,1,0,2,℃,,,,Pulley 진동프로브 프로브온도

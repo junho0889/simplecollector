@@ -1,5 +1,5 @@
 """
-Simple Collector - Industrial Data Collection Framework
+NeuroForge Collector - Industrial Data Collection Framework
 ========================================================
 
 Copyright (c) 2024-2026 NEUROSENSE Inc. All Rights Reserved.

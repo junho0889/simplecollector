@@ -33,15 +33,15 @@ BUILDS = {
     "collector": {
         "context": COLLECTOR_DIR,
         "dockerfile": COLLECTOR_DIR / "build" / "collector" / "Dockerfile",
-        "image": "neuro_collector_mc:mc-latest",
-        "output": DEPLOY_DIR / "neuro_collector_mc.tar",
+        "image": "neuroforge_collector_mc:mc-latest",
+        "output": DEPLOY_DIR / "neuroforge_collector_mc.tar",
         "build_args": {"PROTOCOL": "mc_protocol"},
     },
     "publisher": {
         "context": PUBLISHER_DIR,
         "dockerfile": PUBLISHER_DIR / "Dockerfile",
-        "image": "neuro_publisher:latest",
-        "output": DEPLOY_DIR / "neuro_publisher.tar",
+        "image": "neuroforge_publisher:latest",
+        "output": DEPLOY_DIR / "neuroforge_publisher.tar",
         "build_args": {},
     },
 }

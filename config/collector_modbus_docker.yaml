@@ -1,4 +1,4 @@
-# Simple Collector - Modbus Docker Test Configuration
+# NeuroForge Collector - Modbus Docker Test Configuration
 # ============================================================
 # 실제 PLC (192.168.0.10:502) → Docker 컨테이너 → RabbitMQ
 

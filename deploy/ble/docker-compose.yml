@@ -63,7 +63,7 @@ services:
   # --------------------------------------------------------------------------
 
   publisher:
-    image: neuro_publisher:latest
+    image: neuroforge_publisher:latest
     container_name: ble-publisher
     ports:
       - "4840:4840"
@@ -86,7 +86,7 @@ services:
   # --------------------------------------------------------------------------
 
   collector-ble:
-    image: neuro_collector_ble:latest
+    image: neuroforge_collector_ble:latest
     container_name: ble-collector
     network_mode: host
     privileged: true

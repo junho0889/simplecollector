@@ -193,7 +193,7 @@ Bleak이 BlueZ의 D-Bus 인터페이스를 사용하므로 아래 설정이 **�
 ```yaml
 services:
   ble-collector:
-    image: neuro_collector_ble:latest
+    image: neuroforge_collector_ble:latest
     network_mode: host                          # BLE는 호스트 Bluetooth 스택 직접 사용
     privileged: true                            # BLE 어댑터 접근 권한
     volumes:

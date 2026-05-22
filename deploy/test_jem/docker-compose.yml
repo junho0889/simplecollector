@@ -1,0 +1,46 @@
+# ============================================================================
+# MC+BLE 통합 테스트 — docker-compose.yml
+# ============================================================================
+# RabbitMQ + Publisher만 Docker로 실행
+# MC Collector, BLE Collector는 로컬 Python으로 실행
+#
+# 사용법:
+#   docker compose up -d
+#   # 별도 터미널에서:
+#   python -m src.main -c deploy/test_jem/collector_mc.yaml
+#   python -m src.main -c deploy/test_jem/collector_ble.yaml
+
+services:
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: test-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  publisher:
+    image: neuroforge_publisher:latest
+    container_name: test-publisher
+    volumes:
+      - ./publisher.yaml:/app/config/publisher.yaml:ro
+      - ./collector_mc.yaml:/app/config/collector_mc.yaml:ro
+      - ./tags_mc.csv:/app/config/tags_mc.csv:ro
+      - ./collector_ble.yaml:/app/config/collector_ble.yaml:ro
+      - ./tags_ble.csv:/app/config/tags_ble.csv:ro
+    command: ["--config", "/app/config/publisher.yaml"]
+    environment:
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped

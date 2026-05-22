@@ -1,0 +1,38 @@
+# ============================================================================
+# Resilience Test Stack
+# ============================================================================
+# RabbitMQ + TimescaleDB (publisher는 호스트에서 직접 실행)
+# ============================================================================
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: resilience-rmq
+    ports:
+      - "35672:5672"
+      - "35673:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: resilience-db
+    ports:
+      - "25432:5432"
+    environment:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+      POSTGRES_DB: test_resilience
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d test_resilience"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s

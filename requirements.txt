@@ -1,5 +1,5 @@
 # ============================================================================
-# Simple Collector - Python Dependencies
+# NeuroForge Collector - Python Dependencies
 # ============================================================================
 
 # Core
@@ -8,6 +8,7 @@ python-dotenv>=1.0.0   # 환경변수 관리
 
 # Async / Message Broker
 aio-pika>=9.4.0        # RabbitMQ 비동기 클라이언트 (AMQP 0-9-1)
+asyncpg>=0.29.0        # config DB 로딩 (CONFIG_SOURCE=db 일 때만 사용)
 
 # Industrial Protocols
 # pyserial>=3.5        # Modbus RTU 시리얼 모드 (선택, TCP/RTU-over-TCP는 불필요)

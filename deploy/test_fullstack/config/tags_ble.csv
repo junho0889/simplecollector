@@ -1,0 +1,12 @@
+device_id,tag_id,tag_name,data_type,collection_group,scale,offset,decimals,unit,description
+# === 1호기 (device_id=1) — 가속도/진동 태그만 ===
+1,1,accel_rms_x,float32,ble_data,1,0,3,g,1호기 가속도X
+1,2,accel_rms_y,float32,ble_data,1,0,3,g,1호기 가속도Y
+1,3,accel_rms_z,float32,ble_data,1,0,3,g,1호기 가속도Z
+1,4,velocity_rms_under_1k,float32,ble_data,1,0,3,mm/s,1호기 속도RMS
+1,5,accel_rms_1k_5k,float32,ble_data,1,0,3,g,1호기 가속도1-5k
+1,6,vibration_peak,uint16,ble_data,1,0,,,1호기 진동피크
+# === 2호기 (device_id=2) — 프로브 온도만 ===
+2,1,prob_temp,float32,ble_data,1,0,2,℃,2호기 프로브온도
+# === 3호기 (device_id=3) — 전류만 ===
+3,1,current,float32,ble_data,1,0,2,A,3호기 전류

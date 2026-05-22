@@ -49,7 +49,7 @@ class ComponentFactory:
             raise RuntimeError(
                 f"Protocol '{protocol_type}' is not available.\n"
                 f"Available protocols: {available}\n"
-                f"Install with: pip install simple-collector[{protocol_type}]"
+                f"Install with: pip install neuroforge-collector[{protocol_type}]"
             )
 
         return collector_cls(
@@ -121,7 +121,7 @@ class ComponentFactory:
             if publisher_cls is None:
                 logger.warning(
                     "RabbitMQ publisher not available. "
-                    "Install with: pip install simple-collector[rabbitmq]"
+                    "Install with: pip install neuroforge-collector[rabbitmq]"
                 )
             else:
                 publishers.append(publisher_cls(
@@ -145,11 +145,11 @@ class ComponentFactory:
         if config.collector.protocol:
             protocol = config.collector.protocol.type.lower()
             if not ProtocolRegistry.is_available(protocol):
-                missing.append(f"pip install simple-collector[{protocol}]")
+                missing.append(f"pip install neuroforge-collector[{protocol}]")
 
         # RabbitMQ 확인
         if config.publisher.rabbitmq.enabled:
             if not PublisherRegistry.is_available('rabbitmq'):
-                missing.append("pip install simple-collector[rabbitmq]")
+                missing.append("pip install neuroforge-collector[rabbitmq]")
 
         return missing

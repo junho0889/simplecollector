@@ -501,7 +501,7 @@ python -m src.main -c config/my_collector.yaml
 
 # Docker (ARM64)
 python build_deploy.py --collector
-# Output: deploy/jem/neuro_collector_mc.tar
+# Output: deploy/jem/neuroforge_collector_mc.tar
 ```
 
 ---

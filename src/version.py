@@ -1,5 +1,5 @@
 """
-Simple Collector Version Information
+NeuroForge Collector Version Information
 ====================================
 
 버전 정보의 단일 소스 (Single Source of Truth).
@@ -13,14 +13,52 @@ from typing import Dict, List, Tuple
 # =============================================================================
 # Application Version
 # =============================================================================
-APP_NAME = "Simple Collector"
-APP_VERSION = "0.3.4"
-APP_BUILD_DATE = "2026-04-22"
+APP_NAME = "NeuroForge Collector"
+APP_VERSION = "0.4.0"
+APP_BUILD_DATE = "2026-05-22"
 
 # =============================================================================
 # Changelog
 # =============================================================================
 CHANGELOG: List[Dict[str, str]] = [
+    {
+        "version": "0.4.0",
+        "date": "2026-05-22",
+        "changes": (
+            "feat: config를 DB(neuroforge_config 스키마)에서 로드하는 경로 추가 "
+            "(CONFIG_SOURCE=db). YAML/CSV 대신 vw_collector/vw_device/vw_tag를 읽어 "
+            "AppConfig+TagDefinition 구성 — DB 접속은 env(CONFIG_DB_*/DB_* 폴백), "
+            "collector 식별은 COLLECTOR_KEY. DB 미접속 시 지수 백오프(최대 30초) "
+            "영구 재시도(빈 config로 시작 안 함). PLC는 기존 _parse_tag_row 재사용, "
+            "BLE는 load_ble_tags 동일 구성. 기본값 CONFIG_SOURCE=file로 기존 동작 불변."
+        ),
+    },
+    {
+        "version": "0.3.6",
+        "date": "2026-05-04",
+        "changes": (
+            "fix: 운영 중 PLC 연결 끊김 시 영구 재연결 보장 — _reconnect_loop을 "
+            "collector 수명 동안 항상 실행 (기존: 시작 시점 첫 실패에만 시작 → "
+            "운영 중 끊긴 후 영원히 not_connected). 백오프 상한 5초→30초, "
+            "재연결 실패 ERROR 'Cannot reconnect to host:port' (60초 throttle), "
+            "복구 시 'Reconnected to host:port after N attempt(s)' INFO. "
+            "LOSS 로그 throttle (그룹별 첫 실패 + 30초 주기), 복구 시 "
+            "'Recovered group=X after N consecutive losses' INFO. "
+            "MC Protocol writer NoneType race 가드 (lock 대기 중 transport "
+            "정리되어 'NoneType.write' 에러 폭주하던 문제)."
+        ),
+    },
+    {
+        "version": "0.3.5",
+        "date": "2026-04-22",
+        "changes": (
+            "fix: POSIOT BLE profile 이중 스케일링 버그 — profile이 이미 ÷100 "
+            "변환한 값에 CSV decimals=2가 또 ÷100 적용되어 값이 100배 작게 "
+            "저장되던 문제. posiot/posiot_v2 profile을 raw int 반환으로 통일 "
+            "(CSV scale/offset/decimals가 단일 스케일링 경로). pressure 특수 "
+            "공식도 CSV의 선형 scale/offset으로 이전."
+        ),
+    },
     {
         "version": "0.3.4",
         "date": "2026-04-22",
@@ -85,8 +123,8 @@ CHANGELOG: List[Dict[str, str]] = [
 # Module Versions
 # =============================================================================
 MODULE_VERSIONS: Dict[str, str] = {
-    "core": "0.2.0",           # 핵심 인터페이스, 설정
-    "collectors": "0.3.2",     # 데이터 수집기 (비트 디바이스 워드 기반 읽기 통일)
+    "core": "0.3.0",           # config DB 로딩 (CollectorConfigDbReader + build_*_from_db)
+    "collectors": "0.3.4",     # 영구 재연결 + LOSS/Reconnect 로그 throttle + writer race 가드
     "processors": "0.3.0",     # 데이터 처리기 (재연결 캐시 초기화)
     "publishers": "0.3.0",     # 데이터 발행기 (지수 백오프)
     "pipeline": "0.2.0",       # 파이프라인 관리
@@ -98,7 +136,7 @@ MODULE_VERSIONS: Dict[str, str] = {
 # Protocol Support
 # =============================================================================
 SUPPORTED_PROTOCOLS: Dict[str, str] = {
-    "mc_protocol": "0.3.2",    # 미쓰비시 MC Protocol (비트 디바이스 워드 기반 읽기)
+    "mc_protocol": "0.3.3",    # writer NoneType race 가드 (동시 read 중 transport 정리)
     "modbus": "0.2.0",         # Modbus TCP/RTU (coil/discrete/STRING 추가)
 }
 

@@ -1,0 +1,52 @@
+# BLE_ORG — 기존 이미지(:new), device_id=1
+collector:
+  name: "BLE_ORG"
+  description: "BLE 기존 이미지 (ble_id=1)"
+  site: "진영전기"
+  area: "릴레이 생산"
+  line: "JH-2HO"
+  tags_file: "config/tags_ble_org.csv"
+
+  protocol:
+    type: "ble"
+    extra:
+      cache_ttl: 30.0
+      duplicate_filter_s: 4.0
+
+  devices:
+    - device_id: 1
+      mac_address: "D4:BB:36:61:27:AC"
+      device_name_filter: ""
+      device_profile: "pts-2305bp"
+      description: "BLE_ORG 테스트"
+
+  collection_groups:
+    - name: "ble_data"
+      interval_ms: 1000
+      mode: "on_change"
+      deadband: 0
+
+publisher:
+  rabbitmq:
+    enabled: true
+    host: "${RMQ_HOST:127.0.0.1}"
+    port: ${RMQ_PORT:5672}
+    virtual_host: "/"
+    username: "${RMQ_USER:admin}"
+    password: "${RMQ_PASS:admin}"
+    exchange_name: "plc.data"
+    routing_key_prefix: "plc"
+    compression: "zlib"
+    encryption_enabled: false
+  publish_interval_ms: 1000
+
+buffer:
+  max_size: 5000
+  batch_size: 200
+  threshold_ratio: 0.8
+
+logging:
+  level: "INFO"
+  collection_level: "INFO"
+  publish_level: "INFO"
+  loss_level: "ERROR"

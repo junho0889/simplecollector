@@ -365,8 +365,8 @@ python -m src.main -c config/test/collector_debug.yaml --dry-run
 python -m src.main --demo
 
 # Docker
-docker build --build-arg PROTOCOL=mc_protocol -f build/collector/Dockerfile -t neuro_collector_mc:mc-latest .
-docker run -d -v ./config:/app/config neuro_collector_mc:mc-latest
+docker build --build-arg PROTOCOL=mc_protocol -f build/collector/Dockerfile -t neuroforge_collector_mc:mc-latest .
+docker run -d -v ./config:/app/config neuroforge_collector_mc:mc-latest
 ```
 
 ---

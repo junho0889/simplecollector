@@ -27,7 +27,7 @@ services:
 
   # PLC-A: PS 접점 조립 (192.168.0.1:5007)
   collector-plc-a:
-    image: neuro_collector_mc:mc-latest
+    image: neuroforge_collector_mc:mc-latest
     container_name: jem-collector-plc-a
     volumes:
       - ./collector_plc1.yaml:/app/config/collector.yaml:ro
@@ -40,7 +40,7 @@ services:
 
   # PLC-B: YOKE 조립 (192.168.0.2:5007)
   collector-plc-b:
-    image: neuro_collector_mc:mc-latest
+    image: neuroforge_collector_mc:mc-latest
     container_name: jem-collector-plc-b
     volumes:
       - ./collector_plc2.yaml:/app/config/collector.yaml:ro
@@ -53,7 +53,7 @@ services:
 
   # PLC-C: TER 조립 (192.168.0.3:5007)
   collector-plc-c:
-    image: neuro_collector_mc:mc-latest
+    image: neuroforge_collector_mc:mc-latest
     container_name: jem-collector-plc-c
     volumes:
       - ./collector_plc3.yaml:/app/config/collector.yaml:ro
@@ -66,7 +66,7 @@ services:
 
   # PLC-D: 중간 검사 (192.168.0.4:5007)
   collector-plc-d:
-    image: neuro_collector_mc:mc-latest
+    image: neuroforge_collector_mc:mc-latest
     container_name: jem-collector-plc-d
     volumes:
       - ./collector_plc4.yaml:/app/config/collector.yaml:ro
@@ -79,7 +79,7 @@ services:
 
   # PLC-EFG: AIR 청소 (192.168.0.5:5007)
   collector-plc-efg:
-    image: neuro_collector_mc:mc-latest
+    image: neuroforge_collector_mc:mc-latest
     container_name: jem-collector-plc-efg
     volumes:
       - ./collector_plc5.yaml:/app/config/collector.yaml:ro
@@ -92,7 +92,7 @@ services:
 
   # PLC-H: 1차 SEAL 도포 및 건조 (192.168.0.6:5007)
   collector-plc-h:
-    image: neuro_collector_mc:mc-latest
+    image: neuroforge_collector_mc:mc-latest
     container_name: jem-collector-plc-h
     volumes:
       - ./collector_plc6.yaml:/app/config/collector.yaml:ro
@@ -105,7 +105,7 @@ services:
 
   # PLC-I: 예비납땜 (192.168.0.7:5007)
   collector-plc-i:
-    image: neuro_collector_mc:mc-latest
+    image: neuroforge_collector_mc:mc-latest
     container_name: jem-collector-plc-i
     volumes:
       - ./collector_plc7.yaml:/app/config/collector.yaml:ro
@@ -118,7 +118,7 @@ services:
 
   # PLC-J: 최종검사 (192.168.0.8:5007)
   collector-plc-j:
-    image: neuro_collector_mc:mc-latest
+    image: neuroforge_collector_mc:mc-latest
     container_name: jem-collector-plc-j
     volumes:
       - ./collector_plc8.yaml:/app/config/collector.yaml:ro
@@ -131,7 +131,7 @@ services:
 
   # PLC-K: LASER 날인 (192.168.0.9:5007)
   collector-plc-k:
-    image: neuro_collector_mc:mc-latest
+    image: neuroforge_collector_mc:mc-latest
     container_name: jem-collector-plc-k
     volumes:
       - ./collector_plc9.yaml:/app/config/collector.yaml:ro
@@ -144,7 +144,7 @@ services:
 
   # PLC-L: 동작검사 및 CASE and TER 검사 (192.168.0.10:5007)
   collector-plc-l:
-    image: neuro_collector_mc:mc-latest
+    image: neuroforge_collector_mc:mc-latest
     container_name: jem-collector-plc-l
     volumes:
       - ./collector_plc10.yaml:/app/config/collector.yaml:ro
@@ -166,7 +166,7 @@ services:
   # Publisher DB1: 로컬 TimescaleDB (192.168.0.236:15432)
   # 큐: queue.db, queue.monitor
   publisher-db1:
-    image: neuro_publisher:latest
+    image: neuroforge_publisher:latest
     container_name: jem-publisher-db1
     volumes:
       - ./:/app/config:ro
@@ -178,7 +178,7 @@ services:
   # Publisher DB2: 원격 TimescaleDB (10.8.0.2:5432)
   # 큐: queue.db.copy, queue.monitor.copy
   publisher-db2:
-    image: neuro_publisher:latest
+    image: neuroforge_publisher:latest
     container_name: jem-publisher-db2
     volumes:
       - ./:/app/config:ro

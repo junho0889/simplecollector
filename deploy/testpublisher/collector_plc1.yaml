@@ -1,0 +1,20 @@
+# Test collector config for master sync test
+collector:
+  plc_id: 1
+  name: "PLC-TEST"
+  description: "Master sync test PLC"
+  tags_file: "config/tags_test.csv"
+
+  protocol:
+    type: "mc_protocol"
+    host: "192.168.0.100"
+    port: 5000
+    unit_id: 1
+    timeout_ms: 5000
+    reconnect_interval_ms: 3000
+
+  collection_groups:
+    - name: "plc_data"
+      interval_ms: 1000
+    - name: "alm"
+      interval_ms: 1000

@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "simple-collector"
+name = "neuroforge-collector"
 version = "0.3.3"
 description = "Industrial PLC Data Collector"
 requires-python = ">=3.10"
@@ -48,13 +48,13 @@ dev = [
 ]
 
 [project.scripts]
-simple-collector = "src.main:run"
+neuroforge-collector = "src.main:run"
 
-[project.entry-points."simple_collector.protocols"]
+[project.entry-points."neuroforge_collector.protocols"]
 mc_protocol = "src.collectors.mc_protocol:McProtocolCollector"
 modbus = "src.collectors.modbus:ModbusCollector"
 s7_protocol = "src.collectors.s7_protocol:S7Collector"
-[project.entry-points."simple_collector.publishers"]
+[project.entry-points."neuroforge_collector.publishers"]
 database = "src.publishers.database:DatabasePublisher"
 mqtt = "src.publishers.mqtt:MqttPublisher"
 

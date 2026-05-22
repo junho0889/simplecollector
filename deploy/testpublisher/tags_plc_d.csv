@@ -1,0 +1,13 @@
+tag_id,tag_name,memory,address,data_type,collection_group,scale,offset,decimals,word_length,format,unit,description
+4,공급 서보 ON,Y,443,bool,plc_data,1,0,,,,,1# 공급 서보 ON
+5,피딩 서보 ON,Y,444,bool,plc_data,1,0,,,,,4# 피딩 서보 ON
+6,공급 서보 ON,Y,445,bool,plc_data,1,0,,,,,6# 공급 서보 ON
+7,리벳팅 서보 ON,Y,446,bool,plc_data,1,0,,,,,8# 리벳팅 서보 ON
+8,공급 서보 ON,Y,447,bool,plc_data,1,0,,,,,10# 공급 서보 ON
+9,서보 활성화 ON_수정됨,Y,1115,bool,plc_data,1,0,,,,,3# 서보 활성화 ON (description 변경 테스트)
+14,자동기동_지시등,Y,403,bool,plc_data,1,0,,,,,판넬 자동 기동 램프
+15,자동정지_지시등,Y,404,bool,plc_data,1,0,,,,,판넬 자동 정지 램프
+19,현재모델번호,D,100,word,plc_data,1,0,,1,,,현재 생산 중인 모델 번호
+20,모델선택순서,D,3996,word,plc_data,1,0,,1,,,모델 선택 순서 번호
+21,비상정지_상태,X,100,bool,plc_data,1,0,,,,,비상정지 버튼 1번 입력 상태
+30,신규태그_테스트,D,500,uint16,plc_data,1,0,1,,,,새로 추가된 태그

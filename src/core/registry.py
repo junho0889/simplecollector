@@ -105,7 +105,7 @@ class ProtocolRegistry:
 
         if not available:
             logger.error(f"Protocol '{protocol}' not available: {msg}")
-            logger.info(f"Install with: pip install simple-collector[{protocol}]")
+            logger.info(f"Install with: pip install neuroforge-collector[{protocol}]")
             return None
 
         try:
@@ -231,7 +231,7 @@ def print_environment():
     """환경 정보 출력."""
     env = check_environment()
 
-    print("\n=== Simple Collector - Available Modules ===\n")
+    print("\n=== NeuroForge Collector - Available Modules ===\n")
 
     print("Protocols:")
     for protocol, available in env['protocols'].items():
@@ -244,7 +244,7 @@ def print_environment():
         print(f"  {status} {publisher}")
 
     print("\nTo install missing modules:")
-    print("  pip install simple-collector[modbus]")
-    print("  pip install simple-collector[rabbitmq]")
-    print("  pip install simple-collector[full]")
+    print("  pip install neuroforge-collector[modbus]")
+    print("  pip install neuroforge-collector[rabbitmq]")
+    print("  pip install neuroforge-collector[full]")
     print()

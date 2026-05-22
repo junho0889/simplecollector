@@ -1,0 +1,63 @@
+# ============================================================================
+# Publisher DB1 — 로컬 TimescaleDB (BLE 전용 테스트)
+# ============================================================================
+
+rabbitmq:
+  host: "${RABBITMQ_HOST:rabbitmq}"
+  port: 5672
+  virtual_host: "/"
+  username: "${RABBITMQ_USER:admin}"
+  password: "${RABBITMQ_PASSWORD:admin}"
+  exchange_name: "plc.data"
+  exchange_type: "topic"
+  queue_db: "queue.db"
+  queue_mqtt: "queue.mqtt"
+  queue_monitor: "queue.monitor"
+  routing_key_pattern: "plc.*.data"
+  prefetch_count: 500
+  monitor_prefetch: 30
+  monitor_message_ttl: 30000
+  monitor_max_length: 10000
+  heartbeat: 60
+  connection_timeout: 10
+  compression: "zlib"
+  encryption_enabled: false
+  encryption_key: ""
+
+database:
+  enabled: true
+  host: "timescaledb"
+  port: 5432
+  database: "neurosense"
+  user: "postgres"
+  password: "postgres"
+  pool_size: 5
+  pool_min_size: 2
+  schema_name: "jem_ble_test"
+  device_types: ["ble"]
+  insert_method: "copy"
+  auto_init_schema: true
+  master_sync_enabled: true
+  collection_groups:
+    - name: "ble_data"
+      mode: "all"
+      device_type: "ble"
+      retention_period: "7 days"
+      compression_after: "1 hour"
+  compression_after: "1 hour"
+  compression_segmentby: "ble_id, tag_id"
+  compression_orderby: "timestamp DESC"
+  retention_period: "7 days"
+
+scheduler:
+  enabled: false
+  jobs: []
+
+mqtt:
+  enabled: false
+
+logging:
+  level: "INFO"
+  file_path: "logs/publisher-db1.log"
+  max_size_mb: 10
+  backup_count: 5

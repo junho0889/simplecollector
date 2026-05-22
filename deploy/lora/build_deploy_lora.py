@@ -33,15 +33,15 @@ BUILDS = {
     "collector": {
         "context": COLLECTOR_DIR,
         "dockerfile": COLLECTOR_DIR / "build" / "collector" / "Dockerfile",
-        "image": "neuro_collector_lora:latest",
-        "output": DEPLOY_DIR / "neuro_collector_lora.tar",
+        "image": "neuroforge_collector_lora:latest",
+        "output": DEPLOY_DIR / "neuroforge_collector_lora.tar",
         "build_args": {"PROTOCOL": "lora_rak5146"},
     },
     "publisher": {
         "context": PUBLISHER_DIR,
         "dockerfile": PUBLISHER_DIR / "Dockerfile",
-        "image": "neuro_publisher:latest",
-        "output": DEPLOY_DIR / "neuro_publisher.tar",
+        "image": "neuroforge_publisher:latest",
+        "output": DEPLOY_DIR / "neuroforge_publisher.tar",
         "build_args": {},
     },
 }
@@ -148,8 +148,8 @@ def main():
         print(f"    scp deploy/lora/*.tar user@gateway:/path/")
         print(f"    scp deploy/lora/docker-compose.yml deploy/lora/*.yaml deploy/lora/*.csv deploy/lora/mosquitto.conf user@gateway:/path/")
         print(f"    # 게이트웨이에서:")
-        print(f"    docker load -i neuro_collector_lora.tar")
-        print(f"    docker load -i neuro_publisher.tar")
+        print(f"    docker load -i neuroforge_collector_lora.tar")
+        print(f"    docker load -i neuroforge_publisher.tar")
         print(f"    docker-compose up -d")
         return 0
     else:

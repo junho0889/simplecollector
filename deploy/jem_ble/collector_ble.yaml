@@ -19,25 +19,23 @@ collector:
       mac_address: "F6:5A:83:C7:DB:C7"
       device_name_filter: "POSIOT"
       device_profile: "pts-2305bp"
-      description: "센서_진동프로브"
+      description: "Air 청소 진동센서"
 
     - device_id: 2
       mac_address: "F5:12:5E:BE:EE:12"
       device_name_filter: "POSIOT"
       device_profile: "pts-2305bp"
-      description: "센서_온도프로브"
+      description: "1차씰 도포&건조 온도센서"
 
     - device_id: 3
       mac_address: "E5:79:FD:DB:0A:38"
       device_name_filter: "POSIOT"
       device_profile: "pts-0624b"
-      description: "비방수 센서_전류측정"
+      description: "1차씰 도포&건조 전류센서"
 
   collection_groups:
     - name: "ble_data"
       interval_ms: 1000
-      mode: "on_change"       # 값 변경 시에만 발행 (BLE 센서는 느리게 변하는 값이 많음)
-      deadband: 0             # 0 → 모든 변경 캡처 (노이즈 억제 필요 시 값 상향)
 
 publisher:
   rabbitmq:

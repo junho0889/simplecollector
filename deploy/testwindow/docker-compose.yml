@@ -49,7 +49,7 @@ services:
   # ========================================================================
 
   collector-plc-d:
-    image: neuro_collector_mc:mc-latest
+    image: neuroforge_collector_mc:mc-latest
     container_name: tw-collector-plc-d
     volumes:
       - ./collector_plc4.yaml:/app/config/collector.yaml:ro
@@ -67,7 +67,7 @@ services:
   # ========================================================================
 
   publisher:
-    image: neuro_publisher:latest
+    image: neuroforge_publisher:latest
     container_name: tw-publisher
     volumes:
       - ./:/app/config:ro

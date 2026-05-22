@@ -1,5 +1,5 @@
 # =============================================================================
-# Simple Collector - Status API Service
+# NeuroForge Collector - Status API Service
 # =============================================================================
 # Copyright (c) 2024-2026 NEUROSENSE Inc. All Rights Reserved.
 # =============================================================================
@@ -107,7 +107,7 @@ class StatusAPIService:
     async def _handle_root(self, request: web.Request) -> web.Response:
         """루트 엔드포인트"""
         return web.json_response({
-            "name": "Simple Collector",
+            "name": "NeuroForge Collector",
             "version": "1.0.0",
             "status": "running",
             "api_version": "v1",
@@ -146,7 +146,7 @@ class StatusAPIService:
         uptime = time.time() - self._start_time
 
         status = {
-            "name": "Simple Collector",
+            "name": "NeuroForge Collector",
             "version": "1.0.0",
             "uptime": round(uptime, 2),
             "timestamp": datetime.now().isoformat(),

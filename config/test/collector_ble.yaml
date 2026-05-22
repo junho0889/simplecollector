@@ -1,4 +1,4 @@
-# Simple Collector - BLE (Bluetooth Low Energy) Configuration
+# NeuroForge Collector - BLE (Bluetooth Low Energy) Configuration
 # ============================================================
 # POSIOT 진동/환경 센서 → BLE advertisement → RabbitMQ
 #

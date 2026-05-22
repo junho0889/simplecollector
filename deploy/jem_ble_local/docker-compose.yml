@@ -1,0 +1,104 @@
+# ============================================================================
+# BLE 테스트 배포 — 동일 이미지 2 컨테이너 (device_id=1, 2 비교)
+# ============================================================================
+# Pi 192.168.1.2
+# 스키마: jem_ble_test (BLE 전용, PLC 테이블 없음)
+
+networks:
+  jem-net:
+    driver: bridge
+
+volumes:
+  rabbitmq_data:
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: jem-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - jem-net
+    restart: unless-stopped
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: jem-timescaledb
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: neurosense
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - ./timescale_data/pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d neurosense"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - jem-net
+    restart: unless-stopped
+
+  collector-ble-org:
+    image: neuroforge_collector_ble:new
+    container_name: jem-collector-ble-org
+    network_mode: host
+    privileged: true
+    volumes:
+      - /var/run/dbus:/var/run/dbus:ro
+      - ./collector_ble_org.yaml:/app/config/collector.yaml:ro
+      - ./tags_ble_org.csv:/app/config/tags_ble_org.csv:ro
+      - ./tags_ble_new.csv:/app/config/tags_ble_new.csv:ro
+    environment:
+      RMQ_HOST: 127.0.0.1
+      RMQ_PORT: 5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  collector-ble-new:
+    image: neuroforge_collector_ble:v033
+    container_name: jem-collector-ble-new
+    network_mode: host
+    privileged: true
+    volumes:
+      - /var/run/dbus:/var/run/dbus:ro
+      - ./collector_ble_new.yaml:/app/config/collector.yaml:ro
+      - ./tags_ble_org.csv:/app/config/tags_ble_org.csv:ro
+      - ./tags_ble_new.csv:/app/config/tags_ble_new.csv:ro
+    environment:
+      RMQ_HOST: 127.0.0.1
+      RMQ_PORT: 5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  publisher-db1:
+    image: neuroforge_publisher:latest
+    container_name: jem-publisher-db1
+    volumes:
+      - ./:/app/config:ro
+    command: ["--config", "/app/config/publisher_db1.yaml"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - jem-net
+    restart: unless-stopped

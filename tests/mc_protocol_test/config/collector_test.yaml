@@ -1,5 +1,5 @@
 # ==============================================================================
-# Simple Collector - Docker Test Configuration (MC Protocol)
+# NeuroForge Collector - Docker Test Configuration (MC Protocol)
 # ==============================================================================
 # mc-simulator:5000 → RabbitMQ(host.docker.internal:5672)
 # ==============================================================================

@@ -1,0 +1,119 @@
+# ============================================================================
+# RPi (192.168.0.14) — 10 MC Collectors + 1 BLE Collector
+# ============================================================================
+# MC Simulator: 192.168.0.12:5001-5010
+# RabbitMQ:     192.168.0.12:46672
+# ============================================================================
+
+services:
+
+  collector-plc-a:
+    image: neuroforge_collector_mc:test-arm64
+    container_name: rpi-collector-plc-a
+    volumes:
+      - ./config/collector_plc1.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_04_PLC-A.csv:/app/config/tags_04_PLC-A.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    restart: unless-stopped
+
+  collector-plc-b:
+    image: neuroforge_collector_mc:test-arm64
+    container_name: rpi-collector-plc-b
+    volumes:
+      - ./config/collector_plc2.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_02_PLC-B.csv:/app/config/tags_02_PLC-B.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    restart: unless-stopped
+
+  collector-plc-c:
+    image: neuroforge_collector_mc:test-arm64
+    container_name: rpi-collector-plc-c
+    volumes:
+      - ./config/collector_plc3.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_05_PLC-C.csv:/app/config/tags_05_PLC-C.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    restart: unless-stopped
+
+  collector-plc-d:
+    image: neuroforge_collector_mc:test-arm64
+    container_name: rpi-collector-plc-d
+    volumes:
+      - ./config/collector_plc4.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_10_PLC-D.csv:/app/config/tags_10_PLC-D.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    restart: unless-stopped
+
+  collector-plc-efg:
+    image: neuroforge_collector_mc:test-arm64
+    container_name: rpi-collector-plc-efg
+    volumes:
+      - ./config/collector_plc5.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_01_PLC-EFG.csv:/app/config/tags_01_PLC-EFG.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    restart: unless-stopped
+
+  collector-plc-h:
+    image: neuroforge_collector_mc:test-arm64
+    container_name: rpi-collector-plc-h
+    volumes:
+      - ./config/collector_plc6.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_06_PLC-H.csv:/app/config/tags_06_PLC-H.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    restart: unless-stopped
+
+  collector-plc-i:
+    image: neuroforge_collector_mc:test-arm64
+    container_name: rpi-collector-plc-i
+    volumes:
+      - ./config/collector_plc7.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_07_PLC-I.csv:/app/config/tags_07_PLC-I.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    restart: unless-stopped
+
+  collector-plc-j:
+    image: neuroforge_collector_mc:test-arm64
+    container_name: rpi-collector-plc-j
+    volumes:
+      - ./config/collector_plc8.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_03_PLC-J.csv:/app/config/tags_03_PLC-J.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    restart: unless-stopped
+
+  collector-plc-k:
+    image: neuroforge_collector_mc:test-arm64
+    container_name: rpi-collector-plc-k
+    volumes:
+      - ./config/collector_plc9.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_08_PLC-K.csv:/app/config/tags_08_PLC-K.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    restart: unless-stopped
+
+  collector-plc-l:
+    image: neuroforge_collector_mc:test-arm64
+    container_name: rpi-collector-plc-l
+    volumes:
+      - ./config/collector_plc10.yaml:/app/config/collector.yaml:ro
+      - ./config/tags_09_PLC-L.csv:/app/config/tags_09_PLC-L.csv:ro
+    environment:
+      CONFIG_PATH: config/collector.yaml
+    restart: unless-stopped
+
+  collector-ble:
+    image: neuroforge_collector_ble:test-latest
+    container_name: rpi-collector-ble
+    network_mode: host
+    privileged: true
+    volumes:
+      - /var/run/dbus:/var/run/dbus:ro
+      - ./collector_ble.yaml:/app/config/collector.yaml:ro
+      - ./tags_ble.csv:/app/config/tags_ble.csv:ro
+    restart: unless-stopped

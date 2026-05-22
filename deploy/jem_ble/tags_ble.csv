@@ -1,12 +1,47 @@
 device_id,tag_id,tag_name,data_type,collection_group,scale,offset,decimals,unit,description
-# === 1호기 (device_id=1) — 가속도/진동 태그만 ===
-1,1,accel_rms_x,float32,ble_data,1,0,3,g,1호기 가속도X
-1,2,accel_rms_y,float32,ble_data,1,0,3,g,1호기 가속도Y
-1,3,accel_rms_z,float32,ble_data,1,0,3,g,1호기 가속도Z
-1,4,velocity_rms_under_1k,float32,ble_data,1,0,3,mm/s,1호기 속도RMS
-1,5,accel_rms_1k_5k,float32,ble_data,1,0,3,g,1호기 가속도1-5k
-1,6,vibration_peak,uint16,ble_data,1,0,,,1호기 진동피크
-# === 2호기 (device_id=2) — 프로브 온도만 ===
-2,1,prob_temp,float32,ble_data,1,0,2,℃,2호기 프로브온도
-# === 3호기 (device_id=3) — 전류만 ===
-3,1,current,float32,ble_data,1,0,2,A,3호기 전류
+# === Pulley 진동프로브 (device_id=1, PTS-2305BP, F6:5A:83:C7:DB:C7) ===
+1,1,temperature,int16,ble_data,1,0,2,℃,Pulley 진동프로브 온도
+1,2,humidity,int16,ble_data,1,0,2,%,Pulley 진동프로브 습도
+1,3,pressure,uint16,ble_data,0.0622559,12.207,,hPa,Pulley 진동프로브 기압
+1,4,battery,uint8,ble_data,1,0,,%,Pulley 진동프로브 배터리
+1,5,accel_rms_x,uint16,ble_data,1,0,2,m/s²,Pulley 진동프로브 가속도X
+1,6,accel_rms_y,uint16,ble_data,1,0,2,m/s²,Pulley 진동프로브 가속도Y
+1,7,accel_rms_z,uint16,ble_data,1,0,2,m/s²,Pulley 진동프로브 가속도Z
+1,8,velocity_rms_under_1k,uint16,ble_data,1,0,2,mm/s,Pulley 진동프로브 속도RMS
+1,9,accel_rms_1k_5k,uint16,ble_data,1,0,2,m/s²,Pulley 진동프로브 가속도1-5k
+1,10,vibration_peak,uint16,ble_data,1,0,,Hz,Pulley 진동프로브 진동피크
+1,11,harmony_cnt_under_1k,uint8,ble_data,1,0,,count,Pulley 진동프로브 하모니카운트저
+1,12,harmony_cnt_1k_5k,uint8,ble_data,1,0,,count,Pulley 진동프로브 하모니카운트고
+1,13,gravity_mag_xyz,uint16,ble_data,1,0,,mg,Pulley 진동프로브 중력크기
+1,14,sound_db,uint8,ble_data,1,0,,dB,Pulley 진동프로브 소음
+1,15,sound_peak,uint16,ble_data,1,0,,Hz,Pulley 진동프로브 소음피크
+1,16,prob_temp,int16,ble_data,1,0,2,℃,Pulley 진동프로브 프로브온도
+# === Pulley 온도프로브 (device_id=2, PTS-2305BP, F5:12:5E:BE:EE:12) ===
+2,1,temperature,int16,ble_data,1,0,2,℃,Pulley 온도프로브 온도
+2,2,humidity,int16,ble_data,1,0,2,%,Pulley 온도프로브 습도
+2,3,pressure,uint16,ble_data,0.0622559,12.207,,hPa,Pulley 온도프로브 기압
+2,4,battery,uint8,ble_data,1,0,,%,Pulley 온도프로브 배터리
+2,5,accel_rms_x,uint16,ble_data,1,0,2,m/s²,Pulley 온도프로브 가속도X
+2,6,accel_rms_y,uint16,ble_data,1,0,2,m/s²,Pulley 온도프로브 가속도Y
+2,7,accel_rms_z,uint16,ble_data,1,0,2,m/s²,Pulley 온도프로브 가속도Z
+2,8,velocity_rms_under_1k,uint16,ble_data,1,0,2,mm/s,Pulley 온도프로브 속도RMS
+2,9,accel_rms_1k_5k,uint16,ble_data,1,0,2,m/s²,Pulley 온도프로브 가속도1-5k
+2,10,vibration_peak,uint16,ble_data,1,0,,Hz,Pulley 온도프로브 진동피크
+2,11,harmony_cnt_under_1k,uint8,ble_data,1,0,,count,Pulley 온도프로브 하모니카운트저
+2,12,harmony_cnt_1k_5k,uint8,ble_data,1,0,,count,Pulley 온도프로브 하모니카운트고
+2,13,gravity_mag_xyz,uint16,ble_data,1,0,,mg,Pulley 온도프로브 중력크기
+2,14,sound_db,uint8,ble_data,1,0,,dB,Pulley 온도프로브 소음
+2,15,sound_peak,uint16,ble_data,1,0,,Hz,Pulley 온도프로브 소음피크
+2,16,prob_temp,int16,ble_data,1,0,2,℃,Pulley 온도프로브 프로브온도
+# === 비방수 전류센서 (device_id=3, PTS-0624B, E5:79:FD:DB:0A:38) ===
+3,1,sound_db,uint16,ble_data,1,0,,dB,비방수 전류센서 소음
+3,2,velocity_rms,uint16,ble_data,1,0,,mm/s,비방수 전류센서 속도RMS
+3,3,accel_x,int16,ble_data,1,0,,mg,비방수 전류센서 가속도X
+3,4,accel_y,int16,ble_data,1,0,,mg,비방수 전류센서 가속도Y
+3,5,accel_z,int16,ble_data,1,0,,mg,비방수 전류센서 가속도Z
+3,6,temperature,int16,ble_data,1,0,2,℃,비방수 전류센서 온도
+3,7,humidity,uint16,ble_data,1,0,2,%,비방수 전류센서 습도
+3,8,vib_fft_freq,uint16,ble_data,1,0,,Hz,비방수 전류센서 진동FFT주파수
+3,9,sound_fft_freq,uint16,ble_data,1,0,,Hz,비방수 전류센서 소음FFT주파수
+3,10,probe,int16,ble_data,1,0,2,A,비방수 전류센서 전류
+3,11,battery,uint8,ble_data,1,0,,%,비방수 전류센서 배터리

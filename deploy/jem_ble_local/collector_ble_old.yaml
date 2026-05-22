@@ -1,0 +1,63 @@
+# ============================================================================
+# BLE Collector (구버전 이미지 :old) — D4:BB:36:61:27:AC 테스트
+# ============================================================================
+# 동일 MAC을 신버전과 동시에 수집. 구 포맷 (plc_id + 단일 device 구조).
+
+collector:
+  plc_id: 2
+  name: "BLE_OLD"
+  tags_file: "config/tags_ble_old.csv"
+
+  protocol:
+    type: "ble"
+    host: ""
+    port: 0
+    unit_id: 1
+    timeout_ms: 10000
+    reconnect_interval_ms: 5000
+
+    extra:
+      mac_address: "D4:BB:36:61:27:AC"
+      device_name_filter: ""
+      device_profile: "posiot"
+      cache_ttl: 30.0
+      duplicate_filter_s: 4.0
+
+  collection_groups:
+    - name: "ble_env"
+      interval_ms: 1000
+      timeout_ms: 10000
+      retry_count: 1
+      retry_delay_ms: 2000
+
+buffer:
+  max_size: 5000
+  flush_threshold: 100
+  flush_interval_ms: 5000
+
+publisher:
+  batch_size: 100
+  retry_count: 3
+  retry_delay_ms: 1000
+
+  rabbitmq:
+    enabled: true
+    host: "${RABBITMQ_HOST:127.0.0.1}"
+    port: ${RABBITMQ_PORT:5672}
+    virtual_host: "/"
+    username: "admin"
+    password: "admin"
+    exchange_name: "plc.data"
+    exchange_type: "topic"
+    routing_key_prefix: "plc"
+    compression: "zlib"
+    encryption_enabled: false
+    heartbeat: 60
+    connection_timeout: 10
+    delivery_mode: 2
+
+logging:
+  level: "DEBUG"
+  collection_level: "DEBUG"
+  publish_level: "INFO"
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"

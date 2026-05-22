@@ -1,0 +1,743 @@
+{
+  "name": "neuroforge_collector_mc",
+  "display_name": "MC Protocol Collector",
+  "description": "미쯔비시 MC Protocol PLC 데이터 수집기 (iQ-R/Q/L/FX 시리즈)",
+  "version": "0.3.2",
+  "docker_image": "neuroforge_collector_mc:mc-latest",
+  "service_type": "collector",
+  "protocol": "mc_protocol",
+  "icon": "cpu",
+
+  "config_schema": {
+    "groups": [
+      {
+        "key": "plc_info",
+        "label": "PLC 기본 정보",
+        "description": "수집 대상 PLC 식별 정보. 사이트/라인별 구분을 위해 사용됩니다",
+        "icon": "info",
+        "order": 1,
+        "fields": [
+          {
+            "key": "collector.plc_id",
+            "label": "PLC ID",
+            "type": "number",
+            "default": 1,
+            "required": true,
+            "description": "PLC 고유 식별 번호. 사이트 내에서 중복되지 않아야 합니다",
+            "placeholder": "1",
+            "validation": { "min": 1, "max": 100, "step": 1 }
+          },
+          {
+            "key": "collector.name",
+            "label": "PLC 이름",
+            "type": "text",
+            "default": "",
+            "required": true,
+            "description": "PLC 장비 이름. 관리 화면에서 식별용으로 사용됩니다",
+            "placeholder": "PLC-01",
+            "validation": { "max_length": 100 }
+          },
+          {
+            "key": "collector.description",
+            "label": "설명",
+            "type": "text",
+            "default": "",
+            "required": false,
+            "description": "PLC 장비에 대한 추가 설명",
+            "placeholder": "1호기 메인 PLC",
+            "validation": { "max_length": 200 }
+          },
+          {
+            "key": "collector.site",
+            "label": "사이트",
+            "type": "text",
+            "default": "",
+            "required": false,
+            "description": "PLC가 설치된 사이트(공장) 이름",
+            "placeholder": "본사 공장",
+            "validation": { "max_length": 50 }
+          },
+          {
+            "key": "collector.area",
+            "label": "구역",
+            "type": "text",
+            "default": "",
+            "required": false,
+            "description": "PLC가 설치된 구역 이름",
+            "placeholder": "A동",
+            "validation": { "max_length": 50 }
+          },
+          {
+            "key": "collector.line",
+            "label": "라인",
+            "type": "text",
+            "default": "",
+            "required": false,
+            "description": "PLC가 설치된 생산 라인 이름",
+            "placeholder": "1라인",
+            "validation": { "max_length": 50 }
+          },
+          {
+            "key": "collector.tags_file",
+            "label": "태그 파일 경로",
+            "type": "text",
+            "default": "config/tags.csv",
+            "required": true,
+            "description": "태그 정의 CSV 파일 경로. 컨테이너 내부 경로 기준",
+            "placeholder": "config/tags.csv",
+            "validation": { "max_length": 200 }
+          }
+        ]
+      },
+      {
+        "key": "protocol",
+        "label": "프로토콜 설정",
+        "description": "PLC 통신 프로토콜 및 네트워크 연결 정보",
+        "icon": "plug",
+        "order": 2,
+        "fields": [
+          {
+            "key": "collector.protocol.type",
+            "label": "프로토콜 타입",
+            "type": "select",
+            "default": "mc_protocol",
+            "required": true,
+            "description": "PLC 통신 프로토콜 종류",
+            "options": [
+              { "value": "mc_protocol", "label": "MC Protocol", "description": "미쯔비시 MC Protocol (iQ-R/Q/L/FX)" },
+              { "value": "modbus", "label": "Modbus", "description": "Modbus TCP/RTU" }
+            ]
+          },
+          {
+            "key": "collector.protocol.host",
+            "label": "PLC IP 주소",
+            "type": "ip",
+            "default": "",
+            "required": true,
+            "description": "PLC의 IP 주소. Ethernet 모듈에 설정된 IP를 입력하세요",
+            "placeholder": "192.168.1.10"
+          },
+          {
+            "key": "collector.protocol.port",
+            "label": "PLC 포트",
+            "type": "number",
+            "default": 5007,
+            "required": true,
+            "description": "PLC 통신 포트. MC Protocol 기본값: iQ-R=5007, Q/L=5002",
+            "placeholder": "5007",
+            "validation": { "min": 1, "max": 65535, "step": 1 }
+          },
+          {
+            "key": "collector.protocol.unit_id",
+            "label": "유닛 ID",
+            "type": "number",
+            "default": 1,
+            "required": false,
+            "description": "PLC 유닛 식별자. 멀티 드롭 환경에서 사용",
+            "placeholder": "1",
+            "validation": { "min": 0, "max": 255, "step": 1 }
+          },
+          {
+            "key": "collector.protocol.timeout_ms",
+            "label": "통신 타임아웃",
+            "type": "number",
+            "default": 5000,
+            "required": false,
+            "description": "PLC 요청 응답 대기 시간. 초과 시 타임아웃 에러 발생",
+            "placeholder": "5000",
+            "suffix": "ms",
+            "validation": { "min": 500, "max": 30000, "step": 100 }
+          },
+          {
+            "key": "collector.protocol.reconnect_interval_ms",
+            "label": "재연결 대기 시간",
+            "type": "number",
+            "default": 10000,
+            "required": false,
+            "description": "PLC 연결 끊김 후 재연결 시도까지 대기 시간",
+            "placeholder": "10000",
+            "suffix": "ms",
+            "validation": { "min": 1000, "max": 60000, "step": 1000 }
+          }
+        ]
+      },
+      {
+        "key": "protocol_mc",
+        "label": "MC Protocol 설정",
+        "description": "미쯔비시 MC Protocol 전용 설정. PLC 시리즈와 프레임 타입에 따라 통신 방식이 달라집니다",
+        "icon": "cpu",
+        "order": 3,
+        "fields": [
+          {
+            "key": "collector.protocol.extra.plc_series",
+            "label": "PLC 시리즈",
+            "type": "select",
+            "default": "iq-r",
+            "required": true,
+            "description": "연결할 미쯔비시 PLC 시리즈. 시리즈에 따라 프레임/디바이스 범위가 다릅니다",
+            "options": [
+              { "value": "iq-r", "label": "iQ-R 시리즈", "description": "MELSEC iQ-R (최신, 고성능)" },
+              { "value": "q", "label": "Q 시리즈", "description": "MELSEC-Q (범용)" },
+              { "value": "l", "label": "L 시리즈", "description": "MELSEC-L (소형)" },
+              { "value": "iq-f", "label": "iQ-F 시리즈", "description": "MELSEC iQ-F (FX5 후속)" }
+            ]
+          },
+          {
+            "key": "collector.protocol.extra.frame_type",
+            "label": "프레임 타입",
+            "type": "select",
+            "default": "binary_3e",
+            "required": true,
+            "description": "MC Protocol 통신 프레임 형식. 바이너리 3E가 가장 일반적입니다",
+            "options": [
+              { "value": "binary_3e", "label": "바이너리 3E", "description": "QnA 호환 바이너리 프레임 (가장 일반적)" },
+              { "value": "binary_4e", "label": "바이너리 4E", "description": "iQ-R 전용 확장 프레임" },
+              { "value": "slmp_3e", "label": "SLMP 3E", "description": "SLMP(Seamless Message Protocol) 프레임" }
+            ]
+          },
+          {
+            "key": "collector.protocol.extra.max_address_gap",
+            "label": "최대 주소 갭",
+            "type": "number",
+            "default": 500,
+            "required": false,
+            "description": "연속 읽기 시 허용하는 최대 주소 간격. 값이 클수록 한 번에 더 넓은 범위를 읽습니다",
+            "placeholder": "500",
+            "suffix": "워드",
+            "validation": { "min": 1, "max": 960, "step": 10 }
+          }
+        ]
+      },
+      {
+        "key": "protocol_network",
+        "label": "MC 네트워크 설정",
+        "description": "MC Protocol 네트워크 라우팅 설정. 멀티 스테이션 환경에서만 변경이 필요합니다",
+        "icon": "network",
+        "order": 4,
+        "collapsed": true,
+        "fields": [
+          {
+            "key": "collector.protocol.extra.network_no",
+            "label": "네트워크 번호",
+            "type": "number",
+            "default": 0,
+            "required": false,
+            "description": "MC Protocol 네트워크 번호. 단일 네트워크 환경에서는 0 사용",
+            "placeholder": "0",
+            "validation": { "min": 0, "max": 255, "step": 1 }
+          },
+          {
+            "key": "collector.protocol.extra.pc_no",
+            "label": "PC 번호",
+            "type": "hex",
+            "default": "0xFF",
+            "required": false,
+            "description": "요청 원본 PC 번호. 기본 0xFF는 로컬 PC를 의미합니다",
+            "placeholder": "0xFF"
+          },
+          {
+            "key": "collector.protocol.extra.unit_io",
+            "label": "유닛 I/O 번호",
+            "type": "hex",
+            "default": "0x03FF",
+            "required": false,
+            "description": "대상 유닛 I/O 번호. CPU 직접 접근 시 0x03FF 사용",
+            "placeholder": "0x03FF"
+          },
+          {
+            "key": "collector.protocol.extra.unit_station",
+            "label": "유닛 국번",
+            "type": "number",
+            "default": 0,
+            "required": false,
+            "description": "대상 유닛 국번. CPU 직접 접근 시 0 사용",
+            "placeholder": "0",
+            "validation": { "min": 0, "max": 255, "step": 1 }
+          }
+        ]
+      },
+      {
+        "key": "collection_groups",
+        "label": "수집 그룹 설정",
+        "description": "태그를 그룹별로 나눠 다른 주기/방식으로 수집합니다. 그룹별 수집 주기와 모드를 설정하세요",
+        "icon": "layers",
+        "order": 5,
+        "type": "array",
+        "item_label": "수집 그룹",
+        "min_items": 1,
+        "max_items": 10,
+        "fields": [
+          {
+            "key": "name",
+            "label": "그룹 이름",
+            "type": "text",
+            "default": "",
+            "required": true,
+            "description": "수집 그룹 식별 이름. 태그 CSV의 collection_group 컬럼과 매칭됩니다",
+            "placeholder": "plc_data",
+            "validation": { "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$", "max_length": 50 }
+          },
+          {
+            "key": "interval_ms",
+            "label": "수집 주기",
+            "type": "number",
+            "default": 1000,
+            "required": true,
+            "description": "데이터 수집 간격. polling 모드에서 이 주기마다 PLC를 읽습니다",
+            "placeholder": "1000",
+            "suffix": "ms",
+            "validation": { "min": 10, "max": 300000, "step": 10 }
+          },
+          {
+            "key": "timeout_ms",
+            "label": "수집 타임아웃",
+            "type": "number",
+            "default": 5000,
+            "required": false,
+            "description": "그룹별 수집 타임아웃. 이 시간 내에 수집이 완료되지 않으면 에러 처리",
+            "placeholder": "5000",
+            "suffix": "ms",
+            "validation": { "min": 500, "max": 30000, "step": 100 }
+          },
+          {
+            "key": "retry_count",
+            "label": "재시도 횟수",
+            "type": "number",
+            "default": 2,
+            "required": false,
+            "description": "수집 실패 시 재시도 횟수. 0이면 재시도 없음",
+            "placeholder": "2",
+            "suffix": "회",
+            "validation": { "min": 0, "max": 10, "step": 1 }
+          },
+          {
+            "key": "retry_delay_ms",
+            "label": "재시도 대기 시간",
+            "type": "number",
+            "default": 500,
+            "required": false,
+            "description": "재시도 간 대기 시간",
+            "placeholder": "500",
+            "suffix": "ms",
+            "validation": { "min": 100, "max": 10000, "step": 100 }
+          },
+          {
+            "key": "mode",
+            "label": "수집 모드",
+            "type": "select",
+            "default": "polling",
+            "required": true,
+            "description": "데이터 수집 방식. polling은 주기적 읽기, on_change는 값 변경 시에만 발행",
+            "options": [
+              { "value": "polling", "label": "Polling", "description": "주기적 수집 (실시간 데이터 권장)" },
+              { "value": "on_change", "label": "On Change", "description": "값 변경 시에만 발행 (알람/이벤트 권장)" }
+            ]
+          },
+          {
+            "key": "deadband",
+            "label": "데드밴드",
+            "type": "number",
+            "default": 0,
+            "required": false,
+            "description": "on_change 모드에서 변화 감지 임계값. 이 값 이상 변화해야 발행",
+            "placeholder": "0",
+            "validation": { "min": 0, "max": 1000, "step": 0.1 },
+            "visible_when": { "field": "mode", "value": "on_change" }
+          }
+        ]
+      },
+      {
+        "key": "buffer",
+        "label": "버퍼 설정",
+        "description": "수집된 데이터의 메모리 버퍼 설정. 네트워크 지연 시 데이터 손실을 방지합니다",
+        "icon": "archive",
+        "order": 6,
+        "collapsed": true,
+        "fields": [
+          {
+            "key": "buffer.max_size",
+            "label": "최대 버퍼 크기",
+            "type": "number",
+            "default": 10000,
+            "required": false,
+            "description": "메모리 버퍼 최대 크기. 초과 시 가장 오래된 데이터부터 삭제",
+            "placeholder": "10000",
+            "suffix": "건",
+            "validation": { "min": 100, "max": 1000000, "step": 100 }
+          },
+          {
+            "key": "buffer.flush_threshold",
+            "label": "플러시 임계값",
+            "type": "number",
+            "default": 1000,
+            "required": false,
+            "description": "버퍼에 쌓인 데이터가 이 값 이상이면 즉시 발행",
+            "placeholder": "1000",
+            "suffix": "건",
+            "validation": { "min": 10, "max": 100000, "step": 10 }
+          },
+          {
+            "key": "buffer.flush_interval_ms",
+            "label": "플러시 주기",
+            "type": "number",
+            "default": 3000,
+            "required": false,
+            "description": "버퍼 데이터를 주기적으로 발행하는 간격. 임계값 미달이어도 이 주기마다 발행",
+            "placeholder": "3000",
+            "suffix": "ms",
+            "validation": { "min": 100, "max": 60000, "step": 100 }
+          }
+        ]
+      },
+      {
+        "key": "publisher",
+        "label": "배치/재시도 설정",
+        "description": "RabbitMQ 발행 시 배치 크기 및 재시도 정책",
+        "icon": "send",
+        "order": 7,
+        "collapsed": true,
+        "fields": [
+          {
+            "key": "publisher.batch_size",
+            "label": "배치 크기",
+            "type": "number",
+            "default": 1100,
+            "required": false,
+            "description": "한 번에 발행하는 메시지 수. 너무 크면 메모리 사용 증가",
+            "placeholder": "1100",
+            "suffix": "건",
+            "validation": { "min": 1, "max": 10000, "step": 100 }
+          },
+          {
+            "key": "publisher.retry_count",
+            "label": "재시도 횟수",
+            "type": "number",
+            "default": 3,
+            "required": false,
+            "description": "발행 실패 시 재시도 횟수. 0이면 재시도 없음",
+            "placeholder": "3",
+            "suffix": "회",
+            "validation": { "min": 0, "max": 10, "step": 1 }
+          },
+          {
+            "key": "publisher.retry_delay_ms",
+            "label": "재시도 대기 시간",
+            "type": "number",
+            "default": 1000,
+            "required": false,
+            "description": "발행 재시도 간 대기 시간",
+            "placeholder": "1000",
+            "suffix": "ms",
+            "validation": { "min": 100, "max": 30000, "step": 100 }
+          }
+        ]
+      },
+      {
+        "key": "rabbitmq",
+        "label": "RabbitMQ 연결",
+        "description": "수집된 데이터를 발행할 RabbitMQ 브로커 연결 정보",
+        "icon": "message-square",
+        "order": 8,
+        "fields": [
+          {
+            "key": "publisher.rabbitmq.enabled",
+            "label": "RabbitMQ 활성화",
+            "type": "toggle",
+            "default": true,
+            "required": false,
+            "description": "RabbitMQ 퍼블리셔 활성화. 비활성 시 수집만 수행하고 발행하지 않습니다"
+          },
+          {
+            "key": "publisher.rabbitmq.host",
+            "label": "호스트",
+            "type": "text",
+            "default": "rabbitmq",
+            "required": true,
+            "description": "RabbitMQ 서버 주소. Docker 네트워크 사용 시 컨테이너 이름 입력",
+            "placeholder": "rabbitmq",
+            "validation": { "max_length": 100 },
+            "env_override": "RABBITMQ_HOST"
+          },
+          {
+            "key": "publisher.rabbitmq.port",
+            "label": "포트",
+            "type": "number",
+            "default": 5672,
+            "required": true,
+            "description": "RabbitMQ AMQP 포트 (기본 5672)",
+            "placeholder": "5672",
+            "validation": { "min": 1, "max": 65535, "step": 1 }
+          },
+          {
+            "key": "publisher.rabbitmq.virtual_host",
+            "label": "Virtual Host",
+            "type": "text",
+            "default": "/",
+            "required": false,
+            "description": "RabbitMQ 가상 호스트. 멀티 테넌트 환경에서 격리용",
+            "placeholder": "/",
+            "validation": { "max_length": 50 }
+          },
+          {
+            "key": "publisher.rabbitmq.username",
+            "label": "사용자명",
+            "type": "text",
+            "default": "admin",
+            "required": true,
+            "description": "RabbitMQ 접속 사용자명",
+            "placeholder": "admin",
+            "validation": { "max_length": 50 },
+            "env_override": "RABBITMQ_USER"
+          },
+          {
+            "key": "publisher.rabbitmq.password",
+            "label": "비밀번호",
+            "type": "password",
+            "default": "admin",
+            "required": true,
+            "description": "RabbitMQ 접속 비밀번호",
+            "placeholder": "admin",
+            "validation": { "max_length": 100 },
+            "env_override": "RABBITMQ_PASSWORD"
+          },
+          {
+            "key": "publisher.rabbitmq.exchange_name",
+            "label": "Exchange 이름",
+            "type": "text",
+            "default": "plc.data",
+            "required": true,
+            "description": "데이터를 발행할 RabbitMQ Exchange 이름",
+            "placeholder": "plc.data",
+            "validation": { "pattern": "^[a-zA-Z][a-zA-Z0-9._-]*$", "max_length": 50 }
+          },
+          {
+            "key": "publisher.rabbitmq.exchange_type",
+            "label": "Exchange 타입",
+            "type": "select",
+            "default": "topic",
+            "required": false,
+            "description": "Exchange 유형. topic이 가장 유연하며 권장됩니다",
+            "options": [
+              { "value": "topic", "label": "Topic", "description": "라우팅 키 패턴 매칭 (권장)" },
+              { "value": "direct", "label": "Direct", "description": "정확한 라우팅 키 매칭" },
+              { "value": "fanout", "label": "Fanout", "description": "모든 큐에 브로드캐스트" }
+            ]
+          },
+          {
+            "key": "publisher.rabbitmq.routing_key_prefix",
+            "label": "라우팅 키 접두사",
+            "type": "text",
+            "default": "plc",
+            "required": false,
+            "description": "라우팅 키 접두사. 실제 키는 {prefix}.{plc_id}.data 형태로 생성됩니다",
+            "placeholder": "plc",
+            "validation": { "pattern": "^[a-zA-Z][a-zA-Z0-9._-]*$", "max_length": 50 }
+          },
+          {
+            "key": "publisher.rabbitmq.compression",
+            "label": "압축 방식",
+            "type": "select",
+            "default": "zlib",
+            "required": true,
+            "description": "메시지 직렬화 시 압축 방식. Publisher 서비스의 compression 설정과 반드시 동일해야 합니다",
+            "options": [
+              { "value": "zlib", "label": "zlib 압축", "description": "표준 압축 (기본값, 권장)" },
+              { "value": "gzip", "label": "gzip 압축", "description": "gzip 압축" },
+              { "value": "none", "label": "압축 안함", "description": "비압축 (Publisher도 none이어야 함)" }
+            ],
+            "hint": "collector-publisher의 rabbitmq.compression 값과 반드시 일치시키세요"
+          },
+          {
+            "key": "publisher.rabbitmq.encryption_enabled",
+            "label": "암호화",
+            "type": "toggle",
+            "default": false,
+            "required": false,
+            "description": "Fernet 대칭키 암호화 활성화. 활성 시 Publisher 서비스에서도 동일하게 설정 필요"
+          },
+          {
+            "key": "publisher.rabbitmq.encryption_key",
+            "label": "암호화 키",
+            "type": "password",
+            "default": "",
+            "required": false,
+            "description": "Fernet Base64 키. Publisher 서비스와 동일한 키를 사용해야 합니다",
+            "placeholder": "base64-encoded-fernet-key",
+            "visible_when": { "field": "publisher.rabbitmq.encryption_enabled", "value": true },
+            "hint": "python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\" 로 생성"
+          },
+          {
+            "key": "publisher.rabbitmq.heartbeat",
+            "label": "하트비트",
+            "type": "number",
+            "default": 60,
+            "required": false,
+            "description": "RabbitMQ 연결 유지 하트비트 간격. 0이면 비활성",
+            "placeholder": "60",
+            "suffix": "초",
+            "validation": { "min": 0, "max": 600, "step": 10 }
+          },
+          {
+            "key": "publisher.rabbitmq.connection_timeout",
+            "label": "연결 타임아웃",
+            "type": "number",
+            "default": 10,
+            "required": false,
+            "description": "RabbitMQ 서버 연결 타임아웃",
+            "placeholder": "10",
+            "suffix": "초",
+            "validation": { "min": 5, "max": 60, "step": 5 }
+          },
+          {
+            "key": "publisher.rabbitmq.delivery_mode",
+            "label": "전송 모드",
+            "type": "select",
+            "default": 2,
+            "required": false,
+            "description": "메시지 전송 보장 수준. persistent는 브로커 재시작에도 메시지 보존",
+            "options": [
+              { "value": 1, "label": "Transient", "description": "비영속 (빠름, 브로커 재시작 시 유실)" },
+              { "value": 2, "label": "Persistent", "description": "영속 (권장, 브로커 재시작에도 보존)" }
+            ]
+          }
+        ]
+      },
+      {
+        "key": "logging",
+        "label": "로깅 설정",
+        "description": "서비스 로그 출력 수준 설정. 수집/발행 모듈별로 개별 설정 가능합니다",
+        "icon": "file-text",
+        "order": 9,
+        "collapsed": true,
+        "fields": [
+          {
+            "key": "logging.level",
+            "label": "전체 로그 레벨",
+            "type": "select",
+            "default": "INFO",
+            "required": false,
+            "description": "전체 로그 출력 수준",
+            "options": [
+              { "value": "DEBUG", "label": "DEBUG", "description": "개발 디버깅용 (매우 상세)" },
+              { "value": "VERBOSE", "label": "VERBOSE", "description": "수집 상세 로그 (DEBUG보다 간결)" },
+              { "value": "INFO", "label": "INFO", "description": "일반 운영 (권장)" },
+              { "value": "WARNING", "label": "WARNING", "description": "경고만 표시" },
+              { "value": "ERROR", "label": "ERROR", "description": "오류만 표시" }
+            ]
+          },
+          {
+            "key": "logging.collection_level",
+            "label": "수집 모듈 로그 레벨",
+            "type": "select",
+            "default": "INFO",
+            "required": false,
+            "description": "PLC 데이터 수집 모듈의 로그 출력 수준",
+            "options": [
+              { "value": "DEBUG", "label": "DEBUG", "description": "수집 상세 디버깅" },
+              { "value": "VERBOSE", "label": "VERBOSE", "description": "수집 요약 로그" },
+              { "value": "INFO", "label": "INFO", "description": "일반 운영 (권장)" },
+              { "value": "WARNING", "label": "WARNING", "description": "경고만 표시" },
+              { "value": "ERROR", "label": "ERROR", "description": "오류만 표시" }
+            ]
+          },
+          {
+            "key": "logging.publish_level",
+            "label": "발행 모듈 로그 레벨",
+            "type": "select",
+            "default": "INFO",
+            "required": false,
+            "description": "RabbitMQ 발행 모듈의 로그 출력 수준",
+            "options": [
+              { "value": "DEBUG", "label": "DEBUG", "description": "발행 상세 디버깅" },
+              { "value": "VERBOSE", "label": "VERBOSE", "description": "발행 요약 로그" },
+              { "value": "INFO", "label": "INFO", "description": "일반 운영 (권장)" },
+              { "value": "WARNING", "label": "WARNING", "description": "경고만 표시" },
+              { "value": "ERROR", "label": "ERROR", "description": "오류만 표시" }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+
+  "container": {
+    "environment": [
+      {
+        "key": "CONFIG_PATH",
+        "label": "설정 파일 경로",
+        "type": "text",
+        "default": "/app/config/collector.yaml",
+        "required": true,
+        "description": "컨테이너 내부 YAML 설정 파일 경로",
+        "placeholder": "/app/config/collector.yaml",
+        "editable": false
+      },
+      {
+        "key": "LOG_LEVEL",
+        "label": "로그 레벨 (환경변수 오버라이드)",
+        "type": "select",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 로그 레벨 오버라이드. 미설정 시 YAML 설정 사용",
+        "options": [
+          { "value": "", "label": "YAML 설정 사용", "description": "collector.yaml의 logging.level 따름" },
+          { "value": "DEBUG", "label": "DEBUG" },
+          { "value": "VERBOSE", "label": "VERBOSE" },
+          { "value": "INFO", "label": "INFO" },
+          { "value": "WARNING", "label": "WARNING" },
+          { "value": "ERROR", "label": "ERROR" }
+        ]
+      },
+      {
+        "key": "RABBITMQ_HOST",
+        "label": "RabbitMQ 호스트 (환경변수 오버라이드)",
+        "type": "text",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 RabbitMQ 호스트 오버라이드. Docker 네트워크 사용 시 컨테이너명",
+        "placeholder": "rabbitmq"
+      },
+      {
+        "key": "RABBITMQ_USER",
+        "label": "RabbitMQ 사용자 (환경변수 오버라이드)",
+        "type": "text",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 RabbitMQ 사용자 오버라이드",
+        "placeholder": "admin"
+      },
+      {
+        "key": "RABBITMQ_PASSWORD",
+        "label": "RabbitMQ 비밀번호 (환경변수 오버라이드)",
+        "type": "password",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 RabbitMQ 비밀번호 오버라이드",
+        "placeholder": "admin"
+      }
+    ],
+    "volumes": [
+      {
+        "container_path": "/app/config",
+        "label": "설정 파일",
+        "description": "collector.yaml + tags.csv 설정 파일 디렉토리",
+        "host_path_hint": "/opt/collector/config",
+        "mode": "ro",
+        "required": true
+      },
+      {
+        "container_path": "/app/logs",
+        "label": "로그 파일",
+        "description": "서비스 로그 파일 저장 디렉토리",
+        "host_path_hint": "/opt/collector/logs/collector",
+        "mode": "rw",
+        "required": false
+      }
+    ],
+    "ports": [],
+    "restart_policy": "unless-stopped",
+    "network": "collector-net"
+  },
+
+  "depends_on": ["rabbitmq"]
+}

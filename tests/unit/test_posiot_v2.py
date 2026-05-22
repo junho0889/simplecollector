@@ -123,17 +123,17 @@ class TestV2Fields:
     def test_B020_temp_25(self, profile):
         cid, data = _build_v2_data(temperature=2500)
         result = profile.parse(cid, data)
-        assert result['temperature'] == pytest.approx(25.0, abs=0.01)
+        assert result['temperature'] == 2500
 
     def test_B021_temp_neg10(self, profile):
         cid, data = _build_v2_data(temperature=-1000)
         result = profile.parse(cid, data)
-        assert result['temperature'] == pytest.approx(-10.0, abs=0.01)
+        assert result['temperature'] == -1000
 
     def test_B025_humidity(self, profile):
         cid, data = _build_v2_data(humidity=6520)
         result = profile.parse(cid, data)
-        assert result['humidity'] == pytest.approx(65.2, abs=0.01)
+        assert result['humidity'] == 6520
 
     def test_B028_vib_fft(self, profile):
         cid, data = _build_v2_data(vib_fft=100)
@@ -148,12 +148,12 @@ class TestV2Fields:
     def test_B031_probe_positive(self, profile):
         cid, data = _build_v2_data(probe=3050)
         result = profile.parse(cid, data)
-        assert result['probe'] == pytest.approx(30.50, abs=0.01)
+        assert result['probe'] == 3050
 
     def test_B032_probe_negative(self, profile):
         cid, data = _build_v2_data(probe=-1892)
         result = profile.parse(cid, data)
-        assert result['probe'] == pytest.approx(-18.92, abs=0.01)
+        assert result['probe'] == -1892
 
     def test_B033_battery_95(self, profile):
         cid, data = _build_v2_data(battery=95)
@@ -201,7 +201,7 @@ class TestV1V2Distinction:
         assert len(profile.get_field_names()) == 13
 
     def test_B043_name(self, profile):
-        assert profile.name == "posiot_v2"
+        assert profile.name == "pts-0624b"
 
     def test_B044_v1_data_on_v2(self, profile):
         """V1 데이터를 V2로 파싱하면 값이 다름"""

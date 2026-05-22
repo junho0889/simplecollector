@@ -1,0 +1,1004 @@
+{
+  "db_restart_short": [
+    {
+      "iteration": 1,
+      "passed": true,
+      "duration": 28.95,
+      "recovery": 14.69,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 2,
+      "passed": true,
+      "duration": 45.98,
+      "recovery": 31.82,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 3,
+      "passed": true,
+      "duration": 19.68,
+      "recovery": 5.56,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 4,
+      "passed": true,
+      "duration": 19.59,
+      "recovery": 5.48,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 5,
+      "passed": true,
+      "duration": 20.69,
+      "recovery": 6.57,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 6,
+      "passed": true,
+      "duration": 19.72,
+      "recovery": 5.6,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 7,
+      "passed": true,
+      "duration": 20.71,
+      "recovery": 6.57,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 8,
+      "passed": true,
+      "duration": 20.67,
+      "recovery": 6.54,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 9,
+      "passed": true,
+      "duration": 19.64,
+      "recovery": 5.52,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 10,
+      "passed": true,
+      "duration": 28.82,
+      "recovery": 14.65,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 11,
+      "passed": true,
+      "duration": 19.9,
+      "recovery": 5.68,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 12,
+      "passed": true,
+      "duration": 20.8,
+      "recovery": 6.66,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 13,
+      "passed": true,
+      "duration": 74.67,
+      "recovery": 60.35,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 14,
+      "passed": true,
+      "duration": 20.9,
+      "recovery": 6.64,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 15,
+      "passed": true,
+      "duration": 19.78,
+      "recovery": 5.58,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 16,
+      "passed": true,
+      "duration": 20.84,
+      "recovery": 6.63,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 17,
+      "passed": true,
+      "duration": 28.98,
+      "recovery": 14.75,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 18,
+      "passed": true,
+      "duration": 45.37,
+      "recovery": 31.12,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 19,
+      "passed": false,
+      "duration": 80.62,
+      "recovery": 66.4,
+      "produced": 264,
+      "in_db": 242,
+      "data_loss": 22,
+      "error": ""
+    },
+    {
+      "iteration": 20,
+      "passed": true,
+      "duration": 20.07,
+      "recovery": 5.65,
+      "produced": 264,
+      "in_db": 286,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 21,
+      "passed": true,
+      "duration": 45.23,
+      "recovery": 31.04,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 22,
+      "passed": true,
+      "duration": 19.83,
+      "recovery": 5.69,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 23,
+      "passed": true,
+      "duration": 20.78,
+      "recovery": 6.59,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 24,
+      "passed": true,
+      "duration": 45.32,
+      "recovery": 31.03,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 25,
+      "passed": true,
+      "duration": 60.34,
+      "recovery": 46.2,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 26,
+      "passed": true,
+      "duration": 60.17,
+      "recovery": 46.01,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 27,
+      "passed": true,
+      "duration": 60.27,
+      "recovery": 46.12,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 28,
+      "passed": true,
+      "duration": 59.42,
+      "recovery": 45.17,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 29,
+      "passed": false,
+      "duration": 80.69,
+      "recovery": 66.48,
+      "produced": 264,
+      "in_db": 242,
+      "data_loss": 22,
+      "error": ""
+    },
+    {
+      "iteration": 30,
+      "passed": true,
+      "duration": 39.05,
+      "recovery": 24.85,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 31,
+      "passed": true,
+      "duration": 29.98,
+      "recovery": 15.71,
+      "produced": 264,
+      "in_db": 286,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 32,
+      "passed": true,
+      "duration": 21.0,
+      "recovery": 6.63,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 33,
+      "passed": true,
+      "duration": 19.85,
+      "recovery": 5.75,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 34,
+      "passed": true,
+      "duration": 20.74,
+      "recovery": 6.6,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 35,
+      "passed": true,
+      "duration": 19.85,
+      "recovery": 5.62,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 36,
+      "passed": true,
+      "duration": 19.75,
+      "recovery": 5.61,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 37,
+      "passed": true,
+      "duration": 20.88,
+      "recovery": 6.61,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 38,
+      "passed": true,
+      "duration": 20.87,
+      "recovery": 6.68,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 39,
+      "passed": true,
+      "duration": 20.13,
+      "recovery": 5.72,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 40,
+      "passed": true,
+      "duration": 19.87,
+      "recovery": 5.63,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 41,
+      "passed": true,
+      "duration": 19.76,
+      "recovery": 5.61,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 42,
+      "passed": true,
+      "duration": 20.61,
+      "recovery": 6.54,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 43,
+      "passed": true,
+      "duration": 20.71,
+      "recovery": 6.64,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 44,
+      "passed": true,
+      "duration": 21.01,
+      "recovery": 6.69,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 45,
+      "passed": true,
+      "duration": 20.81,
+      "recovery": 6.58,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 46,
+      "passed": true,
+      "duration": 20.81,
+      "recovery": 6.68,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 47,
+      "passed": true,
+      "duration": 29.1,
+      "recovery": 14.89,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 48,
+      "passed": true,
+      "duration": 20.74,
+      "recovery": 6.65,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 49,
+      "passed": true,
+      "duration": 20.84,
+      "recovery": 6.66,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 50,
+      "passed": true,
+      "duration": 19.89,
+      "recovery": 5.63,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 51,
+      "passed": true,
+      "duration": 19.84,
+      "recovery": 5.68,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 52,
+      "passed": true,
+      "duration": 20.79,
+      "recovery": 6.61,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 53,
+      "passed": true,
+      "duration": 19.93,
+      "recovery": 5.62,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 54,
+      "passed": true,
+      "duration": 19.66,
+      "recovery": 5.58,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 55,
+      "passed": true,
+      "duration": 19.76,
+      "recovery": 5.6,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 56,
+      "passed": true,
+      "duration": 20.62,
+      "recovery": 6.52,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 57,
+      "passed": true,
+      "duration": 20.72,
+      "recovery": 6.58,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 58,
+      "passed": true,
+      "duration": 20.76,
+      "recovery": 6.52,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 59,
+      "passed": true,
+      "duration": 45.21,
+      "recovery": 30.97,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 60,
+      "passed": true,
+      "duration": 19.94,
+      "recovery": 5.62,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 61,
+      "passed": true,
+      "duration": 45.31,
+      "recovery": 31.03,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 62,
+      "passed": true,
+      "duration": 20.84,
+      "recovery": 6.64,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 63,
+      "passed": true,
+      "duration": 19.76,
+      "recovery": 5.6,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 64,
+      "passed": true,
+      "duration": 20.93,
+      "recovery": 6.7,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 65,
+      "passed": true,
+      "duration": 46.73,
+      "recovery": 32.26,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 66,
+      "passed": true,
+      "duration": 28.0,
+      "recovery": 13.76,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 67,
+      "passed": true,
+      "duration": 20.03,
+      "recovery": 5.7,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 68,
+      "passed": true,
+      "duration": 19.91,
+      "recovery": 5.64,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 69,
+      "passed": true,
+      "duration": 29.09,
+      "recovery": 14.8,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 70,
+      "passed": true,
+      "duration": 45.21,
+      "recovery": 30.91,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 71,
+      "passed": true,
+      "duration": 21.09,
+      "recovery": 6.85,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 72,
+      "passed": true,
+      "duration": 19.81,
+      "recovery": 5.6,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 73,
+      "passed": true,
+      "duration": 74.79,
+      "recovery": 60.37,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 74,
+      "passed": true,
+      "duration": 20.92,
+      "recovery": 6.65,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 75,
+      "passed": true,
+      "duration": 20.92,
+      "recovery": 6.56,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 76,
+      "passed": true,
+      "duration": 28.87,
+      "recovery": 14.71,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 77,
+      "passed": true,
+      "duration": 20.83,
+      "recovery": 6.54,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 78,
+      "passed": true,
+      "duration": 19.88,
+      "recovery": 5.71,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 79,
+      "passed": true,
+      "duration": 19.81,
+      "recovery": 5.55,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 80,
+      "passed": true,
+      "duration": 20.67,
+      "recovery": 6.56,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 81,
+      "passed": true,
+      "duration": 20.84,
+      "recovery": 6.6,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 82,
+      "passed": true,
+      "duration": 20.57,
+      "recovery": 6.56,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 83,
+      "passed": true,
+      "duration": 19.87,
+      "recovery": 5.58,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 84,
+      "passed": true,
+      "duration": 20.83,
+      "recovery": 6.65,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 85,
+      "passed": true,
+      "duration": 23.96,
+      "recovery": 9.73,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 86,
+      "passed": true,
+      "duration": 45.27,
+      "recovery": 30.95,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 87,
+      "passed": true,
+      "duration": 20.79,
+      "recovery": 6.62,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 88,
+      "passed": true,
+      "duration": 20.95,
+      "recovery": 6.64,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 89,
+      "passed": true,
+      "duration": 28.91,
+      "recovery": 14.72,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 90,
+      "passed": true,
+      "duration": 20.94,
+      "recovery": 6.62,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 91,
+      "passed": true,
+      "duration": 20.97,
+      "recovery": 6.68,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 92,
+      "passed": true,
+      "duration": 19.76,
+      "recovery": 5.58,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 93,
+      "passed": true,
+      "duration": 29.05,
+      "recovery": 14.75,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 94,
+      "passed": true,
+      "duration": 20.86,
+      "recovery": 6.68,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 95,
+      "passed": true,
+      "duration": 45.19,
+      "recovery": 30.84,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 96,
+      "passed": true,
+      "duration": 20.44,
+      "recovery": 6.06,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 97,
+      "passed": true,
+      "duration": 20.37,
+      "recovery": 5.87,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 98,
+      "passed": true,
+      "duration": 19.84,
+      "recovery": 5.69,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 99,
+      "passed": true,
+      "duration": 19.9,
+      "recovery": 5.64,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    },
+    {
+      "iteration": 100,
+      "passed": true,
+      "duration": 19.8,
+      "recovery": 5.65,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    }
+  ]
+}

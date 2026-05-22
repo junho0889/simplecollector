@@ -1,4 +1,4 @@
-# Simple Collector - LoRa RAK5146 Configuration
+# NeuroForge Collector - LoRa RAK5146 Configuration
 # ===============================================
 # End Device → LoRa → RAK5146 (SPI) → HAL → RabbitMQ
 #

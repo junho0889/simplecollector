@@ -1,5 +1,5 @@
 # ============================================================================
-# Collector Publisher Service - Configuration
+# NeuroForge Publisher - Configuration
 # ============================================================================
 # RabbitMQ에서 메시지를 소비하여 Database/MQTT로 전달하는 서비스 설정
 # 환경변수: ${VAR_NAME} 또는 ${VAR_NAME:default_value} 형식 지원

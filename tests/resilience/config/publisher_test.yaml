@@ -1,0 +1,60 @@
+# ============================================================================
+# Resilience Test - Publisher Configuration
+# ============================================================================
+# RabbitMQ localhost:35672 → DB localhost:25432 (test_resilience)
+# Groups: plc_data(all)
+# ============================================================================
+
+rabbitmq:
+  host: "localhost"
+  port: 35672
+  virtual_host: "/"
+  username: "admin"
+  password: "admin"
+  exchange_name: "plc.data"
+  exchange_type: "topic"
+  queue_db: "queue.db"
+  queue_mqtt: "queue.mqtt"
+  queue_monitor: "queue.monitor"
+  routing_key_pattern: "plc.*.data"
+  prefetch_count: 50
+  monitor_message_ttl: 30000
+  monitor_max_length: 1000
+  monitor_prefetch: 10
+  heartbeat: 60
+  connection_timeout: 10
+  compression: "zlib"
+  encryption_enabled: false
+  encryption_key: ""
+
+database:
+  enabled: true
+  host: "localhost"
+  port: 25432
+  database: "test_resilience"
+  user: "testuser"
+  password: "testpass"
+  pool_size: 5
+  pool_min_size: 2
+  schema_name: "public"
+  insert_method: "copy"
+  auto_init_schema: true
+  master_sync_enabled: false
+  collection_groups:
+    - name: "plc_data"
+      mode: "all"
+      retention_period: "30 days"
+
+  compression_after: "1 day"
+  compression_segmentby: "plc_id, tag_id"
+  compression_orderby: "timestamp DESC"
+  retention_period: ""
+
+mqtt:
+  enabled: false
+
+logging:
+  level: "INFO"
+  file_path: ""
+  max_size_mb: 10
+  backup_count: 5

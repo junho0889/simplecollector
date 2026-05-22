@@ -58,7 +58,7 @@ services:
   # ========================================================================
 
   collector-lora:
-    image: neuro_collector_lora:latest
+    image: neuroforge_collector_lora:latest
     container_name: lora-collector
     privileged: true                    # USB/SPI 접근 필요
     volumes:
@@ -81,7 +81,7 @@ services:
   # ========================================================================
 
   publisher:
-    image: neuro_publisher:latest
+    image: neuroforge_publisher:latest
     container_name: lora-publisher
     volumes:
       - ./:/app/config:ro

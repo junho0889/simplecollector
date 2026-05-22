@@ -1,5 +1,5 @@
 """
-Simple Collector 메인 엔트리포인트
+NeuroForge Collector 메인 엔트리포인트
 ===================================
 
 데이터 수집기 애플리케이션의 시작점입니다.
@@ -47,7 +47,7 @@ from src.version import APP_NAME, APP_VERSION, log_version_info
 def parse_args() -> argparse.Namespace:
     """명령행 인수 파싱."""
     parser = argparse.ArgumentParser(
-        description="Simple Collector - Industrial Data Collection Framework",
+        description="NeuroForge Collector - Industrial Data Collection Framework",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -469,6 +469,40 @@ async def create_pipeline(
 # Main
 # ============================================================================
 
+async def _load_config_from_db(
+    reader, collector_key: str
+) -> Tuple[AppConfig, List[TagDefinition]]:
+    """config DB(neuroforge_config)에서 설정+태그를 로드.
+
+    접속/조회 실패 시 지수 백오프(최대 30초)로 영구 재시도한다.
+    (config 없이 수집은 무의미 → 빈 config로 시작하지 않고 DB 붙을 때까지 대기)
+    로깅이 아직 초기화되기 전이므로 stderr로 출력한다.
+    """
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            await reader.connect()
+            collector_row, group_rows, device_rows, tag_rows = \
+                await reader.load(collector_key)
+            config = ConfigLoader.build_config_from_db(
+                collector_row, group_rows, device_rows)
+            tags = ConfigLoader.build_tags_from_db(
+                tag_rows, collector_row.get('device_type', 'plc'))
+            await reader.close()
+            return config, tags
+        except Exception as e:
+            backoff = min(2 ** min(attempt, 5), 30)
+            print(
+                f"[config-db] load failed (attempt {attempt}): {e} "
+                f"— retry in {backoff}s", file=sys.stderr)
+            try:
+                await reader.close()
+            except Exception:
+                pass
+            await asyncio.sleep(backoff)
+
+
 async def main(args: argparse.Namespace) -> int:
     """
     메인 실행 함수.
@@ -479,17 +513,32 @@ async def main(args: argparse.Namespace) -> int:
     Returns:
         종료 코드 (0: 성공, 1: 오류)
     """
-    # 설정 로드
-    config_path = Path(args.config)
-    if not config_path.exists():
-        print(f"Error: Config file not found: {config_path}", file=sys.stderr)
-        return 1
+    # 설정 로드 (config 소스: db 또는 file)
+    from src.core.config_db import CollectorConfigDbReader, config_source
 
-    try:
-        config = ConfigLoader.load(config_path)
-    except Exception as e:
-        print(f"Error: Failed to load config: {e}", file=sys.stderr)
-        return 1
+    db_tags: Optional[List[TagDefinition]] = None
+
+    if config_source() == "db":
+        collector_key = os.environ.get("COLLECTOR_KEY", "").strip()
+        if not collector_key:
+            print(
+                "Error: CONFIG_SOURCE=db requires COLLECTOR_KEY env var",
+                file=sys.stderr)
+            return 1
+        config, db_tags = await _load_config_from_db(
+            CollectorConfigDbReader(), collector_key)
+        config_source_label = f"config DB (collector_key={collector_key})"
+    else:
+        config_path = Path(args.config)
+        if not config_path.exists():
+            print(f"Error: Config file not found: {config_path}", file=sys.stderr)
+            return 1
+        try:
+            config = ConfigLoader.load(config_path)
+        except Exception as e:
+            print(f"Error: Failed to load config: {e}", file=sys.stderr)
+            return 1
+        config_source_label = str(config_path)
 
     # 로그 레벨 오버라이드
     if args.log_level:
@@ -500,7 +549,7 @@ async def main(args: argparse.Namespace) -> int:
     logger = LoggerFactory.get_system_logger()
 
     logger.info("=" * 60)
-    logger.info("Simple Collector Starting...")
+    logger.info("NeuroForge Collector Starting...")
     logger.info("=" * 60)
 
     # 버전 정보 로깅
@@ -515,7 +564,7 @@ async def main(args: argparse.Namespace) -> int:
             logger.error(f"  - {error}")
         return 1
 
-    logger.info(f"Configuration loaded from: {config_path}")
+    logger.info(f"Configuration loaded from: {config_source_label}")
     logger.info(f"PLC ID: {config.collector.plc_id}")
     logger.info(f"Collector Name: {config.collector.name}")
     logger.info(f"Protocol: {config.collector.protocol.type if config.collector.protocol else 'N/A'}")
@@ -545,10 +594,18 @@ async def main(args: argparse.Namespace) -> int:
         logger.info("Dry-run mode: Configuration is valid")
         return 0
 
-    # 태그 로드
+    # 태그 로드 (db 소스면 이미 로드됨)
     tags: List[TagDefinition] = []
     tags_path = Path(config.collector.tags_file)
-    if tags_path.exists():
+    if db_tags is not None:
+        tags = db_tags
+        groups = {}
+        for tag in tags:
+            groups[tag.collection_group] = groups.get(tag.collection_group, 0) + 1
+        logger.info(f"Loaded {len(tags)} tags from config DB")
+        for group, count in groups.items():
+            logger.info(f"  - Group '{group}': {count} tags")
+    elif tags_path.exists():
         try:
             # BLE devices 설정이 있으면 BLE 전용 로더 사용
             if config.collector.devices:

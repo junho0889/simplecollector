@@ -31,7 +31,7 @@ if [ -f "$SCRIPT_DIR/docker-compose.yml" ]; then
     docker compose down --remove-orphans 2>/dev/null || true
 fi
 
-for name in rabbitmq collector-plc1 collector-plc2 neuro_publisher; do
+for name in rabbitmq collector-plc1 collector-plc2 neuroforge_publisher; do
     if docker ps -a --format '{{.Names}}' | grep -q "^${name}$"; then
         echo "  Removing container: $name"
         docker rm -f "$name" 2>/dev/null || true
@@ -45,7 +45,7 @@ echo "  Done."
 echo ""
 echo "[2/4] Removing existing images..."
 
-for img in "neuro_collector_mc:mc-latest" "neuro_publisher:latest"; do
+for img in "neuroforge_collector_mc:mc-latest" "neuroforge_publisher:latest"; do
     if docker images --format '{{.Repository}}:{{.Tag}}' | grep -q "^${img}$"; then
         echo "  Removing image: $img"
         docker rmi "$img" 2>/dev/null || true

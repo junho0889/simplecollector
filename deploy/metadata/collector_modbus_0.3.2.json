@@ -1,0 +1,1024 @@
+{
+  "name": "neuroforge_collector_modbus",
+  "display_name": "Modbus Collector",
+  "description": "Modbus TCP/RTU PLC 데이터 수집기 (Pure Python, pymodbus 불필요)",
+  "version": "0.3.2",
+  "docker_image": "neuroforge_collector-modbus:modbus-latest",
+  "service_type": "collector",
+  "protocol": "modbus",
+  "icon": "plug-zap",
+
+  "config_schema": {
+    "groups": [
+      {
+        "key": "plc_info",
+        "label": "PLC 기본 정보",
+        "description": "PLC 식별 정보 및 태그 파일 설정",
+        "icon": "cpu",
+        "order": 1,
+        "fields": [
+          {
+            "key": "collector.plc_id",
+            "label": "PLC ID",
+            "type": "number",
+            "default": 1,
+            "required": true,
+            "description": "PLC 고유 식별 번호. 같은 네트워크 내에서 중복 불가",
+            "placeholder": "1",
+            "validation": {
+              "min": 1,
+              "max": 999,
+              "step": 1
+            }
+          },
+          {
+            "key": "collector.name",
+            "label": "PLC 이름",
+            "type": "text",
+            "default": "PLC1",
+            "required": true,
+            "description": "사람이 식별할 수 있는 PLC 이름 (예: 1호기, 인버터A)",
+            "placeholder": "PLC1",
+            "validation": {
+              "max_length": 50
+            }
+          },
+          {
+            "key": "collector.description",
+            "label": "설명",
+            "type": "text",
+            "default": "",
+            "required": false,
+            "description": "PLC 또는 설비에 대한 간단한 설명",
+            "placeholder": "1호기 메인 PLC",
+            "validation": {
+              "max_length": 200
+            }
+          },
+          {
+            "key": "collector.site",
+            "label": "사이트",
+            "type": "text",
+            "default": "",
+            "required": false,
+            "description": "PLC가 설치된 사이트(공장) 이름",
+            "placeholder": "본사공장",
+            "validation": {
+              "max_length": 50
+            }
+          },
+          {
+            "key": "collector.area",
+            "label": "구역",
+            "type": "text",
+            "default": "",
+            "required": false,
+            "description": "PLC가 설치된 구역(동/건물) 이름",
+            "placeholder": "A동",
+            "validation": {
+              "max_length": 50
+            }
+          },
+          {
+            "key": "collector.line",
+            "label": "라인",
+            "type": "text",
+            "default": "",
+            "required": false,
+            "description": "PLC가 설치된 생산 라인 이름",
+            "placeholder": "1라인",
+            "validation": {
+              "max_length": 50
+            }
+          },
+          {
+            "key": "collector.tags_file",
+            "label": "태그 파일 경로",
+            "type": "text",
+            "default": "config/tags.csv",
+            "required": true,
+            "description": "수집할 태그 목록 CSV 파일 경로 (컨테이너 내부 상대 경로)",
+            "placeholder": "config/tags_plc1.csv",
+            "validation": {
+              "pattern": "^[\\w/.-]+\\.csv$"
+            }
+          }
+        ]
+      },
+      {
+        "key": "protocol",
+        "label": "프로토콜 연결 설정",
+        "description": "PLC/디바이스 통신 연결 정보",
+        "icon": "plug",
+        "order": 2,
+        "fields": [
+          {
+            "key": "collector.protocol.type",
+            "label": "프로토콜",
+            "type": "select",
+            "default": "modbus",
+            "required": true,
+            "description": "PLC 통신 프로토콜 선택",
+            "options": [
+              {
+                "value": "mc_protocol",
+                "label": "MC Protocol",
+                "description": "Mitsubishi MELSEC MC Protocol (3E/4E Binary)"
+              },
+              {
+                "value": "modbus",
+                "label": "Modbus",
+                "description": "Modbus TCP/RTU (Pure Python)"
+              }
+            ]
+          },
+          {
+            "key": "collector.protocol.host",
+            "label": "PLC IP 주소",
+            "type": "ip",
+            "default": "192.168.0.10",
+            "required": true,
+            "description": "PLC 또는 Modbus 게이트웨이 IP 주소",
+            "placeholder": "192.168.0.10",
+            "validation": {
+              "pattern": "^(\\d{1,3}\\.){3}\\d{1,3}$"
+            }
+          },
+          {
+            "key": "collector.protocol.port",
+            "label": "포트",
+            "type": "number",
+            "default": 502,
+            "required": true,
+            "description": "Modbus TCP 포트 (표준: 502)",
+            "placeholder": "502",
+            "validation": {
+              "min": 1,
+              "max": 65535,
+              "step": 1
+            }
+          },
+          {
+            "key": "collector.protocol.unit_id",
+            "label": "Slave ID",
+            "type": "number",
+            "default": 1,
+            "required": true,
+            "description": "Modbus 슬레이브(유닛) ID. 단일 장비: 1, 멀티 드롭: 장비별 번호 (0~255)",
+            "placeholder": "1",
+            "validation": {
+              "min": 0,
+              "max": 255,
+              "step": 1
+            }
+          },
+          {
+            "key": "collector.protocol.timeout_ms",
+            "label": "통신 타임아웃",
+            "type": "number",
+            "default": 5000,
+            "required": false,
+            "description": "PLC 응답 대기 시간. RTU 모드나 느린 네트워크에서는 크게 설정",
+            "placeholder": "5000",
+            "suffix": "ms",
+            "validation": {
+              "min": 1000,
+              "max": 30000,
+              "step": 500
+            }
+          },
+          {
+            "key": "collector.protocol.reconnect_interval_ms",
+            "label": "재연결 대기 시간",
+            "type": "number",
+            "default": 3000,
+            "required": false,
+            "description": "PLC 연결 끊김 후 재연결 시도까지 대기 시간",
+            "placeholder": "3000",
+            "suffix": "ms",
+            "validation": {
+              "min": 1000,
+              "max": 60000,
+              "step": 1000
+            }
+          }
+        ]
+      },
+      {
+        "key": "protocol_modbus",
+        "label": "Modbus 설정",
+        "description": "Modbus 프로토콜 고유 설정 (통신 모드, 읽기 최적화)",
+        "icon": "settings",
+        "order": 3,
+        "fields": [
+          {
+            "key": "collector.protocol.extra.mode",
+            "label": "통신 모드",
+            "type": "select",
+            "default": "tcp",
+            "required": true,
+            "description": "Modbus 통신 방식 선택",
+            "options": [
+              {
+                "value": "tcp",
+                "label": "Modbus TCP",
+                "description": "이더넷 TCP 직접 연결 (MBAP 헤더)"
+              },
+              {
+                "value": "rtu",
+                "label": "Modbus RTU (시리얼)",
+                "description": "시리얼 포트 직접 연결 (RS-485/RS-232)"
+              },
+              {
+                "value": "rtu_tcp",
+                "label": "Modbus RTU over TCP",
+                "description": "시리얼 게이트웨이 경유 (RTU 프레임 + TCP 전송)"
+              }
+            ]
+          },
+          {
+            "key": "collector.protocol.extra.max_address_gap",
+            "label": "최대 주소 갭",
+            "type": "number",
+            "default": 200,
+            "required": false,
+            "description": "인접 태그 주소 간격이 이 값 이내이면 한번에 읽기. 크게 설정하면 요청 횟수 감소, 불필요 데이터 증가",
+            "placeholder": "200",
+            "suffix": "레지스터",
+            "validation": {
+              "min": 1,
+              "max": 1000,
+              "step": 10
+            },
+            "hint": "Modbus는 요청당 최대 125 레지스터 제한. 갭이 크면 자동으로 분할 요청"
+          }
+        ]
+      },
+      {
+        "key": "serial",
+        "label": "시리얼 포트 설정",
+        "description": "Modbus RTU 시리얼 통신 파라미터 (RTU 모드에서만 필요)",
+        "icon": "cable",
+        "order": 4,
+        "visible_when": {
+          "field": "collector.protocol.extra.mode",
+          "value": "rtu"
+        },
+        "fields": [
+          {
+            "key": "collector.protocol.extra.serial_port",
+            "label": "시리얼 포트",
+            "type": "text",
+            "default": "COM1",
+            "required": true,
+            "description": "시리얼 포트 이름. Windows: COM1~COM9, Linux: /dev/ttyUSB0, /dev/ttyS0",
+            "placeholder": "COM1",
+            "hint": "Windows: COM1, Linux: /dev/ttyUSB0"
+          },
+          {
+            "key": "collector.protocol.extra.baudrate",
+            "label": "통신 속도",
+            "type": "select",
+            "default": 9600,
+            "required": true,
+            "description": "시리얼 통신 보드레이트. PLC 설정과 동일하게 맞춰야 함",
+            "options": [
+              {
+                "value": 300,
+                "label": "300 bps"
+              },
+              {
+                "value": 1200,
+                "label": "1200 bps"
+              },
+              {
+                "value": 2400,
+                "label": "2400 bps"
+              },
+              {
+                "value": 4800,
+                "label": "4800 bps"
+              },
+              {
+                "value": 9600,
+                "label": "9600 bps",
+                "description": "기본값 (가장 일반적)"
+              },
+              {
+                "value": 19200,
+                "label": "19200 bps"
+              },
+              {
+                "value": 38400,
+                "label": "38400 bps"
+              },
+              {
+                "value": 57600,
+                "label": "57600 bps"
+              },
+              {
+                "value": 115200,
+                "label": "115200 bps",
+                "description": "고속통신"
+              }
+            ]
+          },
+          {
+            "key": "collector.protocol.extra.parity",
+            "label": "패리티",
+            "type": "select",
+            "default": "N",
+            "required": false,
+            "description": "패리티 비트 설정. PLC 설정과 동일하게 맞춰야 함",
+            "options": [
+              {
+                "value": "N",
+                "label": "None",
+                "description": "패리티 없음 (가장 일반적)"
+              },
+              {
+                "value": "E",
+                "label": "Even",
+                "description": "짝수 패리티"
+              },
+              {
+                "value": "O",
+                "label": "Odd",
+                "description": "홀수 패리티"
+              }
+            ]
+          },
+          {
+            "key": "collector.protocol.extra.stopbits",
+            "label": "정지 비트",
+            "type": "select",
+            "default": 1,
+            "required": false,
+            "description": "정지 비트 수. 대부분 1 사용",
+            "options": [
+              {
+                "value": 1,
+                "label": "1 비트",
+                "description": "기본값"
+              },
+              {
+                "value": 2,
+                "label": "2 비트"
+              }
+            ]
+          },
+          {
+            "key": "collector.protocol.extra.bytesize",
+            "label": "데이터 비트",
+            "type": "select",
+            "default": 8,
+            "required": false,
+            "description": "데이터 비트 크기 (거의 항상 8)",
+            "options": [
+              {
+                "value": 7,
+                "label": "7 비트"
+              },
+              {
+                "value": 8,
+                "label": "8 비트",
+                "description": "기본값"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "key": "collection_group",
+        "label": "수집 그룹",
+        "description": "태그 그룹별 수집 주기 설정. CSV 태그 파일의 collection_group 컬럼과 매칭",
+        "icon": "layers",
+        "order": 5,
+        "type": "array",
+        "item_label": "그룹",
+        "min_items": 1,
+        "max_items": 10,
+        "fields": [
+          {
+            "key": "name",
+            "label": "그룹 이름",
+            "type": "text",
+            "default": "fast",
+            "required": true,
+            "description": "수집 그룹 이름. CSV 태그의 collection_group 값과 일치해야 함",
+            "placeholder": "fast",
+            "validation": {
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "max_length": 30
+            },
+            "hint": "영문 소문자, 숫자, _ 만 사용 (예: fast, medium, slow, alm, log)"
+          },
+          {
+            "key": "interval_ms",
+            "label": "수집 주기",
+            "type": "number",
+            "default": 2000,
+            "required": true,
+            "description": "해당 그룹의 PLC 읽기 주기",
+            "placeholder": "2000",
+            "suffix": "ms",
+            "validation": {
+              "min": 100,
+              "max": 60000,
+              "step": 100
+            }
+          },
+          {
+            "key": "timeout_ms",
+            "label": "타임아웃",
+            "type": "number",
+            "default": 5000,
+            "required": false,
+            "description": "해당 그룹 수집 타임아웃. 수집 주기보다 크게 설정",
+            "placeholder": "5000",
+            "suffix": "ms",
+            "validation": {
+              "min": 1000,
+              "max": 30000,
+              "step": 500
+            }
+          },
+          {
+            "key": "retry_count",
+            "label": "재시도 횟수",
+            "type": "number",
+            "default": 2,
+            "required": false,
+            "description": "수집 실패 시 재시도 횟수",
+            "placeholder": "2",
+            "suffix": "회",
+            "validation": {
+              "min": 0,
+              "max": 10,
+              "step": 1
+            }
+          },
+          {
+            "key": "retry_delay_ms",
+            "label": "재시도 대기",
+            "type": "number",
+            "default": 500,
+            "required": false,
+            "description": "재시도 사이 대기 시간",
+            "placeholder": "500",
+            "suffix": "ms",
+            "validation": {
+              "min": 100,
+              "max": 10000,
+              "step": 100
+            }
+          },
+          {
+            "key": "mode",
+            "label": "수집 모드",
+            "type": "select",
+            "default": "polling",
+            "required": false,
+            "description": "polling: 매 주기 전송, on_change: 값 변경 시에만 전송 (알람 그룹에 적합)",
+            "options": [
+              {
+                "value": "polling",
+                "label": "Polling",
+                "description": "매 주기마다 모든 태그 전송 (기본)"
+              },
+              {
+                "value": "on_change",
+                "label": "On Change",
+                "description": "값이 변경된 태그만 전송 (알람/이벤트용)"
+              }
+            ]
+          },
+          {
+            "key": "deadband",
+            "label": "데드밴드",
+            "type": "number",
+            "default": 0,
+            "required": false,
+            "description": "on_change 모드에서 변경 감지 임계값. 0이면 어떤 변화든 감지",
+            "placeholder": "0",
+            "validation": {
+              "min": 0,
+              "max": 10000,
+              "step": 0.1
+            },
+            "visible_when": {
+              "field": "mode",
+              "value": "on_change"
+            }
+          }
+        ]
+      },
+      {
+        "key": "buffer",
+        "label": "버퍼 설정 (선택)",
+        "description": "PLC에서 읽은 데이터를 퍼블리셔로 전달하기 전 임시 저장 버퍼",
+        "icon": "database",
+        "order": 6,
+        "collapsed": true,
+        "fields": [
+          {
+            "key": "buffer.max_size",
+            "label": "최대 버퍼 크기",
+            "type": "number",
+            "default": 10000,
+            "required": false,
+            "description": "버퍼에 보관할 최대 메시지 수. 초과 시 오래된 데이터 삭제",
+            "placeholder": "10000",
+            "suffix": "건",
+            "validation": {
+              "min": 1000,
+              "max": 100000,
+              "step": 1000
+            }
+          },
+          {
+            "key": "buffer.flush_threshold",
+            "label": "플러시 임계값",
+            "type": "number",
+            "default": 1000,
+            "required": false,
+            "description": "이 건수 이상 쌓이면 즉시 퍼블리셔로 전송",
+            "placeholder": "1000",
+            "suffix": "건",
+            "validation": {
+              "min": 100,
+              "max": 50000,
+              "step": 100
+            }
+          },
+          {
+            "key": "buffer.flush_interval_ms",
+            "label": "플러시 주기",
+            "type": "number",
+            "default": 3000,
+            "required": false,
+            "description": "임계값 미달이어도 이 주기마다 자동 전송",
+            "placeholder": "3000",
+            "suffix": "ms",
+            "validation": {
+              "min": 500,
+              "max": 30000,
+              "step": 500
+            }
+          }
+        ]
+      },
+      {
+        "key": "publisher",
+        "label": "퍼블리셔 설정 (선택)",
+        "description": "RabbitMQ로 데이터 전송 시 배치 및 재시도 설정",
+        "icon": "send",
+        "order": 7,
+        "collapsed": true,
+        "fields": [
+          {
+            "key": "publisher.batch_size",
+            "label": "배치 크기",
+            "type": "number",
+            "default": 1100,
+            "required": false,
+            "description": "한번에 RabbitMQ로 보내는 최대 메시지 수",
+            "placeholder": "1100",
+            "suffix": "건",
+            "validation": {
+              "min": 100,
+              "max": 10000,
+              "step": 100
+            }
+          },
+          {
+            "key": "publisher.retry_count",
+            "label": "전송 재시도",
+            "type": "number",
+            "default": 3,
+            "required": false,
+            "description": "RabbitMQ 전송 실패 시 재시도 횟수",
+            "placeholder": "3",
+            "suffix": "회",
+            "validation": {
+              "min": 0,
+              "max": 10,
+              "step": 1
+            }
+          },
+          {
+            "key": "publisher.retry_delay_ms",
+            "label": "재시도 대기",
+            "type": "number",
+            "default": 1000,
+            "required": false,
+            "description": "전송 재시도 사이 대기 시간",
+            "placeholder": "1000",
+            "suffix": "ms",
+            "validation": {
+              "min": 100,
+              "max": 10000,
+              "step": 100
+            }
+          }
+        ]
+      },
+      {
+        "key": "rabbitmq",
+        "label": "RabbitMQ 연결",
+        "description": "메시지 브로커 접속 정보",
+        "icon": "message-square",
+        "order": 8,
+        "fields": [
+          {
+            "key": "publisher.rabbitmq.enabled",
+            "label": "RabbitMQ 사용",
+            "type": "toggle",
+            "default": true,
+            "required": false,
+            "description": "RabbitMQ 퍼블리셔 활성화 여부"
+          },
+          {
+            "key": "publisher.rabbitmq.host",
+            "label": "호스트",
+            "type": "text",
+            "default": "rabbitmq",
+            "required": true,
+            "description": "RabbitMQ 서버 주소. Docker 네트워크 사용 시 컨테이너 이름 입력",
+            "placeholder": "rabbitmq",
+            "validation": {
+              "max_length": 100
+            }
+          },
+          {
+            "key": "publisher.rabbitmq.port",
+            "label": "포트",
+            "type": "number",
+            "default": 5672,
+            "required": true,
+            "description": "RabbitMQ AMQP 포트 (기본 5672)",
+            "placeholder": "5672",
+            "validation": {
+              "min": 1,
+              "max": 65535,
+              "step": 1
+            }
+          },
+          {
+            "key": "publisher.rabbitmq.virtual_host",
+            "label": "Virtual Host (선택)",
+            "type": "text",
+            "default": "/",
+            "required": false,
+            "description": "RabbitMQ 가상 호스트 (기본 /)",
+            "placeholder": "/",
+            "validation": {
+              "max_length": 50
+            }
+          },
+          {
+            "key": "publisher.rabbitmq.username",
+            "label": "사용자명",
+            "type": "text",
+            "default": "admin",
+            "required": true,
+            "description": "RabbitMQ 접속 사용자명",
+            "placeholder": "admin",
+            "validation": {
+              "max_length": 50
+            }
+          },
+          {
+            "key": "publisher.rabbitmq.password",
+            "label": "비밀번호",
+            "type": "password",
+            "default": "admin",
+            "required": true,
+            "description": "RabbitMQ 접속 비밀번호",
+            "placeholder": "admin",
+            "validation": {
+              "max_length": 100
+            }
+          },
+          {
+            "key": "publisher.rabbitmq.exchange_name",
+            "label": "Exchange 이름 (선택)",
+            "type": "text",
+            "default": "plc.data",
+            "required": false,
+            "description": "데이터가 발행될 Exchange 이름",
+            "placeholder": "plc.data",
+            "validation": {
+              "pattern": "^[a-zA-Z][a-zA-Z0-9._-]*$",
+              "max_length": 50
+            }
+          },
+          {
+            "key": "publisher.rabbitmq.exchange_type",
+            "label": "Exchange 타입 (선택)",
+            "type": "select",
+            "default": "topic",
+            "required": false,
+            "description": "Exchange 선택 (topic 권장: 라우팅 키 패턴 매칭 가능)",
+            "options": [
+              {
+                "value": "topic",
+                "label": "Topic",
+                "description": "라우팅 키 패턴 매칭 (권장)"
+              },
+              {
+                "value": "direct",
+                "label": "Direct",
+                "description": "정확한 라우팅 키 매칭"
+              },
+              {
+                "value": "fanout",
+                "label": "Fanout",
+                "description": "모든 큐에 브로드캐스트"
+              }
+            ]
+          },
+          {
+            "key": "publisher.rabbitmq.routing_key_prefix",
+            "label": "라우팅 키 접두사 (선택)",
+            "type": "text",
+            "default": "plc",
+            "required": false,
+            "description": "메시지 라우팅 키 접두사. 최종 형식: {prefix}.{plc_id}.{group}",
+            "placeholder": "plc",
+            "validation": {
+              "pattern": "^[a-z][a-z0-9._-]*$",
+              "max_length": 30
+            }
+          },
+          {
+            "key": "publisher.rabbitmq.compression",
+            "label": "압축 (선택)",
+            "type": "select",
+            "default": "zlib",
+            "required": false,
+            "description": "메시지 압축 방식. zlib 권장 (CPU↑ 네트워크↓)",
+            "options": [
+              {
+                "value": "zlib",
+                "label": "zlib 압축",
+                "description": "표준 압축 (네트워크 절약)"
+              },
+              {
+                "value": "none",
+                "label": "압축 안함",
+                "description": "CPU 부하 최소화"
+              }
+            ]
+          },
+          {
+            "key": "publisher.rabbitmq.encryption_enabled",
+            "label": "암호화 (선택)",
+            "type": "toggle",
+            "default": false,
+            "required": false,
+            "description": "Fernet 대칭키 암호화 활성화. Publisher와 동일한 키 필요"
+          },
+          {
+            "key": "publisher.rabbitmq.heartbeat",
+            "label": "하트비트 (선택)",
+            "type": "number",
+            "default": 60,
+            "required": false,
+            "description": "RabbitMQ 연결 유지 하트비트 간격",
+            "placeholder": "60",
+            "suffix": "초",
+            "validation": {
+              "min": 10,
+              "max": 600,
+              "step": 10
+            }
+          },
+          {
+            "key": "publisher.rabbitmq.connection_timeout",
+            "label": "연결 타임아웃 (선택)",
+            "type": "number",
+            "default": 10,
+            "required": false,
+            "description": "RabbitMQ 서버 연결 타임아웃",
+            "placeholder": "10",
+            "suffix": "초",
+            "validation": {
+              "min": 5,
+              "max": 60,
+              "step": 5
+            }
+          },
+          {
+            "key": "publisher.rabbitmq.delivery_mode",
+            "label": "전송 모드 (선택)",
+            "type": "select",
+            "default": 2,
+            "required": false,
+            "description": "메시지 영속성. Persistent는 RabbitMQ 재시작 후에도 메시지 유지",
+            "options": [
+              {
+                "value": 2,
+                "label": "Persistent",
+                "description": "디스크 저장 (안전, 권장)"
+              },
+              {
+                "value": 1,
+                "label": "Transient",
+                "description": "메모리만 (빠름, 유실 가능)"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "key": "logging",
+        "label": "로깅 설정 (선택)",
+        "description": "컬렉터 로그 출력 수준 설정",
+        "icon": "file-text",
+        "order": 9,
+        "collapsed": true,
+        "fields": [
+          {
+            "key": "logging.level",
+            "label": "전체 로그 레벨",
+            "type": "select",
+            "default": "INFO",
+            "required": false,
+            "description": "전체 로그 출력 수준",
+            "options": [
+              {
+                "value": "DEBUG",
+                "label": "DEBUG",
+                "description": "개발 디버깅용 (매우 상세)"
+              },
+              {
+                "value": "VERBOSE",
+                "label": "VERBOSE",
+                "description": "상세 동작 로그"
+              },
+              {
+                "value": "INFO",
+                "label": "INFO",
+                "description": "일반 운영 (권장)"
+              },
+              {
+                "value": "WARNING",
+                "label": "WARNING",
+                "description": "경고만 표시"
+              },
+              {
+                "value": "ERROR",
+                "label": "ERROR",
+                "description": "오류만 표시"
+              }
+            ]
+          },
+          {
+            "key": "logging.collection_level",
+            "label": "수집 로그 레벨",
+            "type": "select",
+            "default": "INFO",
+            "required": false,
+            "description": "PLC 데이터 수집 관련 로그 수준 (개별 설정)",
+            "options": [
+              {
+                "value": "DEBUG",
+                "label": "DEBUG"
+              },
+              {
+                "value": "VERBOSE",
+                "label": "VERBOSE"
+              },
+              {
+                "value": "INFO",
+                "label": "INFO"
+              },
+              {
+                "value": "WARNING",
+                "label": "WARNING"
+              },
+              {
+                "value": "ERROR",
+                "label": "ERROR"
+              }
+            ]
+          },
+          {
+            "key": "logging.publish_level",
+            "label": "퍼블리셔 로그 레벨",
+            "type": "select",
+            "default": "INFO",
+            "required": false,
+            "description": "RabbitMQ 전송 관련 로그 수준 (개별 설정)",
+            "options": [
+              {
+                "value": "DEBUG",
+                "label": "DEBUG"
+              },
+              {
+                "value": "VERBOSE",
+                "label": "VERBOSE"
+              },
+              {
+                "value": "INFO",
+                "label": "INFO"
+              },
+              {
+                "value": "WARNING",
+                "label": "WARNING"
+              },
+              {
+                "value": "ERROR",
+                "label": "ERROR"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+
+  "container": {
+    "environment": [
+      {
+        "key": "CONFIG_PATH",
+        "label": "설정 파일 경로",
+        "type": "text",
+        "default": "/app/config/collector_modbus.yaml",
+        "required": true,
+        "description": "컨테이너 내부 YAML 설정 파일 경로",
+        "placeholder": "/app/config/collector_modbus.yaml",
+        "editable": false
+      },
+      {
+        "key": "LOG_LEVEL",
+        "label": "로그 레벨 (환경변수 오버라이드)",
+        "type": "select",
+        "default": "INFO",
+        "required": false,
+        "description": "환경변수로 로그 레벨 오버라이드. 미설정 시 YAML 설정 사용",
+        "options": [
+          {
+            "value": "DEBUG",
+            "label": "DEBUG"
+          },
+          {
+            "value": "VERBOSE",
+            "label": "VERBOSE"
+          },
+          {
+            "value": "INFO",
+            "label": "INFO"
+          },
+          {
+            "value": "WARNING",
+            "label": "WARNING"
+          },
+          {
+            "value": "ERROR",
+            "label": "ERROR"
+          }
+        ]
+      }
+    ],
+    "volumes": [
+      {
+        "container_path": "/app/config",
+        "label": "설정 파일",
+        "description": "YAML 설정 + CSV 태그 파일이 위치하는 디렉토리",
+        "host_path_hint": "/opt/collector/config",
+        "mode": "ro",
+        "required": true
+      },
+      {
+        "container_path": "/app/data",
+        "label": "데이터 저장소",
+        "description": "로컬 파일 퍼블리셔 사용 시 데이터 저장 디렉토리",
+        "host_path_hint": "/opt/collector/data",
+        "mode": "rw",
+        "required": false
+      },
+      {
+        "container_path": "/app/logs",
+        "label": "로그 파일",
+        "description": "컬렉터 로그 파일 저장 디렉토리",
+        "host_path_hint": "/opt/collector/logs",
+        "mode": "rw",
+        "required": false
+      }
+    ],
+    "ports": [],
+    "restart_policy": "unless-stopped",
+    "network": "collector-net"
+  },
+
+  "depends_on": ["rabbitmq"],
+
+  "build_args": {
+    "PROTOCOL": {
+      "value": "modbus",
+      "description": "Modbus 빌드용 프로토콜 선택"
+    }
+  }
+}

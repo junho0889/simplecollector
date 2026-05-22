@@ -54,7 +54,7 @@ services:
     restart: unless-stopped
 
   publisher:
-    image: neuro_publisher:latest
+    image: neuroforge_publisher:latest
     container_name: lora-publisher
     volumes:
       - ./:/app/config:ro

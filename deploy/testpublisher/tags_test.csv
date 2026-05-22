@@ -1,0 +1,6 @@
+tag_id,tag_name,memory,address,data_type,collection_group,scale,offset,decimals,word_length,format,unit,description
+1,온도센서A,D,100,uint16,plc_data,1,0,1,,,,온도센서 A
+2,압력센서B,D,102,float32,plc_data,1,0,2,,,,압력센서 B
+3,모터속도,D,104,int16,plc_data,1,0,,2,,,모터 RPM
+4,알람1,L,500,bool,alm,1,0,,,,,비상정지 알람
+5,알람2,L,501,bool,alm,1,0,,,,,과열 알람

@@ -113,7 +113,7 @@ class ECSJsonFormatter(logging.Formatter):
 
     def __init__(
         self,
-        service_name: str = "simple-collector",
+        service_name: str = "neuroforge-collector",
         service_version: str = "",
         environment: str = "production",
     ):
@@ -730,7 +730,7 @@ def setup_logging(config: LoggingConfig) -> None:
 
         if config.ecs_enabled:
             json_handler.setFormatter(ECSJsonFormatter(
-                service_name="simple-collector",
+                service_name="neuroforge-collector",
                 environment=os.environ.get("ENVIRONMENT", "production"),
             ))
         else:

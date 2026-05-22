@@ -132,8 +132,9 @@ class BaseProcessor(IProcessor):
         # 그룹별 태그 관리
         self._tags_by_group: Dict[str, List[TagDefinition]] = {}
 
-        # 최적화: 태그별 출력 타입 캐시 (tag_id → output_type)
-        self._output_type_cache: Dict[int, str] = {}
+        # 최적화: 태그별 출력 타입 캐시 ((device_id, tag_id) → output_type)
+        # 멀티디바이스 모드에서 같은 tag_id라도 디바이스별 설정이 다를 수 있음
+        self._output_type_cache: Dict[tuple, str] = {}
 
         # on_change 모드용 값 캐시 ((plc_id, tag_id) → 이전 값)
         # 멀티디바이스 모드에서 디바이스별 독립 변경 감지를 위해 복합 키 사용
@@ -181,9 +182,10 @@ class BaseProcessor(IProcessor):
 
         # 전체 태그 맵에도 등록 + 출력 타입 캐싱
         for tag in tags:
-            self._tags[tag.tag_id] = tag
+            tag_cache_key = (getattr(tag, 'device_id', None) or 0, tag.tag_id)
+            self._tags[tag_cache_key] = tag
             # 출력 타입 미리 계산하여 캐시
-            self._output_type_cache[tag.tag_id] = self._compute_output_type(tag)
+            self._output_type_cache[tag_cache_key] = self._compute_output_type(tag)
 
         logger.debug(
             f"[{self._name}] Registered {len(tags)} tags for group '{group}'"
@@ -239,8 +241,9 @@ class BaseProcessor(IProcessor):
                     # 스케일링 적용
                     scaled_value = tag.apply_scaling(raw_value) if raw_value is not None else None
 
-                    # 캐시된 출력 타입 사용
-                    output_type = output_type_cache.get(tag.tag_id, 'float')
+                    # 캐시된 출력 타입 사용 (device_id + tag_id 복합 키)
+                    cache_key = (getattr(tag, 'device_id', None) or 0, tag.tag_id)
+                    output_type = output_type_cache.get(cache_key, 'float')
 
                     # 최적화된 ProcessedData 생성
                     processed = create_processed(
@@ -391,7 +394,8 @@ class BaseProcessor(IProcessor):
 
         (호환성을 위해 유지, 캐시 또는 계산 사용)
         """
-        cached = self._output_type_cache.get(tag.tag_id)
+        cache_key = (getattr(tag, 'device_id', None) or 0, tag.tag_id)
+        cached = self._output_type_cache.get(cache_key)
         if cached:
             return cached
         return self._compute_output_type(tag)

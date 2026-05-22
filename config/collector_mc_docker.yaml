@@ -1,4 +1,4 @@
-# Simple Collector - MC Protocol Docker Test Configuration
+# NeuroForge Collector - MC Protocol Docker Test Configuration
 # ============================================================
 # PLC-A (192.168.0.1:5007) → Docker 컨테이너 → RabbitMQ (collector-net)
 

@@ -989,6 +989,213 @@ class ConfigLoader:
         return DataType.FLOAT32
 
     @classmethod
+    def build_config_from_db(
+        cls,
+        collector: Dict[str, Any],
+        groups: List[Dict[str, Any]],
+        devices: List[Dict[str, Any]],
+    ) -> AppConfig:
+        """config DB(neuroforge_config) 행으로부터 AppConfig 구성 (CONFIG_SOURCE=db).
+
+        vw_collector / collector_group / vw_device 행을 YAML 등가 dict로 변환 후
+        기존 _parse_config 를 재사용한다.
+        RabbitMQ 접속(host/port/user/pass)은 env var, 동작값은 rmq_* 컬럼.
+        """
+        def cval(key: str, default: Any) -> Any:
+            v = collector.get(key)
+            return default if v is None else v
+
+        device_type = str(cval('device_type', 'plc')).lower()
+
+        # 프로토콜 extra 재구성 (flat 컬럼 → dict)
+        extra: Dict[str, Any] = {}
+        for k in ('plc_series', 'frame_type', 'network_no', 'pc_no',
+                  'unit_io', 'unit_station', 'max_address_gap',
+                  'cache_ttl', 'duplicate_filter_s'):
+            v = collector.get(k)
+            if v is not None:
+                extra[k] = v
+
+        protocol: Optional[Dict[str, Any]] = None
+        if collector.get('protocol_type'):
+            protocol = {
+                'type': collector['protocol_type'],
+                'host': cval('host', ''),
+                'port': cval('port', 0),
+                'unit_id': cval('unit_id', 1),
+                'timeout_ms': cval('timeout_ms', 5000),
+                'reconnect_interval_ms': cval('reconnect_interval_ms', 10000),
+                'extra': extra,
+            }
+
+        collection_groups = [
+            {
+                'name': g.get('name', 'default'),
+                'interval_ms': g.get('interval_ms', 1000),
+                'timeout_ms': g.get('timeout_ms', 5000),
+                'retry_count': g.get('retry_count', 3),
+                'retry_delay_ms': g.get('retry_delay_ms', 1000),
+                'mode': g.get('mode', 'polling'),
+                'deadband': g.get('deadband', 0.0),
+                'deadband_type': g.get('deadband_type', 'absolute'),
+            }
+            for g in groups
+        ]
+
+        collector_dict: Dict[str, Any] = {
+            'name': cval('name', 'collector'),
+            'description': cval('description', ''),
+            'site': cval('site', ''),
+            'area': cval('area', ''),
+            'line': cval('line', ''),
+            'enabled': cval('enabled', True),
+            'protocol': protocol,
+            'collection_groups': collection_groups,
+        }
+
+        if device_type == 'ble':
+            collector_dict['devices'] = [
+                {
+                    'device_id': d['device_id'],
+                    'mac_address': d.get('mac_address') or '',
+                    'device_profile': d.get('device_profile') or 'posiot',
+                    'device_name_filter': d.get('device_name_filter') or '',
+                    'description': d.get('description') or '',
+                }
+                for d in devices
+            ]
+        elif devices:
+            # PLC: 단일 device → plc_id
+            collector_dict['plc_id'] = devices[0]['device_id']
+
+        def env(*names: str, default: str = '') -> str:
+            for n in names:
+                v = os.environ.get(n)
+                if v is not None:
+                    return v
+            return default
+
+        rabbitmq = {
+            'enabled': cval('rmq_enabled', True),
+            'host': env('RABBITMQ_HOST', 'RMQ_HOST', default='rabbitmq'),
+            'port': int(env('RABBITMQ_PORT', 'RMQ_PORT', default='5672')),
+            'virtual_host': env('RABBITMQ_VHOST', 'RMQ_VHOST', default='/'),
+            'username': env('RABBITMQ_USER', 'RMQ_USER', default='guest'),
+            'password': env('RABBITMQ_PASSWORD', 'RMQ_PASS', default='guest'),
+            'exchange_name': cval('rmq_exchange_name', 'plc.data'),
+            'exchange_type': cval('rmq_exchange_type', 'topic'),
+            'routing_key_prefix': cval('rmq_routing_key_prefix', 'plc'),
+            'compression': cval('rmq_compression', 'zlib'),
+            'encryption_enabled': cval('rmq_encryption_enabled', False),
+            'heartbeat': cval('rmq_heartbeat', 60),
+            'delivery_mode': cval('rmq_delivery_mode', 2),
+        }
+
+        config_dict = {
+            'collector': collector_dict,
+            'publisher': {
+                'rabbitmq': rabbitmq,
+                'publish_interval_ms': cval('rmq_publish_interval_ms', 1000),
+            },
+            'buffer': {
+                'max_size': cval('buf_max_size', 10000),
+                'batch_size': cval('buf_batch_size', 100),
+                'threshold_ratio': cval('buf_threshold_ratio', 0.8),
+                'drop_oldest': cval('buf_drop_oldest', True),
+                'persist_on_shutdown': cval('buf_persist_on_shutdown', True),
+                'persist_path': cval('buf_persist_path', 'data/buffer.pkl'),
+            },
+            'logging': {
+                'level': cval('log_level', 'INFO'),
+                'collection_level': cval('log_collection_level', 'INFO'),
+                'publish_level': cval('log_publish_level', 'INFO'),
+                'loss_level': cval('log_loss_level', 'WARNING'),
+                'file_path': collector.get('log_file_path'),
+                **({'format': collector['log_format']} if collector.get('log_format') else {}),
+            },
+        }
+        return cls._parse_config(config_dict)
+
+    @classmethod
+    def build_tags_from_db(
+        cls, tag_rows: List[Dict[str, Any]], device_type: str,
+    ) -> List[TagDefinition]:
+        """config DB(vw_tag) 행으로부터 TagDefinition 리스트 구성.
+
+        PLC는 기존 _parse_tag_row 를 재사용(파일 경로와 동일 동작), BLE는 직접 구성.
+        """
+        device_type = (device_type or 'plc').lower()
+        tags: List[TagDefinition] = []
+        for t in tag_rows:
+            try:
+                if device_type == 'ble':
+                    tags.append(cls._ble_tag_from_db_row(t))
+                else:
+                    tags.append(cls._parse_tag_row(cls._db_row_to_csv_row(t)))
+            except Exception as e:
+                logger.warning(
+                    f"Failed to build tag from DB (tag_id={t.get('tag_id')}): {e}")
+        logger.info(f"Loaded {len(tags)} tags from config DB")
+        return tags
+
+    @staticmethod
+    def _db_row_to_csv_row(t: Dict[str, Any]) -> Dict[str, str]:
+        """vw_tag(PLC) 행을 _parse_tag_row 가 받는 CSV 행 dict로 변환."""
+        def s(key: str) -> str:
+            v = t.get(key)
+            return '' if v is None else str(v)
+        return {
+            'tag_id': s('tag_id'),
+            'tag_name': t.get('tag_name') or '',
+            'memory': t.get('memory') or '',
+            'address': s('address'),
+            'data_type': t.get('data_type') or 'float32',
+            'collection_group': t.get('collection_group') or 'default',
+            'scale': s('scale'),
+            'offset': s('offset_value'),
+            'decimals': s('decimals'),
+            'word_length': s('word_length'),
+            'string_length': s('string_length'),
+            'format': t.get('format') or '',
+            'unit': t.get('unit') or '',
+            'description': t.get('description') or '',
+            'bool_true_value': s('bool_true_value'),
+            'bool_false_value': s('bool_false_value'),
+            'bool_invert': 'true' if t.get('bool_invert') else '',
+            'mac_address': t.get('mac_address') or '',
+            'byte_offset': t.get('byte_offset') or '',
+        }
+
+    @classmethod
+    def _ble_tag_from_db_row(cls, t: Dict[str, Any]) -> TagDefinition:
+        """vw_tag(BLE) 행을 TagDefinition 으로 (load_ble_tags 와 동일 구성)."""
+        raw_type = (t.get('data_type') or 'float32').strip().upper()
+        data_type = cls._resolve_data_type(raw_type, 16)
+
+        def fnum(key: str, default: float) -> float:
+            v = t.get(key)
+            return default if v is None else float(v)
+
+        return TagDefinition(
+            tag_id=int(t['tag_id']),
+            tag_name=(t.get('tag_name') or '').strip(),
+            address='',
+            data_type=data_type,
+            raw_type=raw_type,
+            scale=fnum('scale', 1.0),
+            offset=fnum('offset_value', 0.0),
+            unit=(t.get('unit') or '').strip(),
+            description=(t.get('description') or '').strip(),
+            collection_group=(t.get('collection_group') or 'ble_data').strip(),
+            decimals=t.get('decimals'),
+            mac_address=(t.get('mac_address') or '').strip().upper(),
+            device_name_filter=(t.get('device_name_filter') or '').strip(),
+            ble_mode=(t.get('device_profile') or '').strip().lower(),
+            byte_offset=(t.get('byte_offset') or '').strip() or None,
+            device_id=int(t['device_id']),
+        )
+
+    @classmethod
     def validate_config(cls, config: AppConfig) -> List[str]:
         """
         설정 유효성 검사.

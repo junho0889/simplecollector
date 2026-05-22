@@ -1,0 +1,17 @@
+device_id,tag_id,tag_name,data_type,collection_group,scale,offset,decimals,unit,description
+2,1,temperature,int16,ble_data,1,0,2,℃,온도
+2,2,humidity,int16,ble_data,1,0,2,%,습도
+2,3,pressure,uint16,ble_data,0.0622559,12.207,,hPa,기압
+2,4,battery,uint8,ble_data,1,0,,%,배터리
+2,5,accel_rms_x,uint16,ble_data,1,0,2,m/s²,가속도X
+2,6,accel_rms_y,uint16,ble_data,1,0,2,m/s²,가속도Y
+2,7,accel_rms_z,uint16,ble_data,1,0,2,m/s²,가속도Z
+2,8,velocity_rms_under_1k,uint16,ble_data,1,0,2,mm/s,속도RMS
+2,9,accel_rms_1k_5k,uint16,ble_data,1,0,2,m/s²,가속도1-5k
+2,10,vibration_peak,uint16,ble_data,1,0,,Hz,진동피크
+2,11,harmony_cnt_under_1k,uint8,ble_data,1,0,,count,하모니카운트저
+2,12,harmony_cnt_1k_5k,uint8,ble_data,1,0,,count,하모니카운트고
+2,13,gravity_mag_xyz,uint16,ble_data,1,0,,mg,중력크기
+2,14,sound_db,uint8,ble_data,1,0,,dB,소음
+2,15,sound_peak,uint16,ble_data,1,0,,Hz,소음피크
+2,16,prob_temp,int16,ble_data,1,0,2,℃,프로브온도

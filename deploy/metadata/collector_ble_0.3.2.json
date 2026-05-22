@@ -1,0 +1,489 @@
+{
+  "name": "neuroforge_collector_ble",
+  "display_name": "BLE Collector",
+  "description": "Bluetooth Low Energy 센서 데이터 수집기 (멀티디바이스, POSIOT 센서 지원)",
+  "version": "0.3.2",
+  "docker_image": "neuroforge_collector_ble:latest",
+  "service_type": "collector",
+  "protocol": "ble",
+  "icon": "bluetooth",
+
+  "config_schema": {
+    "groups": [
+      {
+        "key": "device_info",
+        "label": "BLE 디바이스 설정",
+        "description": "BLE 수집기 식별 정보 및 태그 파일 설정",
+        "icon": "bluetooth",
+        "order": 1,
+        "fields": [
+          {
+            "key": "collector.ble_id",
+            "label": "BLE ID",
+            "type": "number",
+            "default": 1,
+            "required": true,
+            "description": "BLE 수집기 식별자",
+            "validation": { "min": 1, "max": 100, "step": 1 }
+          },
+          {
+            "key": "collector.name",
+            "label": "수집기 이름",
+            "type": "text",
+            "default": "BLE_SITE_A",
+            "required": true,
+            "description": "BLE 수집기 표시 이름",
+            "placeholder": "BLE_SITE_A",
+            "validation": { "max_length": 100 }
+          },
+          {
+            "key": "collector.description",
+            "label": "설명",
+            "type": "text",
+            "default": "",
+            "required": false,
+            "description": "BLE 수집기 설명",
+            "placeholder": "BLE 센서 수집기",
+            "validation": { "max_length": 200 }
+          },
+          {
+            "key": "collector.site",
+            "label": "사이트",
+            "type": "text",
+            "default": "",
+            "required": false,
+            "description": "설치 사이트 이름",
+            "placeholder": "Factory_A",
+            "validation": { "max_length": 100 }
+          },
+          {
+            "key": "collector.area",
+            "label": "구역",
+            "type": "text",
+            "default": "",
+            "required": false,
+            "description": "설치 구역",
+            "placeholder": "Zone_1",
+            "validation": { "max_length": 100 }
+          },
+          {
+            "key": "collector.line",
+            "label": "라인",
+            "type": "text",
+            "default": "",
+            "required": false,
+            "description": "생산 라인",
+            "placeholder": "Line_1",
+            "validation": { "max_length": 100 }
+          },
+          {
+            "key": "collector.tags_file",
+            "label": "태그 CSV 파일",
+            "type": "text",
+            "default": "config/tags_ble.csv",
+            "required": false,
+            "description": "BLE 태그 CSV 파일 경로 (mac_address, mode 컬럼 포함)",
+            "placeholder": "config/tags_ble.csv",
+            "validation": { "max_length": 200 }
+          }
+        ]
+      },
+      {
+        "key": "protocol",
+        "label": "BLE 스캐너 설정",
+        "description": "BLE advertisement 스캔 및 캐시 설정",
+        "icon": "radio",
+        "order": 2,
+        "fields": [
+          {
+            "key": "collector.protocol.type",
+            "label": "프로토콜 타입",
+            "type": "text",
+            "default": "ble",
+            "required": true,
+            "description": "프로토콜 유형 (BLE 고정)",
+            "editable": false
+          },
+          {
+            "key": "collector.protocol.extra.cache_ttl",
+            "label": "캐시 만료 시간",
+            "type": "number",
+            "default": 30.0,
+            "required": false,
+            "description": "Advertisement 캐시 만료 시간. 이 시간 내 새 패킷 없으면 데이터 없음 처리",
+            "suffix": "초",
+            "validation": { "min": 1.0, "max": 300.0, "step": 0.5 }
+          },
+          {
+            "key": "collector.protocol.extra.duplicate_filter_s",
+            "label": "중복 필터 시간",
+            "type": "number",
+            "default": 4.0,
+            "required": false,
+            "description": "같은 MAC의 중복 advertisement 무시 시간",
+            "suffix": "초",
+            "validation": { "min": 0.1, "max": 60.0, "step": 0.1 }
+          }
+        ]
+      },
+      {
+        "key": "collection_groups",
+        "label": "수집 그룹",
+        "description": "데이터 수집 그룹 및 주기 설정",
+        "icon": "layers",
+        "order": 3,
+        "type": "array",
+        "item_label": "수집 그룹",
+        "min_items": 1,
+        "max_items": 5,
+        "fields": [
+          {
+            "key": "name",
+            "label": "그룹 이름",
+            "type": "text",
+            "default": "ble_data",
+            "required": true,
+            "description": "수집 그룹 식별자",
+            "placeholder": "ble_data",
+            "validation": { "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$", "max_length": 50 }
+          },
+          {
+            "key": "interval_ms",
+            "label": "수집 주기",
+            "type": "number",
+            "default": 1000,
+            "required": true,
+            "description": "데이터 수집 주기",
+            "suffix": "ms",
+            "validation": { "min": 100, "max": 60000, "step": 100 }
+          }
+        ]
+      },
+      {
+        "key": "buffer",
+        "label": "버퍼 설정",
+        "description": "수집 데이터 버퍼링 설정",
+        "icon": "database",
+        "order": 4,
+        "collapsed": true,
+        "fields": [
+          {
+            "key": "buffer.max_size",
+            "label": "최대 버퍼 크기",
+            "type": "number",
+            "default": 5000,
+            "required": false,
+            "description": "메모리 버퍼 최대 저장 건수",
+            "suffix": "건",
+            "validation": { "min": 100, "max": 50000, "step": 100 }
+          },
+          {
+            "key": "buffer.batch_size",
+            "label": "배치 크기",
+            "type": "number",
+            "default": 200,
+            "required": false,
+            "description": "한번에 발행하는 데이터 건수",
+            "suffix": "건",
+            "validation": { "min": 10, "max": 5000, "step": 10 }
+          },
+          {
+            "key": "buffer.threshold_ratio",
+            "label": "임계 비율",
+            "type": "number",
+            "default": 0.8,
+            "required": false,
+            "description": "버퍼 사용률 경고 임계값 (0.0~1.0)",
+            "validation": { "min": 0.1, "max": 1.0, "step": 0.1 }
+          }
+        ]
+      },
+      {
+        "key": "rabbitmq",
+        "label": "RabbitMQ 연결",
+        "description": "수집 데이터를 RabbitMQ로 발행하기 위한 브로커 연결 설정",
+        "icon": "message-square",
+        "order": 5,
+        "fields": [
+          {
+            "key": "publisher.rabbitmq.enabled",
+            "label": "RabbitMQ 활성화",
+            "type": "toggle",
+            "default": true,
+            "required": false,
+            "description": "RabbitMQ 퍼블리셔 활성화"
+          },
+          {
+            "key": "publisher.rabbitmq.host",
+            "label": "호스트",
+            "type": "text",
+            "default": "rabbitmq",
+            "required": true,
+            "description": "RabbitMQ 서버 주소. Docker 네트워크 사용 시 컨테이너 이름 입력",
+            "placeholder": "rabbitmq",
+            "validation": { "max_length": 100 },
+            "env_override": "RMQ_HOST",
+            "visible_when": { "field": "publisher.rabbitmq.enabled", "value": true }
+          },
+          {
+            "key": "publisher.rabbitmq.port",
+            "label": "포트",
+            "type": "number",
+            "default": 5672,
+            "required": true,
+            "description": "RabbitMQ AMQP 포트 (기본 5672)",
+            "placeholder": "5672",
+            "validation": { "min": 1, "max": 65535, "step": 1 },
+            "env_override": "RMQ_PORT",
+            "visible_when": { "field": "publisher.rabbitmq.enabled", "value": true }
+          },
+          {
+            "key": "publisher.rabbitmq.virtual_host",
+            "label": "Virtual Host",
+            "type": "text",
+            "default": "/",
+            "required": false,
+            "description": "RabbitMQ 가상 호스트. 멀티 테넌트 환경에서 격리용",
+            "placeholder": "/",
+            "validation": { "max_length": 50 },
+            "visible_when": { "field": "publisher.rabbitmq.enabled", "value": true }
+          },
+          {
+            "key": "publisher.rabbitmq.username",
+            "label": "사용자명",
+            "type": "text",
+            "default": "admin",
+            "required": true,
+            "description": "RabbitMQ 접속 사용자명",
+            "placeholder": "admin",
+            "validation": { "max_length": 50 },
+            "env_override": "RMQ_USER",
+            "visible_when": { "field": "publisher.rabbitmq.enabled", "value": true }
+          },
+          {
+            "key": "publisher.rabbitmq.password",
+            "label": "비밀번호",
+            "type": "password",
+            "default": "admin",
+            "required": true,
+            "description": "RabbitMQ 접속 비밀번호",
+            "placeholder": "admin",
+            "validation": { "max_length": 100 },
+            "env_override": "RMQ_PASS",
+            "visible_when": { "field": "publisher.rabbitmq.enabled", "value": true }
+          },
+          {
+            "key": "publisher.rabbitmq.exchange_name",
+            "label": "Exchange 이름",
+            "type": "text",
+            "default": "plc.data",
+            "required": true,
+            "description": "데이터를 발행하는 Exchange 이름",
+            "placeholder": "plc.data",
+            "validation": { "pattern": "^[a-zA-Z][a-zA-Z0-9._-]*$", "max_length": 50 },
+            "visible_when": { "field": "publisher.rabbitmq.enabled", "value": true }
+          },
+          {
+            "key": "publisher.rabbitmq.routing_key_prefix",
+            "label": "라우팅 키 접두사",
+            "type": "text",
+            "default": "plc",
+            "required": false,
+            "description": "라우팅 키 접두사. 실제 키: {prefix}.{ble_id}.data",
+            "placeholder": "plc",
+            "validation": { "pattern": "^[a-zA-Z][a-zA-Z0-9._-]*$", "max_length": 50 },
+            "visible_when": { "field": "publisher.rabbitmq.enabled", "value": true }
+          },
+          {
+            "key": "publisher.rabbitmq.compression",
+            "label": "압축 방식",
+            "type": "select",
+            "default": "zlib",
+            "required": true,
+            "description": "메시지 직렬화 시 압축 방식. Publisher 설정과 동일해야 함",
+            "options": [
+              { "value": "zlib", "label": "zlib 압축", "description": "표준 압축 (권장)" },
+              { "value": "none", "label": "압축 안함", "description": "비압축 (Publisher도 none이어야 함)" }
+            ],
+            "visible_when": { "field": "publisher.rabbitmq.enabled", "value": true }
+          },
+          {
+            "key": "publisher.rabbitmq.encryption_enabled",
+            "label": "암호화",
+            "type": "toggle",
+            "default": false,
+            "required": false,
+            "description": "Fernet 대칭키 암호화 활성화",
+            "visible_when": { "field": "publisher.rabbitmq.enabled", "value": true }
+          },
+          {
+            "key": "publisher.publish_interval_ms",
+            "label": "발행 주기",
+            "type": "number",
+            "default": 1000,
+            "required": false,
+            "description": "RabbitMQ 데이터 발행 주기",
+            "suffix": "ms",
+            "validation": { "min": 100, "max": 60000, "step": 100 },
+            "visible_when": { "field": "publisher.rabbitmq.enabled", "value": true }
+          }
+        ]
+      },
+      {
+        "key": "logging",
+        "label": "로깅 설정",
+        "description": "서비스 로그 출력 수준 설정",
+        "icon": "file-text",
+        "order": 6,
+        "collapsed": true,
+        "fields": [
+          {
+            "key": "logging.level",
+            "label": "로그 레벨",
+            "type": "select",
+            "default": "INFO",
+            "required": false,
+            "description": "전체 로그 출력 수준",
+            "options": [
+              { "value": "DEBUG", "label": "DEBUG", "description": "개발 디버깅용 (매우 상세)" },
+              { "value": "VERBOSE", "label": "VERBOSE", "description": "상세 운영 로그" },
+              { "value": "INFO", "label": "INFO", "description": "일반 운영 (권장)" },
+              { "value": "WARNING", "label": "WARNING", "description": "경고만 표시" },
+              { "value": "ERROR", "label": "ERROR", "description": "오류만 표시" }
+            ]
+          },
+          {
+            "key": "logging.collection_level",
+            "label": "수집 로그 레벨",
+            "type": "select",
+            "default": "INFO",
+            "required": false,
+            "description": "BLE 데이터 수집 관련 로그 수준",
+            "options": [
+              { "value": "DEBUG", "label": "DEBUG" },
+              { "value": "VERBOSE", "label": "VERBOSE" },
+              { "value": "INFO", "label": "INFO" },
+              { "value": "WARNING", "label": "WARNING" },
+              { "value": "ERROR", "label": "ERROR" }
+            ]
+          },
+          {
+            "key": "logging.publish_level",
+            "label": "발행 로그 레벨",
+            "type": "select",
+            "default": "INFO",
+            "required": false,
+            "description": "RabbitMQ 발행 관련 로그 수준",
+            "options": [
+              { "value": "DEBUG", "label": "DEBUG" },
+              { "value": "VERBOSE", "label": "VERBOSE" },
+              { "value": "INFO", "label": "INFO" },
+              { "value": "WARNING", "label": "WARNING" },
+              { "value": "ERROR", "label": "ERROR" }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+
+  "container": {
+    "environment": [
+      {
+        "key": "CONFIG_PATH",
+        "label": "설정 파일 경로",
+        "type": "text",
+        "default": "/app/config/collector_ble.yaml",
+        "required": true,
+        "description": "컨테이너 내부 YAML 설정 파일 경로",
+        "placeholder": "/app/config/collector_ble.yaml",
+        "editable": false
+      },
+      {
+        "key": "LOG_LEVEL",
+        "label": "로그 레벨 (환경변수 오버라이드)",
+        "type": "select",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 로그 레벨 오버라이드. 미설정 시 YAML 설정 사용",
+        "options": [
+          { "value": "", "label": "YAML 설정 사용", "description": "collector_ble.yaml의 logging.level 따름" },
+          { "value": "DEBUG", "label": "DEBUG" },
+          { "value": "VERBOSE", "label": "VERBOSE" },
+          { "value": "INFO", "label": "INFO" },
+          { "value": "WARNING", "label": "WARNING" },
+          { "value": "ERROR", "label": "ERROR" }
+        ]
+      },
+      {
+        "key": "RMQ_HOST",
+        "label": "RabbitMQ 호스트 (환경변수 오버라이드)",
+        "type": "text",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 RabbitMQ 호스트 오버라이드",
+        "placeholder": "rabbitmq"
+      },
+      {
+        "key": "RMQ_PORT",
+        "label": "RabbitMQ 포트 (환경변수 오버라이드)",
+        "type": "number",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 RabbitMQ 포트 오버라이드",
+        "placeholder": "5672"
+      },
+      {
+        "key": "RMQ_USER",
+        "label": "RabbitMQ 사용자 (환경변수 오버라이드)",
+        "type": "text",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 RabbitMQ 사용자 오버라이드",
+        "placeholder": "admin"
+      },
+      {
+        "key": "RMQ_PASS",
+        "label": "RabbitMQ 비밀번호 (환경변수 오버라이드)",
+        "type": "password",
+        "default": "",
+        "required": false,
+        "description": "환경변수로 RabbitMQ 비밀번호 오버라이드",
+        "placeholder": "admin"
+      }
+    ],
+    "volumes": [
+      {
+        "container_path": "/app/config",
+        "label": "설정 파일",
+        "description": "collector_ble.yaml + tags_ble.csv",
+        "host_path_hint": "/opt/collector/config",
+        "mode": "ro",
+        "required": true
+      },
+      {
+        "container_path": "/var/run/dbus",
+        "label": "D-Bus 소켓",
+        "description": "D-Bus 소켓 (BLE 스캐닝에 필요)",
+        "host_path_hint": "/var/run/dbus",
+        "mode": "ro",
+        "required": true
+      },
+      {
+        "container_path": "/app/logs",
+        "label": "로그 파일",
+        "description": "서비스 로그 파일 저장 디렉토리",
+        "host_path_hint": "/opt/collector/logs/ble",
+        "mode": "rw",
+        "required": false
+      }
+    ],
+    "ports": [],
+    "restart_policy": "unless-stopped",
+    "network_mode": "host",
+    "privileged": true,
+    "network_note": "BLE 수집기는 Bluetooth 하드웨어 직접 접근을 위해 host 네트워크 모드와 privileged 모드가 필요합니다"
+  },
+
+  "depends_on": ["rabbitmq"]
+}

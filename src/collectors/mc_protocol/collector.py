@@ -870,6 +870,13 @@ class McProtocolCollector(BaseCollector):
                     'bit_range': f"{read_group.start_address}-{read_group.end_address}" if word_based_bit else None,
                 }
 
+                # 동시 read 중 다른 코루틴이 disconnect한 경우(transport=None) 가드
+                # — _ensure_connection 통과 후 lock 대기 사이에 끊길 수 있음.
+                # state=ERROR로 표시하여 _reconnect_loop이 복구 책임지게 함.
+                if self._writer is None or self._writer.is_closing():
+                    self._state = ConnectionState.ERROR
+                    return None
+
                 # 전송
                 self._writer.write(request)
                 await self._writer.drain()

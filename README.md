@@ -1,4 +1,4 @@
-# Simple Collector
+# NeuroForge Collector
 
 PLC, 센서 등의 산업용 데이터를 수집하여 TimescaleDB에 저장하는 데이터 수집 프레임워크입니다.
 
@@ -48,8 +48,8 @@ PLC, 센서 등의 산업용 데이터를 수집하여 TimescaleDB에 저장하�
 
 ```bash
 # 저장소 클론
-git clone https://github.com/your-org/simple-collector.git
-cd simple-collector
+git clone https://github.com/your-org/neuroforge-collector.git
+cd neuroforge-collector
 
 # 환경 변수 설정
 cp .env.example .env

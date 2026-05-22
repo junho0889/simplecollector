@@ -16,12 +16,12 @@ DB 장애 복원력 개선 — TimescaleDB 재시작 시 publisher가 자동 복
 
 ```
 deploy/jem/
-├── neuro_publisher.tar          ← Docker 이미지 (v0.2.1, ARM64, 69MB)
+├── neuroforge_publisher.tar          ← Docker 이미지 (v0.2.1, ARM64, 69MB)
 ├── publisher_db1.yaml           ← 설정 (변경 없음, 기존과 동일)
 └── publisher_db2.yaml           ← 설정 (변경 없음, 기존과 동일)
 ```
 
-**neuro_publisher.tar만 가져가면 됩니다.**
+**neuroforge_publisher.tar만 가져가면 됩니다.**
 - publisher_db1.yaml, publisher_db2.yaml은 이전 배포와 동일 (scheduler 설정 이미 포함)
 - collector, tags CSV, custom_init.sql, docker-compose.yml 변경 없음
 
@@ -30,13 +30,13 @@ deploy/jem/
 ### 1. tar 파일 전송
 ```bash
 # USB 또는 scp
-scp deploy/jem/neuro_publisher.tar pi@192.168.0.236:/home/pi/deploy/
+scp deploy/jem/neuroforge_publisher.tar pi@192.168.0.236:/home/pi/deploy/
 ```
 
 ### 2. 이미지 로드
 ```bash
-docker load -i /home/pi/deploy/neuro_publisher.tar
-# → neuro_publisher:latest
+docker load -i /home/pi/deploy/neuroforge_publisher.tar
+# → neuroforge_publisher:latest
 ```
 
 ### 3. publisher 컨테이너 재시작
@@ -55,7 +55,7 @@ docker restart jem-publisher-db2
 ```bash
 # 버전 확인
 docker logs jem-publisher-db1 2>&1 | head -20
-# → "Collector Publisher Service v0.2.1 (build: 2026-03-10)" 확인
+# → "NeuroForge Publisher v0.2.1 (build: 2026-03-10)" 확인
 
 # 정상 동작 확인 (30초 관찰)
 docker logs -f jem-publisher-db1 2>&1 | grep -E "DB|scheduler|reconnect"
@@ -76,7 +76,7 @@ docker logs -f jem-publisher-db1 2>&1 | grep -E "DB|scheduler|reconnect"
 문제 발생 시 이전 이미지로 즉시 롤백:
 ```bash
 # 이전 tar 백업해둔 경우
-docker load -i neuro_publisher_backup.tar
+docker load -i neuroforge_publisher_backup.tar
 docker compose restart publisher-db1 publisher-db2
 ```
 

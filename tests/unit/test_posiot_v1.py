@@ -40,61 +40,61 @@ def _build_full_data(
 
 
 # ============================================================================
-# A-1. temperature (company_id → int16_le / 100.0)
+# A-1. temperature (company_id → int16_le raw, CSV에서 ÷100)
 # ============================================================================
 
 class TestTemperature:
     """A001~A010"""
 
     def test_A001_positive_temp(self, profile):
-        """정상 양수 온도 27.00"""
+        """양수: 0x0A8C = 2700 → CSV 스케일링 후 27.00 ℃"""
         result = profile.parse(0x0A8C, b'\x00' * 27)
-        assert result['temperature'] == pytest.approx(27.0, abs=0.01)
+        assert result['temperature'] == 2700
 
     def test_A002_negative_temp(self, profile):
-        """정상 음수 온도 -30.00"""
+        """음수: raw -3000 → -30.00 ℃"""
         raw = struct.unpack('<H', struct.pack('<h', -3000))[0]
         result = profile.parse(raw, b'\x00' * 27)
-        assert result['temperature'] == pytest.approx(-30.0, abs=0.01)
+        assert result['temperature'] == -3000
 
     def test_A003_zero_temp(self, profile):
         result = profile.parse(0x0000, b'\x00' * 27)
-        assert result['temperature'] == 0.0
+        assert result['temperature'] == 0
 
     def test_A004_max_int16(self, profile):
         result = profile.parse(0x7FFF, b'\x00' * 27)
-        assert result['temperature'] == pytest.approx(327.67, abs=0.01)
+        assert result['temperature'] == 32767
 
     def test_A005_min_int16(self, profile):
         result = profile.parse(0x8000, b'\x00' * 27)
-        assert result['temperature'] == pytest.approx(-327.68, abs=0.01)
+        assert result['temperature'] == -32768
 
     def test_A006_small_positive(self, profile):
         result = profile.parse(0x0001, b'\x00' * 27)
-        assert result['temperature'] == pytest.approx(0.01, abs=0.001)
+        assert result['temperature'] == 1
 
     def test_A007_small_negative(self, profile):
         result = profile.parse(0xFFFF, b'\x00' * 27)
-        assert result['temperature'] == pytest.approx(-0.01, abs=0.001)
+        assert result['temperature'] == -1
 
     def test_A008_25_5(self, profile):
         result = profile.parse(0x09F6, b'\x00' * 27)
-        assert result['temperature'] == pytest.approx(25.50, abs=0.01)
+        assert result['temperature'] == 2550
 
     def test_A009_sensor_lower(self, profile):
-        """센서 하한 -40도"""
+        """센서 하한 -40.00 ℃"""
         raw = struct.unpack('<H', struct.pack('<h', -4000))[0]
         result = profile.parse(raw, b'\x00' * 27)
-        assert result['temperature'] == pytest.approx(-40.0, abs=0.01)
+        assert result['temperature'] == -4000
 
     def test_A010_sensor_upper(self, profile):
-        """센서 상한 85도"""
+        """센서 상한 85.00 ℃"""
         result = profile.parse(0x2134, b'\x00' * 27)
-        assert result['temperature'] == pytest.approx(85.0, abs=0.01)
+        assert result['temperature'] == 8500
 
 
 # ============================================================================
-# A-2. humidity (data[0:2] → int16_le / 100.0)
+# A-2. humidity (data[0:2] → int16_le raw, CSV에서 ÷100)
 # ============================================================================
 
 class TestHumidity:
@@ -103,27 +103,27 @@ class TestHumidity:
     def test_A011_normal_50(self, profile):
         data = struct.pack('<h', 5000) + b'\x00' * 25
         result = profile.parse(0, data)
-        assert result['humidity'] == pytest.approx(50.0, abs=0.01)
+        assert result['humidity'] == 5000
 
     def test_A012_zero(self, profile):
         data = struct.pack('<h', 0) + b'\x00' * 25
         result = profile.parse(0, data)
-        assert result['humidity'] == 0.0
+        assert result['humidity'] == 0
 
     def test_A013_100_percent(self, profile):
         data = struct.pack('<h', 10000) + b'\x00' * 25
         result = profile.parse(0, data)
-        assert result['humidity'] == pytest.approx(100.0, abs=0.01)
+        assert result['humidity'] == 10000
 
     def test_A014_99_99(self, profile):
         data = struct.pack('<h', 9999) + b'\x00' * 25
         result = profile.parse(0, data)
-        assert result['humidity'] == pytest.approx(99.99, abs=0.01)
+        assert result['humidity'] == 9999
 
     def test_A015_negative(self, profile):
         data = struct.pack('<h', -1) + b'\x00' * 25
         result = profile.parse(0, data)
-        assert result['humidity'] == pytest.approx(-0.01, abs=0.001)
+        assert result['humidity'] == -1
 
     def test_A016_too_short(self, profile):
         result = profile.parse(0, b'\x88')
@@ -131,7 +131,7 @@ class TestHumidity:
 
 
 # ============================================================================
-# A-3. pressure (data[2:4] → uint16_be, 특수공식)
+# A-3. pressure (data[2:4] → uint16_be raw, CSV에서 선형 스케일링)
 # ============================================================================
 
 class TestPressure:
@@ -140,20 +140,17 @@ class TestPressure:
     def test_A017_standard(self, profile):
         data = struct.pack('<h', 0) + struct.pack('>H', 40099) + b'\x00' * 23
         result = profile.parse(0, data)
-        expected = round((40099 * 255 + 50000) / 4096.0, 2)
-        assert result['pressure'] == pytest.approx(expected, abs=0.01)
+        assert result['pressure'] == 40099
 
     def test_A018_zero(self, profile):
         data = struct.pack('<h', 0) + struct.pack('>H', 0) + b'\x00' * 23
         result = profile.parse(0, data)
-        expected = round((0 * 255 + 50000) / 4096.0, 2)
-        assert result['pressure'] == pytest.approx(expected, abs=0.01)
+        assert result['pressure'] == 0
 
     def test_A019_max(self, profile):
         data = struct.pack('<h', 0) + struct.pack('>H', 65535) + b'\x00' * 23
         result = profile.parse(0, data)
-        expected = round((65535 * 255 + 50000) / 4096.0, 2)
-        assert result['pressure'] == pytest.approx(expected, abs=0.01)
+        assert result['pressure'] == 65535
 
     def test_A021_too_short(self, profile):
         data = struct.pack('<h', 0) + b'\x00'  # 3바이트 (4 필요)
@@ -204,31 +201,31 @@ class TestFullParse:
     def test_A030_accel(self, profile):
         data = _build_full_data(ax=100, ay=200, az=300)
         result = profile.parse(0, data)
-        assert result['accel_rms_x'] == pytest.approx(1.0, abs=0.01)
-        assert result['accel_rms_y'] == pytest.approx(2.0, abs=0.01)
-        assert result['accel_rms_z'] == pytest.approx(3.0, abs=0.01)
+        assert result['accel_rms_x'] == 100
+        assert result['accel_rms_y'] == 200
+        assert result['accel_rms_z'] == 300
 
     def test_A031_accel_zero(self, profile):
         data = _build_full_data(ax=0, ay=0, az=0)
         result = profile.parse(0, data)
-        assert result['accel_rms_x'] == 0.0
-        assert result['accel_rms_y'] == 0.0
-        assert result['accel_rms_z'] == 0.0
+        assert result['accel_rms_x'] == 0
+        assert result['accel_rms_y'] == 0
+        assert result['accel_rms_z'] == 0
 
     def test_A032_accel_max(self, profile):
         data = _build_full_data(ax=65535, ay=65535, az=65535)
         result = profile.parse(0, data)
-        assert result['accel_rms_x'] == pytest.approx(655.35, abs=0.01)
+        assert result['accel_rms_x'] == 65535
 
     def test_A035_velocity(self, profile):
         data = _build_full_data(velocity=1000)
         result = profile.parse(0, data)
-        assert result['velocity_rms_under_1k'] == pytest.approx(10.0, abs=0.01)
+        assert result['velocity_rms_under_1k'] == 1000
 
     def test_A038_accel_1k5k(self, profile):
         data = _build_full_data(accel_1k5k=1000)
         result = profile.parse(0, data)
-        assert result['accel_rms_1k_5k'] == pytest.approx(10.0, abs=0.01)
+        assert result['accel_rms_1k_5k'] == 1000
 
     def test_A040_vibration_peak(self, profile):
         data = _build_full_data(vib_peak=500)
@@ -255,17 +252,17 @@ class TestFullParse:
     def test_A048_prob_temp_positive(self, profile):
         data = _build_full_data(prob_temp=2500)
         result = profile.parse(0, data)
-        assert result['prob_temp'] == pytest.approx(25.0, abs=0.01)
+        assert result['prob_temp'] == 2500
 
     def test_A049_prob_temp_negative(self, profile):
         data = _build_full_data(prob_temp=-1000)
         result = profile.parse(0, data)
-        assert result['prob_temp'] == pytest.approx(-10.0, abs=0.01)
+        assert result['prob_temp'] == -1000
 
     def test_A050_prob_temp_zero(self, profile):
         data = _build_full_data(prob_temp=0)
         result = profile.parse(0, data)
-        assert result['prob_temp'] == 0.0
+        assert result['prob_temp'] == 0
 
 
 # ============================================================================
@@ -331,7 +328,7 @@ class TestProfileMeta:
         assert len(profile.get_field_names()) == 18
 
     def test_A096_name(self, profile):
-        assert profile.name == "posiot"
+        assert profile.name == "pts-2305bp"
 
     def test_A097_fields_match(self, profile):
         data = _build_full_data()

@@ -1,0 +1,45 @@
+# ============================================================================
+# BLE Multi-Device Test — 로컬 BLE 하드웨어
+# ============================================================================
+collector:
+  ble_id: 1
+  name: "BLE_TEST"
+  description: "BLE 센서 테스트"
+  site: "TEST"
+  area: "TEST"
+  line: "TEST"
+  tags_file: "deploy/test_jem/tags_ble.csv"
+
+  protocol:
+    type: "ble"
+    extra:
+      cache_ttl: 30.0
+      duplicate_filter_s: 4.0
+
+  collection_groups:
+    - name: "ble_data"
+      interval_ms: 1000
+
+publisher:
+  rabbitmq:
+    enabled: true
+    host: "127.0.0.1"
+    port: 5672
+    virtual_host: "/"
+    username: "admin"
+    password: "admin"
+    exchange_name: "plc.data"
+    routing_key_prefix: "plc"
+    compression: "zlib"
+    encryption_enabled: false
+  publish_interval_ms: 1000
+
+buffer:
+  max_size: 5000
+  batch_size: 200
+  threshold_ratio: 0.8
+
+logging:
+  level: "DEBUG"
+  collection_level: "INFO"
+  publish_level: "INFO"

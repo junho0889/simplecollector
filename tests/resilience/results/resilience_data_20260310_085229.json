@@ -1,0 +1,14 @@
+{
+  "db_restart_short": [
+    {
+      "iteration": 1,
+      "passed": true,
+      "duration": 21.04,
+      "recovery": 5.4,
+      "produced": 264,
+      "in_db": 264,
+      "data_loss": 0,
+      "error": ""
+    }
+  ]
+}

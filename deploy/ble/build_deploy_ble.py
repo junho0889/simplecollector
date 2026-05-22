@@ -24,10 +24,10 @@ PUBLISHER_DIR = PROJECT_ROOT.parent / "collector-publisher"
 # 빌드 설정
 # ============================================================================
 PLATFORM = "linux/arm64"
-IMAGE_NAME = "neuro_collector_ble:latest"
-PUBLISHER_IMAGE = "neuro_publisher:latest"
-OUTPUT_TAR = SCRIPT_DIR / "neuro_collector_ble.tar"
-PUBLISHER_TAR = SCRIPT_DIR / "neuro_publisher.tar"
+IMAGE_NAME = "neuroforge_collector_ble:latest"
+PUBLISHER_IMAGE = "neuroforge_publisher:latest"
+OUTPUT_TAR = SCRIPT_DIR / "neuroforge_collector_ble.tar"
+PUBLISHER_TAR = SCRIPT_DIR / "neuroforge_publisher.tar"
 
 # ============================================================================
 # 배포 설정
@@ -134,11 +134,11 @@ def deploy_to_pi() -> bool:
     remote_cmds = []
     if OUTPUT_TAR.exists():
         remote_cmds.append(
-            f"docker load -i {PI_DEPLOY_DIR}/neuro_collector_ble.tar"
+            f"docker load -i {PI_DEPLOY_DIR}/neuroforge_collector_ble.tar"
         )
     if PUBLISHER_TAR.exists():
         remote_cmds.append(
-            f"docker load -i {PI_DEPLOY_DIR}/neuro_publisher.tar"
+            f"docker load -i {PI_DEPLOY_DIR}/neuroforge_publisher.tar"
         )
 
     if remote_cmds:

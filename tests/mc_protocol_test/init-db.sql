@@ -1,5 +1,5 @@
 -- ============================================================================
--- Simple Collector - Database Schema
+-- NeuroForge Collector - Database Schema
 -- ============================================================================
 
 -- Enable TimescaleDB extension
