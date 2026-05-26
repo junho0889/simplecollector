@@ -2,7 +2,7 @@
   "name": "neuroforge_publisher",
   "display_name": "NeuroForge Publisher",
   "description": "RabbitMQ 소비자 → Database(TimescaleDB) / MQTT 포워더 서비스",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "docker_image": "neuroforge_publisher",
   "service_type": "publisher",
   "icon": "database",

@@ -182,7 +182,7 @@ python build_deploy.py --publisher
 | 프로젝트 | 버전 | 최종 빌드 |
 |----------|------|-----------|
 | simpleCollector | 0.4.2 | 2026-05-25 |
-| collector-publisher | 0.3.2 | 2026-05-25 |
+| collector-publisher | 0.3.3 | 2026-05-25 |
 
 ### simpleCollector Changelog
 | 버전 | 날짜 | 변경 내용 |
@@ -204,6 +204,7 @@ python build_deploy.py --publisher
 ### collector-publisher Changelog
 | 버전 | 날짜 | 변경 내용 |
 |------|------|----------|
+| 0.3.3 | 2026-05-25 | feat: 메타 주도 폼(publisher 2차) — build_publisher_capabilities()에 contract_version + config_columns(22컬럼, 5그룹) 추가. publisher_group/snapshot_trigger/settings 컬럼 스키마를 Cortex 폼이 동적 렌더링 가능 |
 | 0.3.2 | 2026-05-25 | feat: catalog auto-publish — DDL에 catalog_publish_log + queue_meta 추가, 메타 시드를 DDL에서 분리(컴포넌트 publish). publish_catalog()가 publisher 메타(enum/naming/constraint/queues) 트랜잭션 UPSERT + 변경 시 INSERT. 실패 시 부팅 블로킹 |
 | 0.3.1 | 2026-05-25 | feat: Cortex 메타 연동 — DDL에 schema_meta/enum_meta/table_naming/constraint_meta 추가, 부팅 시 publisher 버전+ddl_sha UPSERT. worker source_table=`{group}_integrated` 규칙을 table_naming으로 노출 |
 | 0.3.0 | 2026-05-22 | feat: config DB 로딩 경로 추가 (CONFIG_SOURCE=db) — ConfigDbReader가 부팅 시 neuroforge_config 스키마 DDL 보장, master_sync가 vw_device/vw_tag에서 *_master 투영(sync_from_reader), 그룹/정책/extensions는 vw_publisher_group+publisher_settings에서 로드. config 소스/데이터 타깃 연결 분리(CONFIG_DB_* 폴백). 기본 file 모드로 기존 동작 불변 |
