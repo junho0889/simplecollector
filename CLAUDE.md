@@ -161,6 +161,20 @@ python build_deploy.py --publisher
 
 > 설정 파일(`deploy/jem/*.yaml`, `*.csv`, `*.sql`)만 변경한 경우에는 빌드 불필요. 커밋만 수행.
 
+### 이미지 레지스트리 업로드 (NCR)
+**사용자가 빌드를 명시적으로 요청하면(예: "빌드해", "tar 만들어", "이미지 만들어"), 빌드 후 자동으로 NCR에 push한다.**
+
+- **레지스트리**: `neuroforge-max-registry.kr.ncr.ntruss.com` (네임스페이스 `edge/`)
+- **흐름**:
+  1. `python deploy/jem_ble/build_deploy.py` (또는 root `build_deploy.py`)로 tar 생성
+  2. `docker load -i <tar>` 로 로컬 이미지 스토어에 로드 (3개)
+  3. `bash scripts/push-to-ncr.sh` 실행 → 자동으로 `edge/<name>:<APP_VERSION>` + `:latest` 양쪽 push
+- **태깅 컨벤션** (Cortex 확정): `edge/collector-mc`, `edge/collector-ble`, `edge/publisher` — hyphen, no `neuroforge-` prefix, semver no `v` prefix
+- **사전 인증**: `docker login neuroforge-max-registry.kr.ncr.ntruss.com` (Docker Desktop 자격증명 헬퍼에 이미 저장돼 있음 — 재로그인 불필요)
+- **semver 출처**: `src/version.py`의 `APP_VERSION` → `build_deploy.py`가 `--build-arg VERSION=…` 주입 → Dockerfile `LABEL org.opencontainers.image.version` → NCR 콘솔/Cortex 자동 감지
+- **로컬 `deploy/new_db_config/` + 원격 `192.168.0.142:.../collector_images/`** tar 사본도 같은 흐름에서 갱신 (배포 안정화될 때까지 병행)
+- **삭제 시 주의**: 원격에서 옛 tar 정리할 때 **반드시 정확한 파일명 명시**(glob 금지). 다른 팀 파일(worker/apisink/dashboard) 보존.
+
 ## Version Management
 
 ### 버전 규칙
