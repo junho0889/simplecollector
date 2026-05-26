@@ -170,11 +170,27 @@ python build_deploy.py --publisher
   - **namespace = `neuroforge/`** (단일, 통합)
   - **image = `{group}-{role}`** flat hyphen (group ∈ {edge, cortex})
   - **tag = `v<semver>` (v prefix 필수)** + `latest` 겹침
-- **우리 이미지 매핑**:
-  - `neuroforge/edge-collector-mc:v0.4.2` + `:latest`
-  - `neuroforge/edge-collector-ble:v0.4.2` + `:latest`
-  - `neuroforge/edge-publisher:v0.3.3` + `:latest`
 - **사전 인증**: `docker login neuroforge-max-registry.kr.ncr.ntruss.com` (Docker Desktop 자격증명 헬퍼에 저장됨)
+
+#### ⚠️ 버전 관리 룰 (반드시 지킬 것)
+1. **semver 태그는 immutable** — 같은 `:v<X.Y.Z>` 를 다른 binary 로 덮어쓰지 않는다.
+   `push-to-ncr.sh` 가 `docker manifest inspect` 로 미리 검사해서 중복이면 ver 태그 push **자동 skip** (`:latest` 만 갱신). 코드 변경했는데 이 GUARD 가 뜨면 **APP_VERSION 범프부터** 다시.
+2. **코드 변경 → APP_VERSION 범프 → 커밋 → 빌드 → push** 순서 엄수.
+   - `src/version.py` 의 `APP_VERSION` 변경 + `APP_BUILD_DATE` 갱신 + `CHANGELOG` 항목 추가
+   - `deploy/metadata/*.json` 의 `"version"` 도 동일하게
+   - CLAUDE.md "현재 버전" 표 + Changelog 갱신
+3. **커밋한 뒤에 빌드** — Dockerfile LABEL `org.opencontainers.image.revision` 가 `--build-arg GIT_SHA` 로 박힘. 커밋 전 빌드하면 옛 sha 라벨이 박혀 추적성 깨짐.
+4. **range bump 가이드** (semver):
+   - **patch** (z): 버그 수정, 메타/문서, 비호환 없는 내부 변경
+   - **minor** (y): 새 기능, 호환 유지하는 인터페이스 추가 (env 신규 등)
+   - **major** (x): 호환성 깨는 변경 (config 스키마/큐 contract 등)
+5. **재빌드(같은 코드)로 재push 가능** — GUARD 가 manifest digest 같으면 skip 처리하므로 무해. 코드가 진짜 안 바뀌었다면 ver 태그 변경할 필요 없음.
+6. **`:latest` 는 항상 mutable** — 매 push 마다 최신 sha 로 이동. 운영 게이트웨이는 가급적 `:v<ver>` 핀.
+
+#### 우리 이미지 현재 버전
+- `neuroforge/edge-collector-mc:v0.4.3` + `:latest`
+- `neuroforge/edge-collector-ble:v0.4.3` + `:latest`
+- `neuroforge/edge-publisher:v0.3.4` + `:latest`
 
 #### 표준 흐름 (전체 빌드 + 푸시)
 ```bash

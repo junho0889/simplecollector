@@ -51,13 +51,26 @@ for name in "${SELECTED[@]}"; do
     dst_latest="${NCR}/${NS}/${name}:latest"
 
     echo "### ${local_tag}"
-    echo "    tag → ${dst_ver}"
-    echo "    tag → ${dst_latest}"
-    docker tag "${local_tag}" "${dst_ver}"
-    docker tag "${local_tag}" "${dst_latest}"
 
-    echo "    push → ${dst_ver}"
-    docker push "${dst_ver}"
+    # ─── 안전장치: semver 태그는 immutable. 같은 v<ver> 덮어쓰기 금지 ───
+    # 이미 NCR 에 같은 ver 태그가 있으면 ver 푸시 skip (latest 만 갱신).
+    # 코드 변경했는데 동일 ver 면 → APP_VERSION 범프 후 다시 실행 권장.
+    if docker manifest inspect "${dst_ver}" >/dev/null 2>&1; then
+        echo "    [GUARD] ${dst_ver} 이미 NCR 에 존재 — semver 덮어쓰기 차단"
+        echo "            (의도된 재push 면 무해. 코드 변경했다면 APP_VERSION 범프 후 재실행)"
+        skip_ver=1
+    else
+        skip_ver=0
+    fi
+
+    echo "    tag → ${dst_latest}"
+    docker tag "${local_tag}" "${dst_latest}"
+    if [ "${skip_ver}" -eq 0 ]; then
+        echo "    tag → ${dst_ver}"
+        docker tag "${local_tag}" "${dst_ver}"
+        echo "    push → ${dst_ver}"
+        docker push "${dst_ver}"
+    fi
     echo "    push → ${dst_latest}"
     docker push "${dst_latest}"
 
