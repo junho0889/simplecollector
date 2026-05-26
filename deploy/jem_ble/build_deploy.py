@@ -67,9 +67,9 @@ BUILDS = {
         "desc": "MC Protocol Collector",
         "context": PROJECT_ROOT,
         "dockerfile": PROJECT_ROOT / "build" / "collector" / "Dockerfile",
-        # NCR 컨벤션: edge/collector-mc
-        "image": f"collector-mc:{COLLECTOR_VERSION}",
-        "output": SCRIPT_DIR / "collector-mc.tar",
+        # NCR 컨벤션: neuroforge/edge-collector-mc:v<ver>
+        "image": f"edge-collector-mc:{COLLECTOR_VERSION}",
+        "output": SCRIPT_DIR / "edge-collector-mc.tar",
         "build_args": {
             "PROTOCOL": "mc_protocol",
             "VERSION": COLLECTOR_VERSION,
@@ -80,8 +80,8 @@ BUILDS = {
         "desc": "BLE Collector",
         "context": PROJECT_ROOT,
         "dockerfile": PROJECT_ROOT / "deploy" / "ble" / "Dockerfile.ble",
-        "image": f"collector-ble:{COLLECTOR_VERSION}",
-        "output": SCRIPT_DIR / "collector-ble.tar",
+        "image": f"edge-collector-ble:{COLLECTOR_VERSION}",
+        "output": SCRIPT_DIR / "edge-collector-ble.tar",
         "build_args": {
             "VERSION": COLLECTOR_VERSION,
             "GIT_SHA": COLLECTOR_SHA,
@@ -91,8 +91,8 @@ BUILDS = {
         "desc": "Publisher",
         "context": PUBLISHER_DIR,
         "dockerfile": PUBLISHER_DIR / "Dockerfile",
-        "image": f"publisher:{PUBLISHER_VERSION}",
-        "output": SCRIPT_DIR / "publisher.tar",
+        "image": f"edge-publisher:{PUBLISHER_VERSION}",
+        "output": SCRIPT_DIR / "edge-publisher.tar",
         "build_args": {
             "VERSION": PUBLISHER_VERSION,
             "GIT_SHA": PUBLISHER_SHA,

@@ -63,9 +63,9 @@ BUILDS = {
     "collector": {
         "context": COLLECTOR_DIR,
         "dockerfile": COLLECTOR_DIR / "build" / "collector" / "Dockerfile",
-        # NCR 컨벤션: edge/collector-mc — 로컬 태그도 동일 base
-        "image": f"collector-mc:{COLLECTOR_VERSION}",
-        "output": DEPLOY_DIR / "collector-mc.tar",
+        # NCR 컨벤션: neuroforge/edge-collector-mc:v<ver> — 로컬 태그 base
+        "image": f"edge-collector-mc:{COLLECTOR_VERSION}",
+        "output": DEPLOY_DIR / "edge-collector-mc.tar",
         "build_args": {
             "PROTOCOL": "mc_protocol",
             "VERSION": COLLECTOR_VERSION,
@@ -75,8 +75,8 @@ BUILDS = {
     "publisher": {
         "context": PUBLISHER_DIR,
         "dockerfile": PUBLISHER_DIR / "Dockerfile",
-        "image": f"publisher:{PUBLISHER_VERSION}",
-        "output": DEPLOY_DIR / "publisher.tar",
+        "image": f"edge-publisher:{PUBLISHER_VERSION}",
+        "output": DEPLOY_DIR / "edge-publisher.tar",
         "build_args": {
             "VERSION": PUBLISHER_VERSION,
             "GIT_SHA": PUBLISHER_SHA,

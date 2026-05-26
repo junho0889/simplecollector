@@ -164,61 +164,66 @@ python build_deploy.py --publisher
 ### 이미지 레지스트리 업로드 (NCR)
 **사용자가 빌드를 명시적으로 요청하면(예: "빌드해", "tar 만들어", "이미지 만들어"), 빌드 후 자동으로 NCR에 push한다.**
 
-#### 기본 정보
-- **레지스트리**: `neuroforge-max-registry.kr.ncr.ntruss.com` (네임스페이스 `edge/`)
-- **태깅 컨벤션** (Cortex 확정): hyphen + semver(no `v` prefix) + `:latest` 페어
-  - `edge/collector-mc:<APP_VERSION>` + `edge/collector-mc:latest`
-  - `edge/collector-ble:<APP_VERSION>` + `edge/collector-ble:latest`
-  - `edge/publisher:<APP_VERSION>` + `edge/publisher:latest`
-- **사전 인증**: `docker login neuroforge-max-registry.kr.ncr.ntruss.com` (Docker Desktop 자격증명 헬퍼에 저장돼 있어 재로그인 불필요)
+#### 기본 정보 (Cortex 최종 확정 — 2026-05-26)
+- **레지스트리**: `neuroforge-max-registry.kr.ncr.ntruss.com`
+- **경로 형식**: `<NCR>/neuroforge/{group}-{role}:v<semver>` + `:latest`
+  - **namespace = `neuroforge/`** (단일, 통합)
+  - **image = `{group}-{role}`** flat hyphen (group ∈ {edge, cortex})
+  - **tag = `v<semver>` (v prefix 필수)** + `latest` 겹침
+- **우리 이미지 매핑**:
+  - `neuroforge/edge-collector-mc:v0.4.2` + `:latest`
+  - `neuroforge/edge-collector-ble:v0.4.2` + `:latest`
+  - `neuroforge/edge-publisher:v0.3.3` + `:latest`
+- **사전 인증**: `docker login neuroforge-max-registry.kr.ncr.ntruss.com` (Docker Desktop 자격증명 헬퍼에 저장됨)
 
 #### 표준 흐름 (전체 빌드 + 푸시)
 ```bash
-# 1. ARM64 tar 빌드 (3개: collector-mc, collector-ble, publisher)
+# 1. ARM64 tar 빌드 (3개)
 python deploy/jem_ble/build_deploy.py
 
 # 2. 로컬 docker 이미지 스토어에 load
-docker load -i deploy/jem_ble/collector-mc.tar
-docker load -i deploy/jem_ble/collector-ble.tar
-docker load -i deploy/jem_ble/publisher.tar
+docker load -i deploy/jem_ble/edge-collector-mc.tar
+docker load -i deploy/jem_ble/edge-collector-ble.tar
+docker load -i deploy/jem_ble/edge-publisher.tar
 
-# 3. NCR push (semver + latest 양쪽 자동)
+# 3. NCR push (v<ver> + latest 양쪽 자동)
 bash scripts/push-to-ncr.sh
 ```
 
 #### push-to-ncr.sh 사용 패턴
 ```bash
-bash scripts/push-to-ncr.sh                          # 3개 전부
-bash scripts/push-to-ncr.sh collector-mc             # 1개만
-bash scripts/push-to-ncr.sh collector-mc publisher   # 일부만
+bash scripts/push-to-ncr.sh                              # 3개 전부
+bash scripts/push-to-ncr.sh edge-collector-mc            # 1개만
+bash scripts/push-to-ncr.sh edge-collector-mc edge-publisher
 NCR=test-registry.example.com bash scripts/push-to-ncr.sh   # 레지스트리 override
-NS=staging                  bash scripts/push-to-ncr.sh     # 네임스페이스 override
+NS=neuroforge_staging         bash scripts/push-to-ncr.sh   # namespace override
 ```
 - 로컬 docker 이미지에서 `<name>:<semver>` 태그를 찾아 자동 매핑 (없으면 skip + 메시지)
+- `v` 접두사는 스크립트가 자동으로 붙임 (로컬 `0.4.2` → NCR `v0.4.2`)
 - 빌드 안 한 채 "push만"도 가능 → 이미 load된 이미지가 있으면 그대로 푸시
 
 #### 동시 갱신 (병행 기간 6/30까지)
 NCR push가 정착될 때까지 tar 사본도 같이 유지:
 ```bash
 # 로컬 깔끔본
-cp deploy/jem_ble/{collector-mc,collector-ble,publisher}.tar deploy/new_db_config/
+cp deploy/jem_ble/{edge-collector-mc,edge-collector-ble,edge-publisher}.tar deploy/new_db_config/
 
 # 원격(192.168.0.142) — 옛 파일 정리 시 정확한 파일명만 (⚠️ glob 절대 금지, 다른 팀 파일 보존)
 HOST=junho@192.168.0.142
 DIR=/home/junho/Desktop/collectorhub/collector_images
-ssh $HOST "cd $DIR && rm -f collector-mc.tar collector-ble.tar publisher.tar"
-scp deploy/new_db_config/{collector-mc,collector-ble,publisher}.tar $HOST:$DIR/
+ssh $HOST "cd $DIR && rm -f edge-collector-mc.tar edge-collector-ble.tar edge-publisher.tar"
+scp deploy/new_db_config/{edge-collector-mc,edge-collector-ble,edge-publisher}.tar $HOST:$DIR/
 ```
 
 #### 검증
 ```bash
 # 푸시 직후 레지스트리에서 태그 확인 (인증 필요)
-curl -u <user>:<pass> https://neuroforge-max-registry.kr.ncr.ntruss.com/v2/edge/collector-mc/tags/list
+curl -u <user>:<pass> https://neuroforge-max-registry.kr.ncr.ntruss.com/v2/neuroforge/edge-collector-mc/tags/list
 
 # 게이트웨이/다른 PC에서 pull
 docker login neuroforge-max-registry.kr.ncr.ntruss.com   # 1회
-docker pull neuroforge-max-registry.kr.ncr.ntruss.com/edge/collector-mc:0.4.2
-docker pull neuroforge-max-registry.kr.ncr.ntruss.com/edge/publisher:latest
+docker pull neuroforge-max-registry.kr.ncr.ntruss.com/neuroforge/edge-collector-mc:v0.4.2
+docker pull neuroforge-max-registry.kr.ncr.ntruss.com/neuroforge/edge-publisher:latest
 ```
 
 #### 메타 자동 매핑 (이미 박힘)
