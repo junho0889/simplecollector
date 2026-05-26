@@ -65,7 +65,6 @@ BUILDS = {
         "dockerfile": COLLECTOR_DIR / "build" / "collector" / "Dockerfile",
         # NCR 컨벤션: neuroforge/edge-collector-mc:v<ver> — 로컬 태그 base
         "image": f"edge-collector-mc:{COLLECTOR_VERSION}",
-        "output": DEPLOY_DIR / "edge-collector-mc.tar",
         "build_args": {
             "PROTOCOL": "mc_protocol",
             "VERSION": COLLECTOR_VERSION,
@@ -76,7 +75,6 @@ BUILDS = {
         "context": PUBLISHER_DIR,
         "dockerfile": PUBLISHER_DIR / "Dockerfile",
         "image": f"edge-publisher:{PUBLISHER_VERSION}",
-        "output": DEPLOY_DIR / "edge-publisher.tar",
         "build_args": {
             "VERSION": PUBLISHER_VERSION,
             "GIT_SHA": PUBLISHER_SHA,
@@ -105,11 +103,14 @@ def run_cmd(cmd: list[str], desc: str) -> bool:
 
 
 def build_image(name: str, cfg: dict) -> bool:
-    """Docker 이미지 빌드 + tar 내보내기."""
+    """Docker 이미지 빌드 → 로컬 daemon 직접 로드 (--load).
+
+    tar 파일 출력 안 함. NCR push 가 정착돼 tar 배포가 폐기됨 (2026-05-26).
+    이후 흐름: bash scripts/push-to-ncr.sh 가 로컬 이미지를 NCR 로 push.
+    """
     context = cfg["context"]
     dockerfile = cfg["dockerfile"]
     image = cfg["image"]
-    output = cfg["output"]
     build_args = cfg["build_args"]
 
     # 경로 검증
@@ -120,7 +121,6 @@ def build_image(name: str, cfg: dict) -> bool:
         print(f"  [ERROR] Dockerfile 없음: {dockerfile}")
         return False
 
-    # 빌드 커맨드 구성
     cmd = [
         "docker", "buildx", "build",
         "--platform", PLATFORM,
@@ -131,16 +131,13 @@ def build_image(name: str, cfg: dict) -> bool:
     for key, val in build_args.items():
         cmd.extend(["--build-arg", f"{key}={val}"])
 
-    cmd.extend([
-        "--output", f"type=docker,dest={output}",
-        str(context),
-    ])
+    # --load: 빌드 결과를 로컬 docker daemon 에 곧바로 로드 (tar 파일 생성 X)
+    cmd.extend(["--load", str(context)])
 
     success = run_cmd(cmd, f"{name} 빌드 ({PLATFORM})")
 
-    if success and output.exists():
-        size_mb = output.stat().st_size / (1024 * 1024)
-        print(f"  -> {output.name} ({size_mb:.1f} MB)")
+    if success:
+        print(f"  -> 로컬 이미지 등록: {image}")
 
     return success
 
@@ -159,9 +156,6 @@ def main():
     if build_all or args.publisher:
         targets.append("publisher")
 
-    # deploy 디렉토리 확인
-    DEPLOY_DIR.mkdir(parents=True, exist_ok=True)
-
     print(f"JEM 배포 빌드 시작 (platform: {PLATFORM})")
     print(f"대상: {', '.join(targets)}")
 
@@ -179,15 +173,13 @@ def main():
     print(f"{'='*60}")
     for name, success in results.items():
         status = "OK" if success else "FAIL"
-        output = BUILDS[name]["output"]
-        if success and output.exists():
-            size_mb = output.stat().st_size / (1024 * 1024)
-            print(f"  [{status}] {name:12s} -> {output.name} ({size_mb:.1f} MB)")
+        if success:
+            print(f"  [{status}] {name:12s} -> {BUILDS[name]['image']} (local daemon)")
         else:
             print(f"  [{status}] {name:12s}")
 
     if all(results.values()):
-        print(f"\n  배포 파일 위치: {DEPLOY_DIR}")
+        print("\n  다음 단계: bash scripts/push-to-ncr.sh   (NCR 배포)")
         return 0
     else:
         return 1

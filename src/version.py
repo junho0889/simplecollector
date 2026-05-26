@@ -14,13 +14,24 @@ from typing import Dict, List, Tuple
 # Application Version
 # =============================================================================
 APP_NAME = "NeuroForge Collector"
-APP_VERSION = "0.4.3"
+APP_VERSION = "0.4.4"
 APP_BUILD_DATE = "2026-05-26"
 
 # =============================================================================
 # Changelog
 # =============================================================================
 CHANGELOG: List[Dict[str, str]] = [
+    {
+        "version": "0.4.4",
+        "date": "2026-05-26",
+        "changes": (
+            "chore: tar 출력 제거, NCR 단독 배포로 전환 — build_deploy.py 가 "
+            "'--output type=docker,dest=<tar>' 대신 '--load' 를 사용해 로컬 docker daemon "
+            "에 직접 이미지 로드. deploy/jem 등에 tar 파일 더 이상 생성하지 않음. "
+            "이후 흐름: build_deploy.py → bash scripts/push-to-ncr.sh (NCR 푸시). "
+            "런타임 변경 없음, 빌드 파이프라인 단순화 + 디스크 사용 감소."
+        ),
+    },
     {
         "version": "0.4.3",
         "date": "2026-05-26",

@@ -69,7 +69,6 @@ BUILDS = {
         "dockerfile": PROJECT_ROOT / "build" / "collector" / "Dockerfile",
         # NCR 컨벤션: neuroforge/edge-collector-mc:v<ver>
         "image": f"edge-collector-mc:{COLLECTOR_VERSION}",
-        "output": SCRIPT_DIR / "edge-collector-mc.tar",
         "build_args": {
             "PROTOCOL": "mc_protocol",
             "VERSION": COLLECTOR_VERSION,
@@ -81,7 +80,6 @@ BUILDS = {
         "context": PROJECT_ROOT,
         "dockerfile": PROJECT_ROOT / "deploy" / "ble" / "Dockerfile.ble",
         "image": f"edge-collector-ble:{COLLECTOR_VERSION}",
-        "output": SCRIPT_DIR / "edge-collector-ble.tar",
         "build_args": {
             "VERSION": COLLECTOR_VERSION,
             "GIT_SHA": COLLECTOR_SHA,
@@ -92,7 +90,6 @@ BUILDS = {
         "context": PUBLISHER_DIR,
         "dockerfile": PUBLISHER_DIR / "Dockerfile",
         "image": f"edge-publisher:{PUBLISHER_VERSION}",
-        "output": SCRIPT_DIR / "edge-publisher.tar",
         "build_args": {
             "VERSION": PUBLISHER_VERSION,
             "GIT_SHA": PUBLISHER_SHA,
@@ -138,7 +135,11 @@ def run_cmd(cmd: list[str], desc: str, check: bool = True) -> bool:
 
 
 def build_image(name: str, cfg: dict) -> bool:
-    """Docker 이미지 빌드 + tar 내보내기."""
+    """Docker 이미지 빌드 → 로컬 daemon 직접 로드 (--load).
+
+    tar 파일 출력 안 함 (2026-05-26 NCR 단독 배포로 전환). 빌드 후
+    scripts/push-to-ncr.sh 가 로컬 이미지를 NCR 로 push.
+    """
     context = cfg["context"]
     dockerfile = cfg["dockerfile"]
 
@@ -157,15 +158,11 @@ def build_image(name: str, cfg: dict) -> bool:
     ]
     for key, val in cfg["build_args"].items():
         cmd.extend(["--build-arg", f"{key}={val}"])
-    cmd.extend([
-        "--output", f"type=docker,dest={cfg['output']}",
-        str(context),
-    ])
+    cmd.extend(["--load", str(context)])
 
     success = run_cmd(cmd, f"{cfg['desc']} 빌드 ({PLATFORM})")
-    if success and cfg["output"].exists():
-        size_mb = cfg["output"].stat().st_size / (1024 * 1024)
-        print(f"  -> {cfg['output'].name} ({size_mb:.1f} MB)")
+    if success:
+        print(f"  -> 로컬 이미지 등록: {cfg['image']}")
     return success
 
 
@@ -313,10 +310,8 @@ def main():
         print(f"{'='*60}")
         for name, success in results.items():
             status = "OK" if success else "FAIL"
-            output = BUILDS[name]["output"]
-            if success and output.exists():
-                size_mb = output.stat().st_size / (1024 * 1024)
-                print(f"  [{status}] {BUILDS[name]['desc']:25s} -> {output.name} ({size_mb:.1f} MB)")
+            if success:
+                print(f"  [{status}] {BUILDS[name]['desc']:25s} -> {BUILDS[name]['image']} (local daemon)")
             else:
                 print(f"  [{status}] {BUILDS[name]['desc']}")
 
@@ -325,15 +320,14 @@ def main():
             if not args.deploy:
                 return 1
 
-    # 배포
+    # 배포 (deprecated — NCR push 권장)
     if args.deploy or args.deploy_only:
-        if not deploy_to_pi(targets, args.host, args.ssh_key):
-            return 1
-        print(f"\n  배포 완료: {args.host}:{PI_DEPLOY_DIR}")
+        print("\n  [WARN] --deploy/--deploy-only 는 tar+SSH 기반으로 deprecated.")
+        print("  운영 배포는 'bash scripts/push-to-ncr.sh' 로 NCR push 사용.")
+        return 1
 
     if not args.deploy and not args.deploy_only:
-        print(f"\n  tar 파일 위치: {SCRIPT_DIR}")
-        print(f"  배포하려면: python {Path(__file__).name} --deploy")
+        print("\n  다음 단계: bash scripts/push-to-ncr.sh   (NCR 배포)")
 
     return 0
 

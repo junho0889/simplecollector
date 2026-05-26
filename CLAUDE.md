@@ -207,15 +207,10 @@ python build_deploy.py --publisher
 
 #### 표준 흐름 (전체 빌드 + 푸시)
 ```bash
-# 1. ARM64 tar 빌드 (3개)
+# 1. ARM64 빌드 — 로컬 docker daemon 에 직접 load (tar 출력 안 함, 2026-05-26 변경)
 python deploy/jem_ble/build_deploy.py
 
-# 2. 로컬 docker 이미지 스토어에 load
-docker load -i deploy/jem_ble/edge-collector-mc.tar
-docker load -i deploy/jem_ble/edge-collector-ble.tar
-docker load -i deploy/jem_ble/edge-publisher.tar
-
-# 3. NCR push (v<ver> + latest 양쪽 자동)
+# 2. NCR push (v<ver> + latest 양쪽 자동, GUARD: 같은 ver 중복 차단)
 bash scripts/push-to-ncr.sh
 ```
 
@@ -231,18 +226,12 @@ NS=neuroforge_staging         bash scripts/push-to-ncr.sh   # namespace override
 - `v` 접두사는 스크립트가 자동으로 붙임 (로컬 `0.4.2` → NCR `v0.4.2`)
 - 빌드 안 한 채 "push만"도 가능 → 이미 load된 이미지가 있으면 그대로 푸시
 
-#### 동시 갱신 (병행 기간 6/30까지)
-NCR push가 정착될 때까지 tar 사본도 같이 유지:
-```bash
-# 로컬 깔끔본
-cp deploy/jem_ble/{edge-collector-mc,edge-collector-ble,edge-publisher}.tar deploy/new_db_config/
+#### tar 사본 — 더 이상 생성하지 않음 (deprecated 2026-05-26)
+build_deploy.py 가 `--load` 로 로컬 daemon 에 직접 로드만 함. 더 이상:
+- `deploy/jem/` `deploy/jem_ble/` `deploy/new_db_config/` 에 tar 안 생김
+- `192.168.0.142:/.../collector_images/` 에 SCP 안 함
 
-# 원격(192.168.0.142) — 옛 파일 정리 시 정확한 파일명만 (⚠️ glob 절대 금지, 다른 팀 파일 보존)
-HOST=junho@192.168.0.142
-DIR=/home/junho/Desktop/collectorhub/collector_images
-ssh $HOST "cd $DIR && rm -f edge-collector-mc.tar edge-collector-ble.tar edge-publisher.tar"
-scp deploy/new_db_config/{edge-collector-mc,edge-collector-ble,edge-publisher}.tar $HOST:$DIR/
-```
+운영 배포는 **NCR pull 단독** (게이트웨이가 `docker pull <NCR>/neuroforge/edge-*:v<ver>`). 비상시 tar 가 필요하면 임시로 `docker save -o <file>.tar <image>:<tag>` 로 수동 추출.
 
 #### 검증
 ```bash
@@ -286,12 +275,13 @@ docker pull neuroforge-max-registry.kr.ncr.ntruss.com/neuroforge/edge-publisher:
 ### 현재 버전
 | 프로젝트 | 버전 | 최종 빌드 |
 |----------|------|-----------|
-| simpleCollector | 0.4.3 | 2026-05-26 |
-| collector-publisher | 0.3.4 | 2026-05-26 |
+| simpleCollector | 0.4.4 | 2026-05-26 |
+| collector-publisher | 0.3.5 | 2026-05-26 |
 
 ### simpleCollector Changelog
 | 버전 | 날짜 | 변경 내용 |
 |------|------|----------|
+| 0.4.4 | 2026-05-26 | chore: tar 출력 제거, NCR 단독 배포 — build_deploy.py가 `--load`로 로컬 daemon 직접 로드. 이후 흐름: build_deploy.py → scripts/push-to-ncr.sh. 런타임 무변경 |
 | 0.4.3 | 2026-05-26 | feat: DB 로깅 — docker stdout=ERROR만, DEBUG/INFO/WARN/ERROR 전부 neuroforge_logs.collector_log 에 비동기 배치 INSERT(DbLogHandler). LoggingConfig 통일(stdout_min_level/db_*/subsystem_levels 신규). DSN: LOGS_DB_* → CONFIG_DB_* → DB_* 폴백 |
 | 0.4.2 | 2026-05-25 | feat: catalog auto-publish — 부팅 훅 publish_catalog()가 schema_meta + collector enum_meta(device/protocol/data_type 16종/memory 13종 등)을 트랜잭션 UPSERT + catalog_publish_log에 hash 변경/30분 경과 시에만 INSERT. 실패 시 polling 블로킹 |
 | 0.4.1 | 2026-05-25 | feat: Cortex 메타 연동 — 부팅 시 schema_meta에 collector 버전 UPSERT. config DB DDL에 enum_meta/table_naming/constraint_meta 추가(앱 enum·{group}_* 네이밍·운영 제약 노출) |
@@ -310,6 +300,7 @@ docker pull neuroforge-max-registry.kr.ncr.ntruss.com/neuroforge/edge-publisher:
 ### collector-publisher Changelog
 | 버전 | 날짜 | 변경 내용 |
 |------|------|----------|
+| 0.3.5 | 2026-05-26 | chore: build_deploy.py tar 출력 제거 알림 — 운영 흐름: build → push-to-ncr.sh → NCR. GIT_SHA 라벨 갱신 위해 patch 범프 |
 | 0.3.4 | 2026-05-26 | feat: DB 로깅 + LoggingConfig 통일 — publisher LoggingConfig 를 collector 와 동일 구조로 확장(19+α 필드). DbLogHandler 가 neuroforge_logs.publisher_log 에 비동기 배치 INSERT. apply_logs_schema() 부팅 시 logs 스키마/hypertable/정책 IF NOT EXISTS 적용 |
 | 0.3.3 | 2026-05-25 | feat: 메타 주도 폼(publisher 2차) — build_publisher_capabilities()에 contract_version + config_columns(22컬럼, 5그룹) 추가. publisher_group/snapshot_trigger/settings 컬럼 스키마를 Cortex 폼이 동적 렌더링 가능 |
 | 0.3.2 | 2026-05-25 | feat: catalog auto-publish — DDL에 catalog_publish_log + queue_meta 추가, 메타 시드를 DDL에서 분리(컴포넌트 publish). publish_catalog()가 publisher 메타(enum/naming/constraint/queues) 트랜잭션 UPSERT + 변경 시 INSERT. 실패 시 부팅 블로킹 |
