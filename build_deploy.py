@@ -11,6 +11,7 @@ Usage:
 """
 
 import argparse
+import re
 import subprocess
 import sys
 import time
@@ -29,20 +30,57 @@ DEPLOY_DIR = SCRIPT_DIR / "deploy" / "jem"
 # ============================================================================
 PLATFORM = "linux/arm64"
 
+
+def _read_app_version(version_py: Path, default: str = "0.0.0") -> str:
+    """src/version.py 의 APP_VERSION 상수 읽기."""
+    try:
+        text = version_py.read_text(encoding="utf-8")
+        m = re.search(r'^APP_VERSION\s*=\s*"([^"]+)"', text, re.MULTILINE)
+        return m.group(1) if m else default
+    except OSError:
+        return default
+
+
+def _git_sha(repo_dir: Path, length: int = 12) -> str:
+    """현재 HEAD 의 짧은 sha (실패 시 빈 문자열)."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(repo_dir), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=5, check=False,
+        )
+        return out.stdout.strip()[:length]
+    except Exception:
+        return ""
+
+
+COLLECTOR_VERSION = _read_app_version(COLLECTOR_DIR / "src" / "version.py")
+PUBLISHER_VERSION = _read_app_version(PUBLISHER_DIR / "src" / "version.py")
+COLLECTOR_SHA = _git_sha(COLLECTOR_DIR)
+PUBLISHER_SHA = _git_sha(PUBLISHER_DIR)
+
+
 BUILDS = {
     "collector": {
         "context": COLLECTOR_DIR,
         "dockerfile": COLLECTOR_DIR / "build" / "collector" / "Dockerfile",
-        "image": "neuroforge_collector_mc:mc-latest",
-        "output": DEPLOY_DIR / "neuroforge_collector_mc.tar",
-        "build_args": {"PROTOCOL": "mc_protocol"},
+        # NCR 컨벤션: edge/collector-mc — 로컬 태그도 동일 base
+        "image": f"collector-mc:{COLLECTOR_VERSION}",
+        "output": DEPLOY_DIR / "collector-mc.tar",
+        "build_args": {
+            "PROTOCOL": "mc_protocol",
+            "VERSION": COLLECTOR_VERSION,
+            "GIT_SHA": COLLECTOR_SHA,
+        },
     },
     "publisher": {
         "context": PUBLISHER_DIR,
         "dockerfile": PUBLISHER_DIR / "Dockerfile",
-        "image": "neuroforge_publisher:latest",
-        "output": DEPLOY_DIR / "neuroforge_publisher.tar",
-        "build_args": {},
+        "image": f"publisher:{PUBLISHER_VERSION}",
+        "output": DEPLOY_DIR / "publisher.tar",
+        "build_args": {
+            "VERSION": PUBLISHER_VERSION,
+            "GIT_SHA": PUBLISHER_SHA,
+        },
     },
 }
 

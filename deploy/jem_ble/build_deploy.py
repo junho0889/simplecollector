@@ -17,6 +17,7 @@ Usage:
 """
 
 import argparse
+import re
 import subprocess
 import sys
 import time
@@ -34,30 +35,68 @@ PUBLISHER_DIR = PROJECT_ROOT.parent / "collector-publisher"
 # ============================================================================
 PLATFORM = "linux/arm64"
 
+
+def _read_app_version(version_py: Path, default: str = "0.0.0") -> str:
+    try:
+        text = version_py.read_text(encoding="utf-8")
+        m = re.search(r'^APP_VERSION\s*=\s*"([^"]+)"', text, re.MULTILINE)
+        return m.group(1) if m else default
+    except OSError:
+        return default
+
+
+def _git_sha(repo_dir: Path, length: int = 12) -> str:
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(repo_dir), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=5, check=False,
+        )
+        return out.stdout.strip()[:length]
+    except Exception:
+        return ""
+
+
+COLLECTOR_VERSION = _read_app_version(PROJECT_ROOT / "src" / "version.py")
+PUBLISHER_VERSION = _read_app_version(PUBLISHER_DIR / "src" / "version.py")
+COLLECTOR_SHA = _git_sha(PROJECT_ROOT)
+PUBLISHER_SHA = _git_sha(PUBLISHER_DIR)
+
+
 BUILDS = {
     "mc": {
         "desc": "MC Protocol Collector",
         "context": PROJECT_ROOT,
         "dockerfile": PROJECT_ROOT / "build" / "collector" / "Dockerfile",
-        "image": "neuroforge_collector_mc:mc-latest",
-        "output": SCRIPT_DIR / "neuroforge_collector_mc.tar",
-        "build_args": {"PROTOCOL": "mc_protocol"},
+        # NCR 컨벤션: edge/collector-mc
+        "image": f"collector-mc:{COLLECTOR_VERSION}",
+        "output": SCRIPT_DIR / "collector-mc.tar",
+        "build_args": {
+            "PROTOCOL": "mc_protocol",
+            "VERSION": COLLECTOR_VERSION,
+            "GIT_SHA": COLLECTOR_SHA,
+        },
     },
     "ble": {
         "desc": "BLE Collector",
         "context": PROJECT_ROOT,
         "dockerfile": PROJECT_ROOT / "deploy" / "ble" / "Dockerfile.ble",
-        "image": "neuroforge_collector_ble:latest",
-        "output": SCRIPT_DIR / "neuroforge_collector_ble.tar",
-        "build_args": {},
+        "image": f"collector-ble:{COLLECTOR_VERSION}",
+        "output": SCRIPT_DIR / "collector-ble.tar",
+        "build_args": {
+            "VERSION": COLLECTOR_VERSION,
+            "GIT_SHA": COLLECTOR_SHA,
+        },
     },
     "publisher": {
         "desc": "Publisher",
         "context": PUBLISHER_DIR,
         "dockerfile": PUBLISHER_DIR / "Dockerfile",
-        "image": "neuroforge_publisher:latest",
-        "output": SCRIPT_DIR / "neuroforge_publisher.tar",
-        "build_args": {},
+        "image": f"publisher:{PUBLISHER_VERSION}",
+        "output": SCRIPT_DIR / "publisher.tar",
+        "build_args": {
+            "VERSION": PUBLISHER_VERSION,
+            "GIT_SHA": PUBLISHER_SHA,
+        },
     },
 }
 
