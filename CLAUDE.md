@@ -179,13 +179,26 @@ python build_deploy.py --publisher
    - `src/version.py` 의 `APP_VERSION` 변경 + `APP_BUILD_DATE` 갱신 + `CHANGELOG` 항목 추가
    - `deploy/metadata/*.json` 의 `"version"` 도 동일하게
    - CLAUDE.md "현재 버전" 표 + Changelog 갱신
-3. **커밋한 뒤에 빌드** — Dockerfile LABEL `org.opencontainers.image.revision` 가 `--build-arg GIT_SHA` 로 박힘. 커밋 전 빌드하면 옛 sha 라벨이 박혀 추적성 깨짐.
-4. **range bump 가이드** (semver):
+3. **커밋 메시지 필수 규약** — NCR push 전 마지막 커밋은 **반드시 한글로 변경점 명시** (`git log` / NCR 콘솔 / Cortex UI 에서 그대로 표시):
+   - **subject (한 줄)**: `feat:`, `fix:`, `chore:` 접두어 + 한글 요약 (예: `feat: DB 로깅 (neuroforge_logs.collector_log) + LoggingConfig 통일`)
+   - **body (여러 줄)**: 무엇이 바뀌었는지 구체적으로 — 추가/수정/제거된 파일·기능·환경변수·DDL 명시
+   - **buildable change 인데 메시지가 모호하면 (`update`, `wip`, `tmp` 등) push 보류 후 메시지 보강** — Cortex / 다른 팀이 `git log` 만 보고 알 수 있어야 함
+   - 예시 (좋음):
+     ```
+     feat: catalog auto-publish 컨벤션 — publisher 부팅 훅 추가
+
+     - schema_meta + enum_meta + table_naming + queues 트랜잭션 UPSERT
+     - catalog_publish_log 에 hash 변경 또는 30분 경과 시에만 INSERT
+     - 실패 시 connect() 실패 → polling 시작 차단
+     - PUBLISHER_INSTANCE_ID env / IMAGE_TAG / GIT_SHA 자동 주입
+     ```
+4. **커밋한 뒤에 빌드** — Dockerfile LABEL `org.opencontainers.image.revision` 가 `--build-arg GIT_SHA` 로 박힘. 커밋 전 빌드하면 옛 sha 라벨이 박혀 추적성 깨짐.
+5. **range bump 가이드** (semver):
    - **patch** (z): 버그 수정, 메타/문서, 비호환 없는 내부 변경
    - **minor** (y): 새 기능, 호환 유지하는 인터페이스 추가 (env 신규 등)
    - **major** (x): 호환성 깨는 변경 (config 스키마/큐 contract 등)
-5. **재빌드(같은 코드)로 재push 가능** — GUARD 가 manifest digest 같으면 skip 처리하므로 무해. 코드가 진짜 안 바뀌었다면 ver 태그 변경할 필요 없음.
-6. **`:latest` 는 항상 mutable** — 매 push 마다 최신 sha 로 이동. 운영 게이트웨이는 가급적 `:v<ver>` 핀.
+6. **재빌드(같은 코드)로 재push 가능** — GUARD 가 manifest digest 같으면 skip 처리하므로 무해. 코드가 진짜 안 바뀌었다면 ver 태그 변경할 필요 없음.
+7. **`:latest` 는 항상 mutable** — 매 push 마다 최신 sha 로 이동. 운영 게이트웨이는 가급적 `:v<ver>` 핀.
 
 #### 우리 이미지 현재 버전
 - `neuroforge/edge-collector-mc:v0.4.3` + `:latest`
