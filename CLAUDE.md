@@ -164,16 +164,73 @@ python build_deploy.py --publisher
 ### 이미지 레지스트리 업로드 (NCR)
 **사용자가 빌드를 명시적으로 요청하면(예: "빌드해", "tar 만들어", "이미지 만들어"), 빌드 후 자동으로 NCR에 push한다.**
 
+#### 기본 정보
 - **레지스트리**: `neuroforge-max-registry.kr.ncr.ntruss.com` (네임스페이스 `edge/`)
-- **흐름**:
-  1. `python deploy/jem_ble/build_deploy.py` (또는 root `build_deploy.py`)로 tar 생성
-  2. `docker load -i <tar>` 로 로컬 이미지 스토어에 로드 (3개)
-  3. `bash scripts/push-to-ncr.sh` 실행 → 자동으로 `edge/<name>:<APP_VERSION>` + `:latest` 양쪽 push
-- **태깅 컨벤션** (Cortex 확정): `edge/collector-mc`, `edge/collector-ble`, `edge/publisher` — hyphen, no `neuroforge-` prefix, semver no `v` prefix
-- **사전 인증**: `docker login neuroforge-max-registry.kr.ncr.ntruss.com` (Docker Desktop 자격증명 헬퍼에 이미 저장돼 있음 — 재로그인 불필요)
-- **semver 출처**: `src/version.py`의 `APP_VERSION` → `build_deploy.py`가 `--build-arg VERSION=…` 주입 → Dockerfile `LABEL org.opencontainers.image.version` → NCR 콘솔/Cortex 자동 감지
-- **로컬 `deploy/new_db_config/` + 원격 `192.168.0.142:.../collector_images/`** tar 사본도 같은 흐름에서 갱신 (배포 안정화될 때까지 병행)
-- **삭제 시 주의**: 원격에서 옛 tar 정리할 때 **반드시 정확한 파일명 명시**(glob 금지). 다른 팀 파일(worker/apisink/dashboard) 보존.
+- **태깅 컨벤션** (Cortex 확정): hyphen + semver(no `v` prefix) + `:latest` 페어
+  - `edge/collector-mc:<APP_VERSION>` + `edge/collector-mc:latest`
+  - `edge/collector-ble:<APP_VERSION>` + `edge/collector-ble:latest`
+  - `edge/publisher:<APP_VERSION>` + `edge/publisher:latest`
+- **사전 인증**: `docker login neuroforge-max-registry.kr.ncr.ntruss.com` (Docker Desktop 자격증명 헬퍼에 저장돼 있어 재로그인 불필요)
+
+#### 표준 흐름 (전체 빌드 + 푸시)
+```bash
+# 1. ARM64 tar 빌드 (3개: collector-mc, collector-ble, publisher)
+python deploy/jem_ble/build_deploy.py
+
+# 2. 로컬 docker 이미지 스토어에 load
+docker load -i deploy/jem_ble/collector-mc.tar
+docker load -i deploy/jem_ble/collector-ble.tar
+docker load -i deploy/jem_ble/publisher.tar
+
+# 3. NCR push (semver + latest 양쪽 자동)
+bash scripts/push-to-ncr.sh
+```
+
+#### push-to-ncr.sh 사용 패턴
+```bash
+bash scripts/push-to-ncr.sh                          # 3개 전부
+bash scripts/push-to-ncr.sh collector-mc             # 1개만
+bash scripts/push-to-ncr.sh collector-mc publisher   # 일부만
+NCR=test-registry.example.com bash scripts/push-to-ncr.sh   # 레지스트리 override
+NS=staging                  bash scripts/push-to-ncr.sh     # 네임스페이스 override
+```
+- 로컬 docker 이미지에서 `<name>:<semver>` 태그를 찾아 자동 매핑 (없으면 skip + 메시지)
+- 빌드 안 한 채 "push만"도 가능 → 이미 load된 이미지가 있으면 그대로 푸시
+
+#### 동시 갱신 (병행 기간 6/30까지)
+NCR push가 정착될 때까지 tar 사본도 같이 유지:
+```bash
+# 로컬 깔끔본
+cp deploy/jem_ble/{collector-mc,collector-ble,publisher}.tar deploy/new_db_config/
+
+# 원격(192.168.0.142) — 옛 파일 정리 시 정확한 파일명만 (⚠️ glob 절대 금지, 다른 팀 파일 보존)
+HOST=junho@192.168.0.142
+DIR=/home/junho/Desktop/collectorhub/collector_images
+ssh $HOST "cd $DIR && rm -f collector-mc.tar collector-ble.tar publisher.tar"
+scp deploy/new_db_config/{collector-mc,collector-ble,publisher}.tar $HOST:$DIR/
+```
+
+#### 검증
+```bash
+# 푸시 직후 레지스트리에서 태그 확인 (인증 필요)
+curl -u <user>:<pass> https://neuroforge-max-registry.kr.ncr.ntruss.com/v2/edge/collector-mc/tags/list
+
+# 게이트웨이/다른 PC에서 pull
+docker login neuroforge-max-registry.kr.ncr.ntruss.com   # 1회
+docker pull neuroforge-max-registry.kr.ncr.ntruss.com/edge/collector-mc:0.4.2
+docker pull neuroforge-max-registry.kr.ncr.ntruss.com/edge/publisher:latest
+```
+
+#### 메타 자동 매핑 (이미 박힘)
+- `src/version.py` 의 `APP_VERSION` → `build_deploy.py` 가 `--build-arg VERSION=...` 주입
+- → Dockerfile `LABEL org.opencontainers.image.version` 박힘
+- → push-to-ncr.sh 가 로컬 태그(`<name>:0.4.2`)에서 버전 파싱 → NCR `<name>:0.4.2` + `:latest` 자동
+- → NCR 콘솔/Cortex 가 `org.opencontainers.image.{version,title,source,revision}` 자동 감지
+
+#### 트러블슈팅
+- `denied: access forbidden` / `unauthorized` → `docker login neuroforge-max-registry.kr.ncr.ntruss.com` 재실행
+- `manifest invalid` → 로컬 이미지 미존재 — `docker load -i <tar>` 누락 확인
+- `no local image: <name>:<version>` (push-to-ncr.sh) → build_deploy.py 안 돈 상태, 또는 docker load 누락
 
 ## Version Management
 
