@@ -664,9 +664,10 @@ def setup_logging(config: LoggingConfig) -> None:
     root_logger.setLevel(get_log_level(config.level))
     root_logger.handlers.clear()
 
-    # 콘솔 핸들러
+    # 콘솔 핸들러 — docker logs 노이즈 차단 위해 stdout_min_level 부터만 출력
+    # (기본 ERROR; DEBUG/INFO/WARNING 은 DB 로 감)
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(VERBOSE)  # VERBOSE 레벨까지 출력 가능
+    console_handler.setLevel(get_log_level(config.stdout_min_level))
 
     if sys.stdout.isatty():
         console_formatter = ColoredFormatter(config.format)
@@ -737,6 +738,33 @@ def setup_logging(config: LoggingConfig) -> None:
             json_handler.setFormatter(SimpleJsonFormatter())
 
         root_logger.addHandler(json_handler)
+
+    # DB 핸들러 (neuroforge_logs.collector_log) — 비동기 배치 INSERT
+    if config.db_enabled:
+        try:
+            from src.utils.db_log_handler import DbLogHandler, build_logs_dsn
+            schema = os.environ.get("LOGS_DB_SCHEMA", "neuroforge_logs")
+            instance_id = (
+                os.environ.get("COLLECTOR_KEY")
+                or os.environ.get("HOSTNAME")
+                or "unknown"
+            )
+            dsn = build_logs_dsn()
+            if dsn:
+                db_handler = DbLogHandler(
+                    component_table=f"{schema}.collector_log",
+                    instance_id=instance_id,
+                    dsn=dsn,
+                    batch_size=config.db_batch_size,
+                    flush_interval_ms=config.db_flush_interval_ms,
+                    queue_max=config.db_queue_max,
+                    level=get_log_level(config.db_min_level),
+                )
+                db_handler.setFormatter(logging.Formatter(config.format))
+                root_logger.addHandler(db_handler)
+        except Exception as e:
+            # DB 로깅 실패해도 앱은 계속 — stdout fallback
+            print(f"[setup_logging] DB log handler 부착 실패: {e}", file=sys.stderr)
 
     # 하위 로거 레벨 설정
     _setup_child_loggers(config)

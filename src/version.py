@@ -14,13 +14,25 @@ from typing import Dict, List, Tuple
 # Application Version
 # =============================================================================
 APP_NAME = "NeuroForge Collector"
-APP_VERSION = "0.4.2"
-APP_BUILD_DATE = "2026-05-25"
+APP_VERSION = "0.4.3"
+APP_BUILD_DATE = "2026-05-26"
 
 # =============================================================================
 # Changelog
 # =============================================================================
 CHANGELOG: List[Dict[str, str]] = [
+    {
+        "version": "0.4.3",
+        "date": "2026-05-26",
+        "changes": (
+            "feat: DB 로깅 — docker stdout 은 ERROR 만(기본 stdout_min_level), "
+            "DEBUG/INFO/WARNING/ERROR 전부 neuroforge_logs.collector_log 에 비동기 배치 INSERT "
+            "(DbLogHandler, asyncpg). LoggingConfig 에 stdout_min_level / db_enabled / "
+            "db_min_level / db_batch_size / db_flush_interval_ms / db_queue_max / "
+            "subsystem_levels 신규. DSN 우선순위 LOGS_DB_* → CONFIG_DB_* → DB_* 폴백. "
+            "DB 다운 시 큐 누적 + 회복 자동 재개, 큐 가득 시 drop+stderr 1회 경고."
+        ),
+    },
     {
         "version": "0.4.2",
         "date": "2026-05-25",
@@ -149,7 +161,7 @@ MODULE_VERSIONS: Dict[str, str] = {
     "publishers": "0.3.0",     # 데이터 발행기 (지수 백오프)
     "pipeline": "0.2.0",       # 파이프라인 관리
     "services": "0.2.0",       # 부가 서비스 (Status API 등)
-    "utils": "0.2.1",          # 유틸리티 (VERBOSE 로그 레벨 추가)
+    "utils": "0.3.0",          # DbLogHandler 추가 (neuroforge_logs.collector_log 비동기 배치 INSERT)
 }
 
 # =============================================================================

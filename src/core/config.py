@@ -111,6 +111,21 @@ class LoggingConfig:
     include_traceback: bool = True
     include_context: bool = True
 
+    # ===== docker stdout 필터 (노이즈 차단) =====
+    stdout_min_level: str = "ERROR"
+
+    # ===== DB 로깅 (neuroforge_logs.collector_log) =====
+    # DbLogHandler — asyncpg 배치 INSERT, 실패 시 stdout fallback
+    db_enabled: bool = True
+    db_min_level: str = "INFO"
+    db_batch_size: int = 100
+    db_flush_interval_ms: int = 2000
+    db_queue_max: int = 10_000
+
+    # ===== 서브시스템 levels (자유 키 dict) =====
+    # collector 예: {"collection": "INFO", "publish": "INFO", "loss": "WARNING"}
+    subsystem_levels: Dict[str, str] = field(default_factory=dict)
+
 
 @dataclass
 class BufferConfig:
@@ -798,6 +813,14 @@ class ConfigLoader:
             error_detail_enabled=logging_dict.get('error_detail_enabled', True),
             include_traceback=logging_dict.get('include_traceback', True),
             include_context=logging_dict.get('include_context', True),
+            # stdout 필터 + DB 로깅 + 서브시스템 levels
+            stdout_min_level=logging_dict.get('stdout_min_level', 'ERROR'),
+            db_enabled=logging_dict.get('db_enabled', True),
+            db_min_level=logging_dict.get('db_min_level', 'INFO'),
+            db_batch_size=int(logging_dict.get('db_batch_size', 100)),
+            db_flush_interval_ms=int(logging_dict.get('db_flush_interval_ms', 2000)),
+            db_queue_max=int(logging_dict.get('db_queue_max', 10000)),
+            subsystem_levels=dict(logging_dict.get('subsystem_levels', {})),
         )
 
         return AppConfig(
