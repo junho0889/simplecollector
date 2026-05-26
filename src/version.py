@@ -14,13 +14,33 @@ from typing import Dict, List, Tuple
 # Application Version
 # =============================================================================
 APP_NAME = "NeuroForge Collector"
-APP_VERSION = "0.4.0"
-APP_BUILD_DATE = "2026-05-22"
+APP_VERSION = "0.4.2"
+APP_BUILD_DATE = "2026-05-25"
 
 # =============================================================================
 # Changelog
 # =============================================================================
 CHANGELOG: List[Dict[str, str]] = [
+    {
+        "version": "0.4.2",
+        "date": "2026-05-25",
+        "changes": (
+            "feat: catalog auto-publish 컨벤션 — 부팅 훅 publish_catalog()가 schema_meta + "
+            "collector enum_meta(device_type/protocol_type/data_type 16종/memory 13종 등) 트랜잭션 UPSERT + "
+            "catalog_publish_log에 변경 시에만 INSERT(hash 같고 30분 이내면 skip). "
+            "실패 시 polling 블로킹(메타 없이 도는 위험 차단) — outer 재시도 루프로 처리. "
+            "instance_id=COLLECTOR_KEY, IMAGE_TAG/GIT_SHA env 주입 가능."
+        ),
+    },
+    {
+        "version": "0.4.1",
+        "date": "2026-05-25",
+        "changes": (
+            "feat: Cortex 메타 연동 — 부팅 시 neuroforge_config.schema_meta에 "
+            "('collector', CONFIG_SCHEMA_VERSION) UPSERT (best-effort). config DB의 "
+            "enum_meta/table_naming/constraint_meta(DDL)로 앱 enum·테이블 네이밍·운영 제약 노출."
+        ),
+    },
     {
         "version": "0.4.0",
         "date": "2026-05-22",
@@ -123,7 +143,7 @@ CHANGELOG: List[Dict[str, str]] = [
 # Module Versions
 # =============================================================================
 MODULE_VERSIONS: Dict[str, str] = {
-    "core": "0.3.0",           # config DB 로딩 (CollectorConfigDbReader + build_*_from_db)
+    "core": "0.3.1",           # config DB 로딩 + Cortex schema_meta 기록
     "collectors": "0.3.4",     # 영구 재연결 + LOSS/Reconnect 로그 throttle + writer race 가드
     "processors": "0.3.0",     # 데이터 처리기 (재연결 캐시 초기화)
     "publishers": "0.3.0",     # 데이터 발행기 (지수 백오프)

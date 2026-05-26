@@ -489,6 +489,16 @@ async def _load_config_from_db(
                 collector_row, group_rows, device_rows)
             tags = ConfigLoader.build_tags_from_db(
                 tag_rows, collector_row.get('device_type', 'plc'))
+            # publish_catalog: 부팅 훅 (블로킹 — 실패 시 outer 재시도 루프가 처리)
+            from src.core.config_db import CONFIG_SCHEMA_VERSION
+            await reader.publish_catalog(
+                component="collector",
+                instance_id=collector_key,
+                version=CONFIG_SCHEMA_VERSION,
+                capabilities=reader.build_collector_capabilities(),
+                image_tag=os.environ.get("IMAGE_TAG"),
+                git_sha=os.environ.get("GIT_SHA"),
+            )
             await reader.close()
             return config, tags
         except Exception as e:

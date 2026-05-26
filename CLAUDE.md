@@ -181,12 +181,14 @@ python build_deploy.py --publisher
 ### 현재 버전
 | 프로젝트 | 버전 | 최종 빌드 |
 |----------|------|-----------|
-| simpleCollector | 0.4.0 | 2026-05-22 |
-| collector-publisher | 0.3.0 | 2026-05-22 |
+| simpleCollector | 0.4.2 | 2026-05-25 |
+| collector-publisher | 0.3.2 | 2026-05-25 |
 
 ### simpleCollector Changelog
 | 버전 | 날짜 | 변경 내용 |
 |------|------|----------|
+| 0.4.2 | 2026-05-25 | feat: catalog auto-publish — 부팅 훅 publish_catalog()가 schema_meta + collector enum_meta(device/protocol/data_type 16종/memory 13종 등)을 트랜잭션 UPSERT + catalog_publish_log에 hash 변경/30분 경과 시에만 INSERT. 실패 시 polling 블로킹 |
+| 0.4.1 | 2026-05-25 | feat: Cortex 메타 연동 — 부팅 시 schema_meta에 collector 버전 UPSERT. config DB DDL에 enum_meta/table_naming/constraint_meta 추가(앱 enum·{group}_* 네이밍·운영 제약 노출) |
 | 0.4.0 | 2026-05-22 | feat: config DB 로딩 경로 추가 (CONFIG_SOURCE=db) — YAML/CSV 대신 neuroforge_config 스키마(vw_collector/vw_device/vw_tag)에서 AppConfig+태그 구성. DB 접속 env(CONFIG_DB_*/DB_* 폴백), collector 식별 COLLECTOR_KEY, 미접속 시 영구 재시도. 기본 file 모드로 기존 동작 불변 |
 | 0.3.6 | 2026-05-04 | fix: 운영 중 PLC 끊김 시 영구 재연결 보장 — _reconnect_loop 항상 실행, 백오프 30초 cap, 재연결 실패 ERROR throttle(60초), 복구 시 INFO. LOSS 로그 throttle(첫+30초+복구). MC Protocol writer NoneType race 가드 |
 | 0.3.5 | 2026-04-22 | fix: POSIOT BLE profile 이중 스케일링 버그 — profile이 raw int만 반환하도록 변경 (CSV scale/offset/decimals 단일 경로), pressure 특수공식도 CSV 선형 스케일로 이전 |
@@ -202,6 +204,8 @@ python build_deploy.py --publisher
 ### collector-publisher Changelog
 | 버전 | 날짜 | 변경 내용 |
 |------|------|----------|
+| 0.3.2 | 2026-05-25 | feat: catalog auto-publish — DDL에 catalog_publish_log + queue_meta 추가, 메타 시드를 DDL에서 분리(컴포넌트 publish). publish_catalog()가 publisher 메타(enum/naming/constraint/queues) 트랜잭션 UPSERT + 변경 시 INSERT. 실패 시 부팅 블로킹 |
+| 0.3.1 | 2026-05-25 | feat: Cortex 메타 연동 — DDL에 schema_meta/enum_meta/table_naming/constraint_meta 추가, 부팅 시 publisher 버전+ddl_sha UPSERT. worker source_table=`{group}_integrated` 규칙을 table_naming으로 노출 |
 | 0.3.0 | 2026-05-22 | feat: config DB 로딩 경로 추가 (CONFIG_SOURCE=db) — ConfigDbReader가 부팅 시 neuroforge_config 스키마 DDL 보장, master_sync가 vw_device/vw_tag에서 *_master 투영(sync_from_reader), 그룹/정책/extensions는 vw_publisher_group+publisher_settings에서 로드. config 소스/데이터 타깃 연결 분리(CONFIG_DB_* 폴백). 기본 file 모드로 기존 동작 불변 |
 | 0.2.3 | 2026-04-30 | fix: DB 다운 시 로그 폭주 / 즉시 재전달 루프 — QueueConsumer 연속 실패 지수 백오프(최대 10초) + 로그 throttle(30초), 'pool unavailable' 중복 ERROR 로그 제거 |
 | 0.2.2 | 2026-04-22 | {group}_integrated 압축/보관 정책 remove→add 스왑 — YAML 변경값이 재시작만으로 반영 |

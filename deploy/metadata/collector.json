@@ -2,7 +2,7 @@
   "name": "neuroforge-collector",
   "display_name": "NeuroForge Collector",
   "description": "산업용 PLC 데이터 수집기 — MC Protocol, Modbus, FEnet, S7, BLE, LoRa 지원",
-  "version": "0.4.0",
+  "version": "0.4.2",
   "docker_image": "hub_collector",
   "service_type": "collector",
   "icon": "radio-tower",
