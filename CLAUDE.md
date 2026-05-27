@@ -276,7 +276,7 @@ docker pull neuroforge-max-registry.kr.ncr.ntruss.com/neuroforge/edge-publisher:
 | 프로젝트 | 버전 | 최종 빌드 |
 |----------|------|-----------|
 | simpleCollector | 0.4.4 | 2026-05-26 |
-| collector-publisher | 0.3.5 | 2026-05-26 |
+| collector-publisher | 0.3.6 | 2026-05-27 |
 
 ### simpleCollector Changelog
 | 버전 | 날짜 | 변경 내용 |
@@ -300,6 +300,7 @@ docker pull neuroforge-max-registry.kr.ncr.ntruss.com/neuroforge/edge-publisher:
 ### collector-publisher Changelog
 | 버전 | 날짜 | 변경 내용 |
 |------|------|----------|
+| 0.3.6 | 2026-05-27 | feat: DB 부하 회복력 — (1) asyncpg `command_timeout` yaml 노출 (`database.command_timeout`, 기본 30s) (2) 그룹별 COPY를 `asyncio.gather` 병렬화 → pool_size 활용 (3) `_insert_copy_to_group` partial split-on-fail — COPY 실패 시 batch 절반으로 재귀 재시도 (4) BufferedQueueConsumer `flush_size/flush_interval/backoff_cap_sec` yaml 노출 (`rabbitmq.db_flush_*`). 정상 운영 동일, IO 사건(백필/외부 polling) 회복력 크게 향상 |
 | 0.3.5 | 2026-05-26 | chore: build_deploy.py tar 출력 제거 알림 — 운영 흐름: build → push-to-ncr.sh → NCR. GIT_SHA 라벨 갱신 위해 patch 범프 |
 | 0.3.4 | 2026-05-26 | feat: DB 로깅 + LoggingConfig 통일 — publisher LoggingConfig 를 collector 와 동일 구조로 확장(19+α 필드). DbLogHandler 가 neuroforge_logs.publisher_log 에 비동기 배치 INSERT. apply_logs_schema() 부팅 시 logs 스키마/hypertable/정책 IF NOT EXISTS 적용 |
 | 0.3.3 | 2026-05-25 | feat: 메타 주도 폼(publisher 2차) — build_publisher_capabilities()에 contract_version + config_columns(22컬럼, 5그룹) 추가. publisher_group/snapshot_trigger/settings 컬럼 스키마를 Cortex 폼이 동적 렌더링 가능 |
