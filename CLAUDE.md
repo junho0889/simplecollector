@@ -275,12 +275,13 @@ docker pull neuroforge-max-registry.kr.ncr.ntruss.com/neuroforge/edge-publisher:
 ### 현재 버전
 | 프로젝트 | 버전 | 최종 빌드 |
 |----------|------|-----------|
-| simpleCollector | 0.4.4 | 2026-05-26 |
-| collector-publisher | 0.3.6 | 2026-05-27 |
+| simpleCollector | 0.4.5 | 2026-05-27 |
+| collector-publisher | 0.3.7 | 2026-05-27 |
 
 ### simpleCollector Changelog
 | 버전 | 날짜 | 변경 내용 |
 |------|------|----------|
+| 0.4.5 | 2026-05-27 | chore: multi-arch 이미지 — `build_deploy.py`가 `linux/amd64,linux/arm64` 동시 빌드 + buildx `--push`로 NCR에 manifest list 직접 push. ARM64 전용 이미지가 ubuntu(amd64)에서 pull fail 하던 이슈 해결. BLE collector도 통합 BUILDS. 옛 흐름은 `--legacy-load`로 유지. 런타임 무변경 |
 | 0.4.4 | 2026-05-26 | chore: tar 출력 제거, NCR 단독 배포 — build_deploy.py가 `--load`로 로컬 daemon 직접 로드. 이후 흐름: build_deploy.py → scripts/push-to-ncr.sh. 런타임 무변경 |
 | 0.4.3 | 2026-05-26 | feat: DB 로깅 — docker stdout=ERROR만, DEBUG/INFO/WARN/ERROR 전부 neuroforge_logs.collector_log 에 비동기 배치 INSERT(DbLogHandler). LoggingConfig 통일(stdout_min_level/db_*/subsystem_levels 신규). DSN: LOGS_DB_* → CONFIG_DB_* → DB_* 폴백 |
 | 0.4.2 | 2026-05-25 | feat: catalog auto-publish — 부팅 훅 publish_catalog()가 schema_meta + collector enum_meta(device/protocol/data_type 16종/memory 13종 등)을 트랜잭션 UPSERT + catalog_publish_log에 hash 변경/30분 경과 시에만 INSERT. 실패 시 polling 블로킹 |
@@ -300,6 +301,7 @@ docker pull neuroforge-max-registry.kr.ncr.ntruss.com/neuroforge/edge-publisher:
 ### collector-publisher Changelog
 | 버전 | 날짜 | 변경 내용 |
 |------|------|----------|
+| 0.3.7 | 2026-05-27 | chore: multi-arch 이미지 (linux/amd64 + linux/arm64) — simpleCollector 의 build_deploy.py 가 buildx multi-platform + --push 로 NCR 에 manifest list 직접 push. v0.3.6 amd64 미지원 이슈 해결. 런타임 무변경 |
 | 0.3.6 | 2026-05-27 | feat: DB 부하 회복력 — (1) asyncpg `command_timeout` yaml 노출 (`database.command_timeout`, 기본 30s) (2) 그룹별 COPY를 `asyncio.gather` 병렬화 → pool_size 활용 (3) `_insert_copy_to_group` partial split-on-fail — COPY 실패 시 batch 절반으로 재귀 재시도 (4) BufferedQueueConsumer `flush_size/flush_interval/backoff_cap_sec` yaml 노출 (`rabbitmq.db_flush_*`). 정상 운영 동일, IO 사건(백필/외부 polling) 회복력 크게 향상 |
 | 0.3.5 | 2026-05-26 | chore: build_deploy.py tar 출력 제거 알림 — 운영 흐름: build → push-to-ncr.sh → NCR. GIT_SHA 라벨 갱신 위해 patch 범프 |
 | 0.3.4 | 2026-05-26 | feat: DB 로깅 + LoggingConfig 통일 — publisher LoggingConfig 를 collector 와 동일 구조로 확장(19+α 필드). DbLogHandler 가 neuroforge_logs.publisher_log 에 비동기 배치 INSERT. apply_logs_schema() 부팅 시 logs 스키마/hypertable/정책 IF NOT EXISTS 적용 |

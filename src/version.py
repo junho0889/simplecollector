@@ -14,13 +14,24 @@ from typing import Dict, List, Tuple
 # Application Version
 # =============================================================================
 APP_NAME = "NeuroForge Collector"
-APP_VERSION = "0.4.4"
-APP_BUILD_DATE = "2026-05-26"
+APP_VERSION = "0.4.5"
+APP_BUILD_DATE = "2026-05-27"
 
 # =============================================================================
 # Changelog
 # =============================================================================
 CHANGELOG: List[Dict[str, str]] = [
+    {
+        "version": "0.4.5",
+        "date": "2026-05-27",
+        "changes": (
+            "chore: multi-arch 이미지 (linux/amd64 + linux/arm64) — build_deploy.py "
+            "가 buildx multi-platform + --push 로 NCR 에 manifest list 직접 push. "
+            "ARM64 전용으로 빌드돼서 ubuntu(amd64) 환경에서 pull 시 fail 하던 이슈 해결. "
+            "BLE collector 도 BUILDS 에 통합. 옛 단일 arch + --load 흐름은 --legacy-load 옵션으로 유지. "
+            "런타임 코드 변경 없음. (이미지: edge-collector-mc, edge-collector-ble)"
+        ),
+    },
     {
         "version": "0.4.4",
         "date": "2026-05-26",
