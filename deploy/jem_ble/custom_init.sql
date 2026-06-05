@@ -426,10 +426,10 @@ CREATE TRIGGER trg_tb_hist_cycle_time
 --   run_start:   교대 시작 시점의 누적값 (베이스라인)
 --   shift_production = accumulated - run_start
 --
--- 태그 매칭:
---   plc_data_master.description LIKE '%생산수량%' → 생산수량 태그
---   plc_data_master.description LIKE '%NG%수량%'  → NG수량 태그
---   (PLC별로 레지스터 주소가 다르므로 description 기반 매칭 사용)
+-- 태그 매칭 (tag_id 기준 — description 무관, 언어/이름 변경에 안전):
+--   tb_prod_tag_map(plc_id → prod_tag_id, ng_tag_id) 에서 조회
+--   ng_tag_id 가 NULL 이면 그 PLC 는 NG 미추적 (shift_ng_qty=0 유지)
+--   (EFG(PLC5)는 _e 라인 tag_id 만 매핑 → _fg 자동 제외, NG 는 미매핑=0)
 --
 -- 정지시간 중복 제거:
 --   alm과 action이 동시에 활성화되면 정지시간이 이중 집계되지 않도록
@@ -621,16 +621,31 @@ $$ LANGUAGE plpgsql;
 -- 6-2. 생산수량/NG수량 추적 트리거
 -- plc_data_latest UPDATE 시 실행
 -- 동작:
---   1. 변경된 태그가 '생산수량' 또는 'NG 수량'인지 description으로 판별
+--   1. 변경된 태그가 생산/NG 태그인지 tb_prod_tag_map(tag_id)으로 판별
 --   2. 현재 교대와 current 테이블의 교대가 다르면 → 교대 전환 처리
 --      - 기존 실적을 history에 저장
 --      - current를 새 교대로 리셋 (run_start = 현재 누적값)
 --   3. accumulated 갱신, shift_production/shift_ng_qty 재계산
 --   4. 달성률/직행률 등 계산값 갱신
+
+-- 생산/NG 태그 매핑 (tag_id 기준 — description 무관)
+--   description 가 한글/영문/이름변경 되어도 안전. ng_tag_id NULL = NG 미추적(0).
+CREATE TABLE IF NOT EXISTS {schema}.tb_prod_tag_map (
+    plc_id      INT PRIMARY KEY,
+    prod_tag_id INT,
+    ng_tag_id   INT
+);
+INSERT INTO {schema}.tb_prod_tag_map (plc_id, prod_tag_id, ng_tag_id) VALUES
+    (1,232,234),(2,252,254),(3,245,247),(4,332,336),(5,103,NULL),
+    (6,64,66),(7,85,87),(8,176,178),(9,128,130),(10,126,128)
+ON CONFLICT (plc_id) DO UPDATE
+    SET prod_tag_id = EXCLUDED.prod_tag_id, ng_tag_id = EXCLUDED.ng_tag_id;
+
 CREATE OR REPLACE FUNCTION {schema}.fn_production_shift_tracker()
 RETURNS TRIGGER AS $$
 DECLARE
-    v_tag_desc   TEXT;
+    v_prod_tag   INTEGER;
+    v_ng_tag     INTEGER;
     v_is_prod    BOOLEAN := FALSE;
     v_is_ng      BOOLEAN := FALSE;
     v_cur        RECORD;
@@ -647,19 +662,20 @@ DECLARE
     v_tl_green   BOOLEAN;
     v_tl_yellow  BOOLEAN;
 BEGIN
-    -- 변경된 태그의 description 조회
-    SELECT m.description INTO v_tag_desc
-    FROM {schema}.plc_data_master m
-    WHERE m.plc_id = NEW.plc_id AND m.tag_id = NEW.tag_id;
+    -- 태그 종류 판별 (tag_id 기준 — tb_prod_tag_map 에서 조회)
+    --   description 무관: 언어/이름 변경에도 안전
+    --   ng_tag_id NULL 이면 그 PLC 는 NG 미추적 (shift_ng_qty=0 유지)
+    SELECT prod_tag_id, ng_tag_id INTO v_prod_tag, v_ng_tag
+    FROM {schema}.tb_prod_tag_map
+    WHERE plc_id = NEW.plc_id;
 
-    IF v_tag_desc IS NULL THEN
-        RETURN NEW;
+    IF NOT FOUND THEN
+        RETURN NEW;  -- 매핑 없는 PLC 는 스킵
     END IF;
 
-    -- 태그 종류 판별
-    IF v_tag_desc LIKE '%생산수량%' THEN
+    IF    NEW.tag_id = v_prod_tag THEN
         v_is_prod := TRUE;
-    ELSIF v_tag_desc LIKE '%NG%수량%' THEN
+    ELSIF v_ng_tag IS NOT NULL AND NEW.tag_id = v_ng_tag THEN
         v_is_ng := TRUE;
     ELSE
         RETURN NEW;  -- 관심 태그가 아니면 스킵
@@ -720,12 +736,9 @@ BEGIN
         SELECT
             NEW.plc_id, v_shift.shift_type, v_shift.shift_start, v_shift.shift_end,
             v_target, v_target_min,
-            -- 생산수량 태그 조회
-            (SELECT m.tag_id FROM {schema}.plc_data_master m
-             WHERE m.plc_id = NEW.plc_id AND m.description LIKE '%생산수량%' LIMIT 1),
-            -- NG수량 태그 조회 (없으면 NULL)
-            (SELECT m.tag_id FROM {schema}.plc_data_master m
-             WHERE m.plc_id = NEW.plc_id AND m.description LIKE '%NG%수량%' LIMIT 1),
+            -- 생산수량 / NG수량 태그 (tb_prod_tag_map 기준)
+            v_prod_tag,
+            v_ng_tag,
             -- 생산수량 초기값
             CASE WHEN v_is_prod THEN v_new_val ELSE 0 END,
             CASE WHEN v_is_prod THEN v_new_val ELSE 0 END,
