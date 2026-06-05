@@ -17,7 +17,7 @@ rabbitmq:
   queue_monitor: "queue.monitor"
   routing_key_pattern: "plc.*.data"
   prefetch_count: 500
-  monitor_prefetch: 10
+  monitor_prefetch: 1      # 1 = monitor 직렬 처리 → alm_latest 동시 UPSERT 없음 → 데드락 불가
   monitor_message_ttl: 30000
   monitor_max_length: 10000
   heartbeat: 60
@@ -47,7 +47,7 @@ database:
       retention_period: "3 years"
       compression_after: "1 day"
     - name: "alm"
-      mode: "latest"
+      mode: "all"
       device_type: "plc"
       retention_period: "3 years"
       compression_after: "1 day"
@@ -104,7 +104,7 @@ database:
               plc_ids: [8]
               capture_tags: [3038, 3039, 3040, 3041, 3042]
     - name: "action"
-      mode: "latest"
+      mode: "integrated"
       device_type: "plc"
       retention_period: "3 years"
       compression_after: "1 day"
