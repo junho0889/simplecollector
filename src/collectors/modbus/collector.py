@@ -317,7 +317,7 @@ class ModbusTcpTransport(ModbusTransport):
                     self._reader.readexactly(self.MBAP_HEADER_SIZE),
                     timeout=self._timeout,
                 )
-                _, _, resp_length, _ = struct.unpack('>HHHB', header)
+                resp_tid, _, resp_length, _ = struct.unpack('>HHHB', header)
 
                 # --- 나머지 데이터 수신 ---
                 remaining = resp_length - 1  # UnitID는 MBAP에 포함
@@ -325,6 +325,19 @@ class ModbusTcpTransport(ModbusTransport):
                     self._reader.readexactly(remaining),
                     timeout=self._timeout,
                 )
+
+                # --- Transaction ID 검증 ---
+                # 이전 요청의 지연 응답(stale)이 현재 요청의 응답으로 해석되면
+                # 다른 레지스터 영역의 값이 현재 태그에 기록되는 무음 오염 발생.
+                # TID 불일치 시 스트림 동기를 신뢰할 수 없으므로 소켓 폐기.
+                if resp_tid != tid:
+                    logger.error(
+                        f"Modbus TCP transaction ID mismatch: "
+                        f"expected {tid}, got {resp_tid} "
+                        f"(stale response - closing connection)"
+                    )
+                    await self._close()
+                    return None
 
                 # --- 응답 검증 ---
                 resp_fc = data[0]
@@ -352,10 +365,14 @@ class ModbusTcpTransport(ModbusTransport):
                 return register_data
 
             except asyncio.TimeoutError:
+                # 소켓을 유지하면 지연 도착 응답이 다음 요청의 응답으로
+                # 해석되므로(프레임 오정렬) 반드시 폐기 후 재수립.
                 logger.error(
                     f"Modbus TCP timeout: FC{function_code:02X} "
-                    f"addr={start_address} qty={quantity}"
+                    f"addr={start_address} qty={quantity} "
+                    f"(closing connection to prevent frame misalignment)"
                 )
+                await self._close()
                 return None
             except (ConnectionResetError, BrokenPipeError, ConnectionError) as e:
                 logger.error(f"Modbus TCP connection lost: {e}")
@@ -487,19 +504,26 @@ class ModbusRtuOverTcpTransport(ModbusTransport):
                 # --- CRC 검증 ---
                 full_frame = header + remaining
                 if not ModbusCRC.verify(full_frame):
+                    # CRC 불일치는 프레임 경계 자체가 어긋났을 수 있음 → 폐기
                     logger.error(
-                        f"Modbus RTU/TCP CRC error: FC{function_code:02X} addr={start_address}"
+                        f"Modbus RTU/TCP CRC error: FC{function_code:02X} "
+                        f"addr={start_address} (closing connection)"
                     )
+                    await self._close()
                     return None
 
                 register_data = remaining[:byte_count]
                 return register_data
 
             except asyncio.TimeoutError:
+                # RTU 프레임은 TID가 없어 stale 응답 검출이 불가능하므로
+                # 타임아웃 시 소켓 폐기가 유일한 오염 방지 수단.
                 logger.error(
                     f"Modbus RTU/TCP timeout: FC{function_code:02X} "
-                    f"addr={start_address} qty={quantity}"
+                    f"addr={start_address} qty={quantity} "
+                    f"(closing connection to prevent frame misalignment)"
                 )
+                await self._close()
                 return None
             except (ConnectionResetError, BrokenPipeError, ConnectionError) as e:
                 logger.error(f"Modbus RTU/TCP connection lost: {e}")

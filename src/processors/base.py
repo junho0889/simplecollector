@@ -227,8 +227,18 @@ class BaseProcessor(IProcessor):
         create_processed = self._create_processed_data_fast
 
         try:
-            # 프로토콜별 파싱
-            parsed_values = await self._parse_raw_data(data, tags)
+            # 실패 데이터 라우팅 (H-1): collector가 수집 실패 시
+            # metadata["failed"]=True 로 전달한다. 프로토콜별 파서는 빈 raw를
+            # 파싱할 수 없어 []를 반환하므로(→ 아무 행도 안 생김), 여기서 전
+            # 태그를 raw=None(quality_code=0) 경로로 라우팅해 통신이상이 DB에
+            # 기록되게 한다. 1곳 수정으로 전 프로토콜(MC/Modbus/BLE 등) 적용.
+            if data.metadata.get("failed"):
+                parsed_values: List[Tuple[TagDefinition, Any]] = [
+                    (tag, None) for tag in tags
+                ]
+            else:
+                # 프로토콜별 파싱
+                parsed_values = await self._parse_raw_data(data, tags)
 
             # 결과 리스트 사전 할당
             results: List[ProcessedData] = []

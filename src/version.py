@@ -14,13 +14,33 @@ from typing import Dict, List, Tuple
 # Application Version
 # =============================================================================
 APP_NAME = "NeuroForge Collector"
-APP_VERSION = "0.4.5"
-APP_BUILD_DATE = "2026-05-27"
+APP_VERSION = "0.4.6"
+APP_BUILD_DATE = "2026-06-10"
 
 # =============================================================================
 # Changelog
 # =============================================================================
 CHANGELOG: List[Dict[str, str]] = [
+    {
+        "version": "0.4.6",
+        "date": "2026-06-10",
+        "changes": (
+            "fix: QA 감사 Critical 3건 (C-1/C-2/C-3) — "
+            "(1) RabbitMQ publisher 재연결 태스크를 start()에서 상시 기동: "
+            "운영 중 브로커 단절 1회로 영구 발행 중단 + 버퍼 drop_oldest 무음 "
+            "손실되던 문제 해결 (collector v0.3.6과 동일 패턴), _do_connect 시 "
+            "이전 연결 잔존 리소스 정리. "
+            "(2) MC Protocol _receive_response 타임아웃/수신 오류 시 소켓 폐기 + "
+            "state=ERROR: 지연 도착 응답이 다음 요청의 응답으로 파싱되어 "
+            "엉뚱한 태그에 값이 기록되던 프레임 오정렬 오염 차단. "
+            "(3) Modbus TCP Transaction ID 검증(stale 응답 폐기) + "
+            "TCP/RTU-over-TCP 타임아웃 시 소켓 폐기 + RTU CRC 오류 시 폐기. "
+            "+ High 2건: (H-1) BaseProcessor.process가 metadata['failed'] 검사 → "
+            "수집 실패 시 전 태그 quality_code=0 행 생성(전 프로토콜, 통신이상과 "
+            "무수집 구분 가능). (H-2) MC _extract_bool 비트 디바이스 분기 — "
+            "비트주소 직접 조회로 word_addr 충돌(알람 오발생/미발생) 차단."
+        ),
+    },
     {
         "version": "0.4.5",
         "date": "2026-05-27",
@@ -178,9 +198,9 @@ CHANGELOG: List[Dict[str, str]] = [
 # =============================================================================
 MODULE_VERSIONS: Dict[str, str] = {
     "core": "0.3.1",           # config DB 로딩 + Cortex schema_meta 기록
-    "collectors": "0.3.4",     # 영구 재연결 + LOSS/Reconnect 로그 throttle + writer race 가드
-    "processors": "0.3.0",     # 데이터 처리기 (재연결 캐시 초기화)
-    "publishers": "0.3.0",     # 데이터 발행기 (지수 백오프)
+    "collectors": "0.3.5",     # MC/Modbus 타임아웃 시 소켓 폐기 + Modbus TID 검증
+    "processors": "0.3.1",     # 실패데이터 quality=0 라우팅 (H-1)
+    "publishers": "0.3.1",     # 재연결 태스크 상시 기동 (운영 중 단절 복구)
     "pipeline": "0.2.0",       # 파이프라인 관리
     "services": "0.2.0",       # 부가 서비스 (Status API 등)
     "utils": "0.3.0",          # DbLogHandler 추가 (neuroforge_logs.collector_log 비동기 배치 INSERT)
@@ -190,8 +210,8 @@ MODULE_VERSIONS: Dict[str, str] = {
 # Protocol Support
 # =============================================================================
 SUPPORTED_PROTOCOLS: Dict[str, str] = {
-    "mc_protocol": "0.3.3",    # writer NoneType race 가드 (동시 read 중 transport 정리)
-    "modbus": "0.2.0",         # Modbus TCP/RTU (coil/discrete/STRING 추가)
+    "mc_protocol": "0.3.5",    # 타임아웃 소켓 폐기 + _extract_bool 비트 디바이스 분기
+    "modbus": "0.2.1",         # Transaction ID 검증 + 타임아웃/CRC 오류 시 소켓 폐기
 }
 
 # =============================================================================

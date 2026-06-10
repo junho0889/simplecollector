@@ -1096,10 +1096,24 @@ class McProtocolCollector(BaseCollector):
                 return await self._receive_3e_response()
 
         except asyncio.TimeoutError:
-            logger.error(f"[{self._name}] Response timeout")
+            # 타임아웃 시 소켓을 반드시 폐기한다.
+            # 소켓을 유지하면 지연 도착한 이전 응답이 다음 요청의 응답으로
+            # 파싱되어(3E 프레임은 시퀀스 번호 없음) 엉뚱한 태그에 값이
+            # 기록되는 무음 데이터 오염이 발생한다.
+            logger.error(
+                f"[{self._name}] Response timeout - closing connection "
+                f"to prevent frame misalignment"
+            )
+            await self._close_connection()
+            self._state = ConnectionState.ERROR
             return None
         except Exception as e:
-            logger.error(f"[{self._name}] Response error: {e}")
+            # 수신/파싱 실패도 스트림 위치를 신뢰할 수 없으므로 재수립
+            logger.error(
+                f"[{self._name}] Response error: {e} - closing connection"
+            )
+            await self._close_connection()
+            self._state = ConnectionState.ERROR
             return None
 
     async def _receive_3e_response(self) -> Optional[bytes]:

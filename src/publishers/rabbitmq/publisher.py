@@ -118,6 +118,10 @@ class RabbitMQPublisher(BasePublisher):
             연결 성공 여부
         """
         try:
+            # 재연결 시 이전 연결 잔존 리소스 정리 (누수 방지)
+            if self._connection is not None:
+                await self._do_disconnect()
+
             # AMQP URL 구성
             vhost = self._rmq_config.virtual_host
             if not vhost.startswith('/'):

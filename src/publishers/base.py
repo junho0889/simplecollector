@@ -262,10 +262,14 @@ class BasePublisher(IPublisher):
         """
         await super().start()
 
-        # 연결 시도
-        if not await self.connect():
-            # 재연결 태스크 시작
-            self._reconnect_task = asyncio.create_task(self._reconnect_loop())
+        # 연결 시도 (실패해도 아래 상시 재연결 루프가 복구)
+        await self.connect()
+
+        # 재연결 태스크 상시 기동 (collector _reconnect_loop와 동일 패턴)
+        # 최초 연결 성공 후 운영 중 브로커 단절 시에도 _is_connected=False를
+        # 감지해 재연결한다. (이전: 최초 connect 실패 시에만 생성 → 운영 중
+        # 단절 1회로 영구 발행 중단 + 버퍼 drop_oldest 무음 손실)
+        self._reconnect_task = asyncio.create_task(self._reconnect_loop())
 
         # 발행 루프 시작
         self._publish_task = asyncio.create_task(self._publish_loop())

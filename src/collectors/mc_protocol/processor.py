@@ -264,7 +264,20 @@ class McProtocolProcessor(BaseProcessor):
         Returns:
             0.0 또는 1.0
         """
-        # 워드 디바이스의 특정 비트
+        # H-2: 디바이스 타입으로 분기. 수집기는 비트 디바이스(M/X/Y/L 등)를
+        # 비트주소 키로 저장하므로 곧장 비트주소 조회해야 한다.
+        # (이전: 무조건 word_addr=address//16 을 먼저 조회 → 같은 그룹에
+        #  비트주소 16 이상 태그가 있으면 다른 비트주소(address//16)의 값과
+        #  충돌해 알람 오발생/미발생)
+        from .collector import DeviceCode
+
+        if DeviceCode.is_bit_device(device):
+            raw = device_data.get(address)
+            if raw is not None:
+                return float(raw & 1)
+            return None
+
+        # 워드 디바이스(D, W 등)의 특정 비트: 워드주소 + 비트위치 해석
         word_addr = address // 16
         bit_pos = address % 16
 
@@ -272,11 +285,6 @@ class McProtocolProcessor(BaseProcessor):
         if raw is not None:
             bit_value = (raw >> bit_pos) & 1
             return float(bit_value)
-
-        # 비트 디바이스는 그대로 사용
-        raw = device_data.get(address)
-        if raw is not None:
-            return float(raw & 1)
 
         return None
 
