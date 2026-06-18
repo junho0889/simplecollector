@@ -73,7 +73,9 @@ collector:
       timeout_ms: 5000
       retry_count: 2
       retry_delay_ms: 500
-
+      mode: "on_change"
+      deadband: 0
+      
     - name: "tl_data"
       interval_ms: 100
       timeout_ms: 5000
