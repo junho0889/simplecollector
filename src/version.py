@@ -14,13 +14,26 @@ from typing import Dict, List, Tuple
 # Application Version
 # =============================================================================
 APP_NAME = "NeuroForge Collector"
-APP_VERSION = "0.4.7"
+APP_VERSION = "0.4.8"
 APP_BUILD_DATE = "2026-06-18"
 
 # =============================================================================
 # Changelog
 # =============================================================================
 CHANGELOG: List[Dict[str, str]] = [
+    {
+        "version": "0.4.8",
+        "date": "2026-06-18",
+        "changes": (
+            "feat: MQTT collector 추가 (src/collectors/mqtt/) — 브로커 구독(PUB/SUB) 수집기. "
+            "BLE 스캐너 패턴: MqttSubscriber(aiomqtt)가 토픽별 최신 payload 캐시 → BaseCollector "
+            "폴링 루프가 _do_collect로 읽음. MqttProcessor가 payload 파싱(JSON path 또는 스칼라) → "
+            "BaseProcessor가 스케일/라우팅. 태그 매핑은 tag.address='토픽#json_path'(config/CSV "
+            "무수정), 구독은 protocol.extra.subscribe_topics/base_topic. registry에 'mqtt'(aiomqtt) "
+            "등록. cache_ttl로 stale 감지, 재연결은 프레임워크 _reconnect_loop. 샘플: "
+            "config/test/collector_mqtt.yaml + tags_mqtt.csv. on_change 모드 권장."
+        ),
+    },
     {
         "version": "0.4.7",
         "date": "2026-06-18",

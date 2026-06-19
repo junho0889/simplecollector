@@ -37,6 +37,7 @@ class ProtocolRegistry:
         'ble': ('src.collectors.ble', ['bleak']),             # BLE advertisement
         'lora_rak5146': ('src.collectors.lora_rak5146', []),   # LoRa RAK5146 (SX1303 HAL)
         'lora': ('src.collectors.lora_rak5146', []),           # alias
+        'mqtt': ('src.collectors.mqtt', ['aiomqtt']),          # MQTT 브로커 구독 (PUB/SUB)
     }
 
     _cache: Dict[str, Any] = {}

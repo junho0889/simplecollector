@@ -1,0 +1,7 @@
+tag_id,tag_name,memory,address,data_type,collection_group,scale,offset,decimals,unit,string_length,word_length,format,description
+1,temp,,factory/line1/data#temperature,float32,plc_data,1,0,1,℃,,,,온도(JSON temperature)
+2,humidity,,factory/line1/data#humidity,float32,plc_data,1,0,1,%,,,,습도(JSON humidity)
+3,prod_count,,factory/line1/data#$.counters.production,uint32,plc_data,1,0,,ea,,,,생산수량(중첩 JSON)
+4,run,,factory/line1/status#running,bool,alm,1,0,,,,,,가동상태(JSON bool)
+5,line_speed,,factory/line1/speed,float32,plc_data,1,0,2,mpm,,,,라인속도(스칼라 payload 전체)
+6,alarm_code,,factory/line1/alarm#code,uint16,alm,1,0,,,,,,알람코드(JSON code)

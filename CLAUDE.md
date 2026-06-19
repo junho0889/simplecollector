@@ -275,12 +275,13 @@ docker pull neuroforge-max-registry.kr.ncr.ntruss.com/neuroforge/edge-publisher:
 ### 현재 버전
 | 프로젝트 | 버전 | 최종 빌드 |
 |----------|------|-----------|
-| simpleCollector | 0.4.7 | 2026-06-18 |
+| simpleCollector | 0.4.8 | 2026-06-18 |
 | collector-publisher | 0.3.11 | 2026-06-18 |
 
 ### simpleCollector Changelog
 | 버전 | 날짜 | 변경 내용 |
 |------|------|----------|
+| 0.4.8 | 2026-06-18 | feat: MQTT collector 추가 (`src/collectors/mqtt/`) — 브로커 구독(PUB/SUB) 수집기. BLE 스캐너 패턴: MqttSubscriber(aiomqtt)가 토픽별 최신 payload 캐시 → BaseCollector 폴링이 _do_collect로 읽고, MqttProcessor가 payload(JSON path/스칼라) 파싱 → BaseProcessor 스케일/라우팅. 태그 매핑 `tag.address="토픽#json_path"`(config/CSV 무수정), 구독은 protocol.extra.subscribe_topics/base_topic. registry에 'mqtt'(aiomqtt) 등록. cache_ttl stale 감지, 재연결은 _reconnect_loop. 샘플 config/test/collector_mqtt.yaml+tags_mqtt.csv |
 | 0.4.7 | 2026-06-18 | feat: neuroforge_config enum_meta superset 통일 (worker팀 공존, CONFIG_SCHEMA_VERSION 1.0.0→1.1.0) — build_collector_capabilities enum_meta 키 table_name→scope, column_name→field. publish_catalog가 (scope,field,value)로 UPSERT + 자기 scope만 DELETE 후 재발행(라이브 worker/forwarder 행 보존). schema_meta는 schema_version 그대로(컬럼 무변경). DDL은 publisher 소유라 collector는 publish 경로만 정렬 |
 | 0.4.6 | 2026-06-10 | fix: QA 감사(docs/QA_AUDIT_REPORT_2026-06-10.md) Critical 3건 + High 2건 — (C-1) RabbitMQ publisher 재연결 태스크를 start()에서 상시 기동: 운영 중 브로커 단절 1회로 영구 발행 중단 + 버퍼 drop_oldest 무음 손실되던 문제 해결, _do_connect 시 이전 연결 정리. (C-2) MC Protocol _receive_response 타임아웃/수신 오류 시 소켓 폐기 + state=ERROR — 지연 응답 프레임 오정렬로 엉뚱한 태그에 값 기록되던 무음 오염 차단. (C-3) Modbus TCP Transaction ID 검증(stale 응답 폐기) + TCP/RTU-over-TCP 타임아웃·RTU CRC 오류 시 소켓 폐기. (H-1) BaseProcessor가 metadata failed 검사 → 수집 실패 시 전 태그 quality_code=0 행 생성(통신이상↔무수집 구분). (H-2) MC _extract_bool 비트 디바이스 분기 — word_addr 충돌로 알람 오발생/미발생하던 문제 차단. 회귀 테스트 docs/regression_qa_*.py (36건 PASS) |
 | 0.4.5 | 2026-05-27 | chore: multi-arch 이미지 — `build_deploy.py`가 `linux/amd64,linux/arm64` 동시 빌드 + buildx `--push`로 NCR에 manifest list 직접 push. ARM64 전용 이미지가 ubuntu(amd64)에서 pull fail 하던 이슈 해결. BLE collector도 통합 BUILDS. 옛 흐름은 `--legacy-load`로 유지. 런타임 무변경 |

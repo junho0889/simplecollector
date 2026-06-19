@@ -1,0 +1,56 @@
+# ============================================================================
+# MQTT 수집기 샘플 — 브로커 구독 (PUB/SUB)
+# ============================================================================
+# 브로커는 별도로 띄워두고(예: mosquitto), 이 collector가 구독해서 수집.
+# 토픽→태그 매핑은 tags_mqtt.csv의 address 컬럼("토픽#json_path").
+
+collector:
+  plc_id: 20
+  name: "MQTT-LINE1"
+  description: "MQTT 브로커 구독 수집기"
+  site: "진영전기"
+  area: "릴레이 생산"
+  line: "JH-2HO"
+  tags_file: "config/test/tags_mqtt.csv"
+
+  protocol:
+    type: "mqtt"
+    host: "127.0.0.1"
+    port: 1883
+    extra:
+      client_id: "neuroforge-col-mqtt-20"
+      username: "${MQTT_USER:}"      # 시크릿은 env (없으면 익명)
+      password: "${MQTT_PASS:}"
+      keepalive: 60
+      qos: 1
+      tls: false
+      cache_ttl_s: 30                # 이 시간 넘게 갱신 없는 토픽은 stale(수집 제외)
+      # 구독 토픽: 명시 리스트(권장) 또는 base_topic 와일드카드
+      subscribe_topics:
+        - "factory/line1/#"
+
+  collection_groups:
+    - name: "plc_data"
+      interval_ms: 1000
+      mode: "on_change"             # MQTT는 push라 on_change가 자연스러움
+      deadband: 0
+    - name: "alm"
+      interval_ms: 1000
+      mode: "on_change"
+      deadband: 0
+
+buffer:
+  max_size: 10000
+  batch_size: 100
+
+publisher:
+  rabbitmq:
+    enabled: true
+    host: "${RABBITMQ_HOST:rabbitmq}"
+    port: 5672
+    exchange_name: "plc.data"
+    routing_key_prefix: "plc"
+    compression: "zlib"
+
+logging:
+  level: "INFO"
