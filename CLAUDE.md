@@ -276,7 +276,7 @@ docker pull neuroforge-max-registry.kr.ncr.ntruss.com/neuroforge/edge-publisher:
 | 프로젝트 | 버전 | 최종 빌드 |
 |----------|------|-----------|
 | simpleCollector | 0.4.7 | 2026-06-18 |
-| collector-publisher | 0.3.10 | 2026-06-18 |
+| collector-publisher | 0.3.11 | 2026-06-18 |
 
 ### simpleCollector Changelog
 | 버전 | 날짜 | 변경 내용 |
@@ -303,6 +303,7 @@ docker pull neuroforge-max-registry.kr.ncr.ntruss.com/neuroforge/edge-publisher:
 ### collector-publisher Changelog
 | 버전 | 날짜 | 변경 내용 |
 |------|------|----------|
+| 0.3.11 | 2026-06-18 | fix: schema_meta.version 타입 TEXT→INTEGER 정정 — worker가 INTEGER로 쓰는 계약버전을 0.3.10 superset DDL이 TEXT로 만들어 worker publish 타입에러 나던 것 해결(Cortex 252 실측). ALTER COLUMN version TYPE INTEGER USING version::integer 추가(기존 NULL 무손실). schema_version(TEXT) 무변경 |
 | 0.3.10 | 2026-06-18 | feat: neuroforge_config enum_meta/schema_meta superset 통일 (worker/forwarder 공존, CONFIG_SCHEMA_VERSION 1.0.0→1.1.0) — enum_meta table_name→scope·column_name→field (PK scope,field,value), schema_meta에 worker 컬럼(version/binary_version/built_at/booted_at/updated_at) nullable 추가 + schema_version NOT NULL 완화. DDL 멱등 마이그레이션(rename DO블록 + ADD COLUMN IF NOT EXISTS). publish_catalog는 자기 scope만 DELETE 후 재발행. collector/publisher ↔ worker/forwarder 같은 config 스키마 동시 운영 가능 |
 | 0.3.9 | 2026-06-10 | fix: QA 감사 Critical 3건 + High 1건 — (C-7) BufferedQueueConsumer deserialize 실패에 지수 백오프(최대 10초) + 로그 throttle(30초) + x-delivery-count 기준 5회 초과 시 nack(requeue=False): 포이즌 메시지 1건이 queue.db 전체를 무한 핫루프로 정지시키던 문제 해결. (C-8) connect() 풀 누수 차단 — create_pool 성공 후 후속 단계 실패 시 풀 close (5초 재시도마다 min_size개씩 누적 → Postgres max_connections 고갈 방지). (C-9) payload의 collection_group을 SQL 식별자로 쓰기 전 _safe_group_name() 검증 — 위반 레코드 skip+카운트 경고, 인젝션 표면/무음 데이터 증발 차단. (H-4) _upsert_group_latest 최종 실패 시 raise → nack 복원 — silent ack로 배치 유실/latest stale 되던 문제 해결. (M-1) compression_orderby 폴백 'source_time DESC'→'timestamp DESC' — yaml 키 생략 시 압축 정책 조용히 비활성되던 지뢰 제거 (스키마/저장 무변경) |
 | 0.3.8 | 2026-06-04 | fix: alm_latest UPSERT 데드락 — `_upsert_group_latest`가 unnest 다중행 UPSERT를 행 순서 고정 없이 날려, publisher 2개(또는 큰 pool)가 같은 `{group}_latest`를 동시 갱신 시 서로 다른 락 순서로 ShareLock 교착. unnest 배열을 `(device_id, tag_id)` 정렬해 모든 트랜잭션이 동일 순서로 락 획득 → 데드락 원천 차단. 추가로 잔여 데드락 시 victim 배치를 버리지 않고 지터 백오프로 최대 3회 재시도(DeadlockDetectedError 한정) → alm_latest stale/history 누락 방지. 동시성/pool_size 무관 안전 |
