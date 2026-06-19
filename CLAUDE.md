@@ -275,12 +275,13 @@ docker pull neuroforge-max-registry.kr.ncr.ntruss.com/neuroforge/edge-publisher:
 ### 현재 버전
 | 프로젝트 | 버전 | 최종 빌드 |
 |----------|------|-----------|
-| simpleCollector | 0.4.6 | 2026-06-10 |
-| collector-publisher | 0.3.9 | 2026-06-10 |
+| simpleCollector | 0.4.7 | 2026-06-18 |
+| collector-publisher | 0.3.10 | 2026-06-18 |
 
 ### simpleCollector Changelog
 | 버전 | 날짜 | 변경 내용 |
 |------|------|----------|
+| 0.4.7 | 2026-06-18 | feat: neuroforge_config enum_meta superset 통일 (worker팀 공존, CONFIG_SCHEMA_VERSION 1.0.0→1.1.0) — build_collector_capabilities enum_meta 키 table_name→scope, column_name→field. publish_catalog가 (scope,field,value)로 UPSERT + 자기 scope만 DELETE 후 재발행(라이브 worker/forwarder 행 보존). schema_meta는 schema_version 그대로(컬럼 무변경). DDL은 publisher 소유라 collector는 publish 경로만 정렬 |
 | 0.4.6 | 2026-06-10 | fix: QA 감사(docs/QA_AUDIT_REPORT_2026-06-10.md) Critical 3건 + High 2건 — (C-1) RabbitMQ publisher 재연결 태스크를 start()에서 상시 기동: 운영 중 브로커 단절 1회로 영구 발행 중단 + 버퍼 drop_oldest 무음 손실되던 문제 해결, _do_connect 시 이전 연결 정리. (C-2) MC Protocol _receive_response 타임아웃/수신 오류 시 소켓 폐기 + state=ERROR — 지연 응답 프레임 오정렬로 엉뚱한 태그에 값 기록되던 무음 오염 차단. (C-3) Modbus TCP Transaction ID 검증(stale 응답 폐기) + TCP/RTU-over-TCP 타임아웃·RTU CRC 오류 시 소켓 폐기. (H-1) BaseProcessor가 metadata failed 검사 → 수집 실패 시 전 태그 quality_code=0 행 생성(통신이상↔무수집 구분). (H-2) MC _extract_bool 비트 디바이스 분기 — word_addr 충돌로 알람 오발생/미발생하던 문제 차단. 회귀 테스트 docs/regression_qa_*.py (36건 PASS) |
 | 0.4.5 | 2026-05-27 | chore: multi-arch 이미지 — `build_deploy.py`가 `linux/amd64,linux/arm64` 동시 빌드 + buildx `--push`로 NCR에 manifest list 직접 push. ARM64 전용 이미지가 ubuntu(amd64)에서 pull fail 하던 이슈 해결. BLE collector도 통합 BUILDS. 옛 흐름은 `--legacy-load`로 유지. 런타임 무변경 |
 | 0.4.4 | 2026-05-26 | chore: tar 출력 제거, NCR 단독 배포 — build_deploy.py가 `--load`로 로컬 daemon 직접 로드. 이후 흐름: build_deploy.py → scripts/push-to-ncr.sh. 런타임 무변경 |
@@ -302,6 +303,7 @@ docker pull neuroforge-max-registry.kr.ncr.ntruss.com/neuroforge/edge-publisher:
 ### collector-publisher Changelog
 | 버전 | 날짜 | 변경 내용 |
 |------|------|----------|
+| 0.3.10 | 2026-06-18 | feat: neuroforge_config enum_meta/schema_meta superset 통일 (worker/forwarder 공존, CONFIG_SCHEMA_VERSION 1.0.0→1.1.0) — enum_meta table_name→scope·column_name→field (PK scope,field,value), schema_meta에 worker 컬럼(version/binary_version/built_at/booted_at/updated_at) nullable 추가 + schema_version NOT NULL 완화. DDL 멱등 마이그레이션(rename DO블록 + ADD COLUMN IF NOT EXISTS). publish_catalog는 자기 scope만 DELETE 후 재발행. collector/publisher ↔ worker/forwarder 같은 config 스키마 동시 운영 가능 |
 | 0.3.9 | 2026-06-10 | fix: QA 감사 Critical 3건 + High 1건 — (C-7) BufferedQueueConsumer deserialize 실패에 지수 백오프(최대 10초) + 로그 throttle(30초) + x-delivery-count 기준 5회 초과 시 nack(requeue=False): 포이즌 메시지 1건이 queue.db 전체를 무한 핫루프로 정지시키던 문제 해결. (C-8) connect() 풀 누수 차단 — create_pool 성공 후 후속 단계 실패 시 풀 close (5초 재시도마다 min_size개씩 누적 → Postgres max_connections 고갈 방지). (C-9) payload의 collection_group을 SQL 식별자로 쓰기 전 _safe_group_name() 검증 — 위반 레코드 skip+카운트 경고, 인젝션 표면/무음 데이터 증발 차단. (H-4) _upsert_group_latest 최종 실패 시 raise → nack 복원 — silent ack로 배치 유실/latest stale 되던 문제 해결. (M-1) compression_orderby 폴백 'source_time DESC'→'timestamp DESC' — yaml 키 생략 시 압축 정책 조용히 비활성되던 지뢰 제거 (스키마/저장 무변경) |
 | 0.3.8 | 2026-06-04 | fix: alm_latest UPSERT 데드락 — `_upsert_group_latest`가 unnest 다중행 UPSERT를 행 순서 고정 없이 날려, publisher 2개(또는 큰 pool)가 같은 `{group}_latest`를 동시 갱신 시 서로 다른 락 순서로 ShareLock 교착. unnest 배열을 `(device_id, tag_id)` 정렬해 모든 트랜잭션이 동일 순서로 락 획득 → 데드락 원천 차단. 추가로 잔여 데드락 시 victim 배치를 버리지 않고 지터 백오프로 최대 3회 재시도(DeadlockDetectedError 한정) → alm_latest stale/history 누락 방지. 동시성/pool_size 무관 안전 |
 | 0.3.7 | 2026-05-27 | chore: multi-arch 이미지 (linux/amd64 + linux/arm64) — simpleCollector 의 build_deploy.py 가 buildx multi-platform + --push 로 NCR 에 manifest list 직접 push. v0.3.6 amd64 미지원 이슈 해결. 런타임 무변경 |

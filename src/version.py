@@ -14,13 +14,25 @@ from typing import Dict, List, Tuple
 # Application Version
 # =============================================================================
 APP_NAME = "NeuroForge Collector"
-APP_VERSION = "0.4.6"
-APP_BUILD_DATE = "2026-06-10"
+APP_VERSION = "0.4.7"
+APP_BUILD_DATE = "2026-06-18"
 
 # =============================================================================
 # Changelog
 # =============================================================================
 CHANGELOG: List[Dict[str, str]] = [
+    {
+        "version": "0.4.7",
+        "date": "2026-06-18",
+        "changes": (
+            "feat: neuroforge_config enum_meta superset 통일 (worker팀 공존, "
+            "CONFIG_SCHEMA_VERSION 1.0.0→1.1.0) — build_collector_capabilities enum_meta "
+            "키 table_name→scope, column_name→field. publish_catalog가 (scope,field,value)로 "
+            "UPSERT + 자기 scope만 DELETE 후 재발행(라이브 worker 행 보존). schema_meta는 "
+            "schema_version 그대로 UPSERT(컬럼 무변경). DDL은 publisher 소유(neuroforge_config_"
+            "schema.sql)라 collector는 publish 경로만 정렬."
+        ),
+    },
     {
         "version": "0.4.6",
         "date": "2026-06-10",

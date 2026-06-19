@@ -27,7 +27,9 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIG_SCHEMA = "neuroforge_config"
 # neuroforge_config 계약 버전 — publisher 쪽과 동일 값 유지 (schema_meta에 기록)
-CONFIG_SCHEMA_VERSION = "1.0.0"
+# 1.1.0 (2026-06-18): enum_meta/schema_meta superset 통일 (worker팀 공존)
+#   enum_meta: table_name→scope, column_name→field
+CONFIG_SCHEMA_VERSION = "1.1.0"
 # catalog_publish_log 중복 INSERT 방지 간격
 PUBLISH_LOG_DEDUP_MIN = 30
 _IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -115,23 +117,23 @@ class CollectorConfigDbReader:
                 "device", "tag",
             ],
             "enum_meta": (
-                [{"table_name": "collector", "column_name": "device_type",
+                [{"scope": "collector", "field": "device_type",
                   "value": v, "label": l, "sort_order": i + 1}
                  for i, (v, l) in enumerate([("plc", "PLC"), ("ble", "BLE")])]
-                + [{"table_name": "collector_protocol", "column_name": "protocol_type",
+                + [{"scope": "collector_protocol", "field": "protocol_type",
                     "value": v, "label": l, "sort_order": i + 1}
                    for i, (v, l) in enumerate(protocol_types)]
-                + [{"table_name": "tag", "column_name": "data_type",
+                + [{"scope": "tag", "field": "data_type",
                     "value": v, "label": v.upper(), "sort_order": i + 1}
                    for i, v in enumerate(data_types)]
-                + [{"table_name": "tag", "column_name": "memory",
+                + [{"scope": "tag", "field": "memory",
                     "value": v, "label": l, "sort_order": i + 1}
                    for i, (v, l) in enumerate(memory_codes)]
-                + [{"table_name": "collector_group", "column_name": "mode",
+                + [{"scope": "collector_group", "field": "mode",
                     "value": v, "label": l, "sort_order": i + 1}
                    for i, (v, l) in enumerate([
                        ("polling", "폴링 (주기)"), ("on_change", "변경 시에만")])]
-                + [{"table_name": "collector_group", "column_name": "deadband_type",
+                + [{"scope": "collector_group", "field": "deadband_type",
                     "value": v, "label": l, "sort_order": i + 1}
                    for i, (v, l) in enumerate([
                        ("absolute", "절대값"), ("percent", "퍼센트")])]
@@ -165,16 +167,23 @@ class CollectorConfigDbReader:
                         applied_at = NOW()
                 """, component, version)
 
-                # 2. enum_meta
-                for e in capabilities.get("enum_meta", []):
+                # 2. enum_meta — 자기 scope만 DELETE 후 재발행 (worker/forwarder 행 보존,
+                #    라이브 사이트 전체 TRUNCATE 금지). superset 통일: (scope, field, value)
+                enum_rows = capabilities.get("enum_meta", [])
+                own_scopes = sorted({e["scope"] for e in enum_rows})
+                if own_scopes:
+                    await conn.execute(
+                        f"DELETE FROM {self._schema}.enum_meta WHERE scope = ANY($1::text[])",
+                        own_scopes)
+                for e in enum_rows:
                     await conn.execute(f"""
                         INSERT INTO {self._schema}.enum_meta
-                            (table_name, column_name, value, label, sort_order)
+                            (scope, field, value, label, sort_order)
                         VALUES ($1, $2, $3, $4, $5)
-                        ON CONFLICT (table_name, column_name, value) DO UPDATE SET
+                        ON CONFLICT (scope, field, value) DO UPDATE SET
                             label = EXCLUDED.label,
                             sort_order = EXCLUDED.sort_order
-                    """, e["table_name"], e["column_name"], e["value"],
+                    """, e["scope"], e["field"], e["value"],
                         e.get("label"), e.get("sort_order", 0))
 
                 # 3. catalog_publish_log (dedup by hash + 30min window)
